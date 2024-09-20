@@ -1,10 +1,12 @@
 """Binary sensor predictor integration module."""
+
 from logging import getLogger
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.typing import ConfigType, HomeAssistantType
 
 _LOGGER = getLogger(__name__)
+
 
 # pylint: disable=unused-argument
 async def async_setup(hass: HomeAssistantType, config: ConfigType) -> bool:

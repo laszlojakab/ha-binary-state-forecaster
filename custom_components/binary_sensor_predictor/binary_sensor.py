@@ -1,6 +1,7 @@
 """
 The binary sensor module for binary sensor predictor integration.
 """
+
 import logging
 from datetime import datetime, timedelta
 from typing import Final, List, Union, cast
@@ -38,6 +39,7 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
 
 # pylint: disable=too-many-instance-attributes
 class BinarySensorPredictor(BinarySensorEntity, RestoreSensor):

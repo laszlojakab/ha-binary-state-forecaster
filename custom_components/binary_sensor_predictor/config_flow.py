@@ -1,4 +1,5 @@
-""" The configuration flow for Helios Easy Controls integration. """
+"""The configuration flow for Helios Easy Controls integration."""
+
 import logging
 from typing import Any, Union
 
