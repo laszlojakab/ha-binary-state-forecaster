@@ -1,42 +1,33 @@
-""" The configuration flow for Helios Easy Controls integration. """
-import logging
-from typing import Any, Union
+"""The configuration flow for Helios Easy Controls integration."""
+
+from typing import Any
 
 import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_NAME, CONF_UNIQUE_ID
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.helpers.entity_registry import async_get
+from homeassistant.helpers.entity_registry import EntityRegistry, async_get
 
 from .const import (
     CONF_BINARY_SENSOR,
     CONF_FADING,
-    CONF_FILTER_BINARY_SENSOR,
     CONF_PERIOD,
     CONF_THRESHOLD,
     CONF_TIME_BLOCK_PERIOD,
     DOMAIN,
 )
 
-_LOGGER = logging.getLogger(__name__)
-
 
 @config_entries.HANDLERS.register(DOMAIN)
 class BinarySensorPredictorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """
-    Configuration flow handler for Binary sensor predictor integration.
-    """
+    """Configuration flow handler for Binary sensor predictor integration."""
 
     VERSION = 1
 
-    async def async_step_user(
-        self, user_input: Union[dict[str, Any], None] = None
-    ) -> FlowResult:
-        """
-        Handles the step when integration added from the UI.
-        """
-        entity_registry = await async_get(self.hass)
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        """Handle a flow initiated by the user."""
+        entity_registry: EntityRegistry = await async_get(self.hass)
 
         data_schema = vol.Schema(
             {
@@ -45,11 +36,15 @@ class BinarySensorPredictorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     sorted(
                         [
                             entity_id
-                            for entity_id in entity_registry.entities.keys()
-                            if entity_id.startswith("binary_sensor.")
-                            or entity_id.startswith("light.")
-                            or entity_id.startswith("switch.")
-                            or entity_id.startswith("input_boolean.")
+                            for entity_id in entity_registry.entities
+                            if entity_id.startswith(
+                                (
+                                    "binary_sensor.",
+                                    "light.",
+                                    "switch.",
+                                    "input_boolean.",
+                                )
+                            )
                         ]
                     )
                 ),

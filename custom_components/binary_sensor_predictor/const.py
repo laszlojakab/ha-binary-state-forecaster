@@ -1,4 +1,5 @@
 """Module of binary sensor predictor constants."""
+
 DOMAIN = "binary_sensor_predictor"
 
 CONF_BINARY_SENSOR = "binary_sensor"

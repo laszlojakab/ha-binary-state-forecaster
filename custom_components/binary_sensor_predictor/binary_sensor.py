@@ -1,9 +1,8 @@
-"""
-The binary sensor module for binary sensor predictor integration.
-"""
+"""The binary sensor module for binary sensor predictor integration."""
+
 import logging
-from datetime import datetime, timedelta
-from typing import Final, List, Union, cast
+from datetime import UTC, datetime, timedelta
+from typing import Final, cast
 
 from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.components.sensor import RestoreSensor
@@ -15,14 +14,13 @@ from homeassistant.const import (
     STATE_ON,
     STATE_UNKNOWN,
 )
-from homeassistant.core import CALLBACK_TYPE, Event, State, callback
+from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, State, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import (
     async_track_state_change_event,
     async_track_time_change,
     async_track_time_interval,
 )
-from homeassistant.helpers.typing import HomeAssistantType
 
 from .const import (
     ATTR_CURRENT_STATE,
@@ -39,14 +37,11 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-# pylint: disable=too-many-instance-attributes
-class BinarySensorPredictor(BinarySensorEntity, RestoreSensor):
-    """
-    Represents a binary sensor predictor binary sensor.
-    """
 
-    # pylint: disable=too-many-arguments
-    def __init__(
+class BinarySensorPredictor(BinarySensorEntity, RestoreSensor):
+    """Represents a binary sensor predictor binary sensor."""
+
+    def __init__(  # noqa: PLR0913
         self,
         unique_id: str,
         name: str,
@@ -56,14 +51,12 @@ class BinarySensorPredictor(BinarySensorEntity, RestoreSensor):
         fading: float,
         threshold: float,
     ):
-        """
-        Initialize a new instance of `BinarySensorPredictor` class.
-        """
+        """Initialize a new instance of `BinarySensorPredictor` class."""
         self._attr_unique_id = unique_id
         self._attr_name = name
         self._attr_state = False
-        self._unsubscribe_state_change: Union[CALLBACK_TYPE, None] = None
-        self._unsubscribe_time_change: Union[CALLBACK_TYPE, None] = None
+        self._unsubscribe_state_change: CALLBACK_TYPE | None = None
+        self._unsubscribe_time_change: CALLBACK_TYPE | None = None
         self._binary_sensor_entity_id: Final[str] = binary_sensor_entity_id
         self._fading: Final[float] = fading
         self._threshold: Final[float] = threshold
@@ -81,47 +74,57 @@ class BinarySensorPredictor(BinarySensorEntity, RestoreSensor):
 
     @property
     def probabilities(self) -> list[float]:
+        """Gets the calculated probabilities"""
         return self._attr_extra_state_attributes[ATTR_PROBABILITIES]
 
     @probabilities.setter
     def probabilities(self, value: list[float]) -> None:
+        """Sets the calculated probabilities"""
         self._attr_extra_state_attributes[ATTR_PROBABILITIES] = value
 
     @property
     def current_time_block_index(self) -> int:
+        """Gets the current time block's index."""
         return self._attr_extra_state_attributes[ATTR_CURRENT_TIME_BLOCK]
 
     @current_time_block_index.setter
     def current_time_block_index(self, value: int) -> None:
+        """Sets the current time block's index."""
         self._attr_extra_state_attributes[ATTR_CURRENT_TIME_BLOCK] = value
 
     @property
     def probability(self) -> float:
+        """Gets the current probability."""
         return self._attr_extra_state_attributes[ATTR_PROBABILITY]
 
     @probability.setter
     def probability(self, value: float) -> None:
+        """Sets the current probability."""
         self._attr_extra_state_attributes[ATTR_PROBABILITY] = value
 
     @property
     def current_time_block_state(self) -> str:
+        """Gets the current time block's state."""
         return self._attr_extra_state_attributes[ATTR_CURRENT_TIME_BLOCK_STATE]
 
     @current_time_block_state.setter
     def current_time_block_state(self, value: str) -> None:
+        """Sets the current time block's state."""
         self._attr_extra_state_attributes[ATTR_CURRENT_TIME_BLOCK_STATE] = value
 
     @property
     def current_state(self) -> str:
+        """Gets the current state of the binary sensor."""
         return self._attr_extra_state_attributes.get(ATTR_CURRENT_STATE, STATE_UNKNOWN)
 
     @current_state.setter
     def current_state(self, value: str) -> None:
+        """Sets the current state of the binary sensor."""
         self._attr_extra_state_attributes[ATTR_CURRENT_STATE] = value
 
     async def async_added_to_hass(self) -> None:
         """Executed when the sensor is added to Home Assistant."""
-        _LOGGER.debug(f"Entity `{self.entity_id}` added to hass.")
+        _LOGGER.debug("Entity `%s` added to hass.", self.entity_id)
 
         last_state = await self.async_get_last_state()
         if last_state:
@@ -129,9 +132,7 @@ class BinarySensorPredictor(BinarySensorEntity, RestoreSensor):
                 ATTR_PROBABILITIES, self._get_probabilities_attribute_default()
             )
 
-            _LOGGER.debug(
-                f"{self.entity_id} restored probabilities: {self.probabilities}"
-            )
+            _LOGGER.debug("%s restored probabilities: %s", self.entity_id, self.probabilities)
 
         self._update_probability_attribute()
         self._update_state()
@@ -156,16 +157,20 @@ class BinarySensorPredictor(BinarySensorEntity, RestoreSensor):
 
         return await super().async_will_remove_from_hass()
 
-    # pylint: disable=unused-argument,redefined-outer-name
     @callback
-    async def _time_block_changed_listener(self, datetime: datetime) -> None:
+    async def _time_block_changed_listener(
+        self,
+        datetime: datetime,  # noqa: ARG002
+    ) -> None:
         """
         Handles the case when a time block ends.
 
         Args:
-            datetime: The date time when the listener executed.
+            datetime:
+              The date time when the listener executed.
+
         """
-        _LOGGER.debug(f"Time block changed for `{self.entity_id}`, updating.")
+        _LOGGER.debug("Time block changed for `%s`, updating.", self.entity_id)
         current_time_block_index = self._get_current_time_block_index()
 
         self.current_time_block_index = current_time_block_index
@@ -173,9 +178,7 @@ class BinarySensorPredictor(BinarySensorEntity, RestoreSensor):
         if self.current_state != STATE_ON:
             self.current_time_block_state = STATE_OFF
 
-        self._update_time_block_probability(
-            current_time_block_index, self.current_state
-        )
+        self._update_time_block_probability(current_time_block_index, self.current_state)
 
         self._first_time_block_elapsed = True
 
@@ -191,10 +194,13 @@ class BinarySensorPredictor(BinarySensorEntity, RestoreSensor):
 
         Args:
             event: The state change event.
+
         """
         new_state = cast(State, event.data.get("new_state")).state
         _LOGGER.debug(
-            f"Predicted entity has changed for `{self.entity_id}` to `{new_state}`, updating."
+            "Predicted entity has changed for `%s` to `%s`, updating.",
+            self.entity_id,
+            new_state,
         )
         if (
             new_state == STATE_ON
@@ -219,8 +225,8 @@ class BinarySensorPredictor(BinarySensorEntity, RestoreSensor):
 
         self.async_schedule_update_ha_state()
 
-    def _update_time_block_probability(self, time_block: int, to_state: str):
-        _LOGGER.debug(f"Updating probability at {time_block} based on `{to_state}`.")
+    def _update_time_block_probability(self, time_block: int, to_state: str) -> None:
+        _LOGGER.debug("Updating probability at %i based on `%s`.", time_block, to_state)
         if to_state in (STATE_OFF, STATE_ON):
             self.probabilities[time_block] = round(
                 int(to_state == STATE_ON) * (1 - self._fading)
@@ -229,15 +235,15 @@ class BinarySensorPredictor(BinarySensorEntity, RestoreSensor):
             )
 
     def _schedule_update_for_next_time_block(self) -> None:
-        """
-        Schedules tracking of the next time block start.
-        """
+        """Schedules tracking of the next time block start."""
         next_time_block = self._get_next_time_block()
         _LOGGER.debug(
-            f"Scheduling interval starts at `{next_time_block}` for `{self.entity_id}`."
+            "Scheduling interval starts at `%s` for `%s`.",
+            next_time_block,
+            self.entity_id,
         )
 
-        async def schedule_interval(datetime: datetime):
+        async def schedule_interval(datetime: datetime) -> None:
             await self._time_block_changed_listener(datetime)
 
             self._unsubscribe_time_change = async_track_time_interval(
@@ -260,18 +266,17 @@ class BinarySensorPredictor(BinarySensorEntity, RestoreSensor):
             The start of the next time block.
         """
         return datetime.fromtimestamp(
-            ((datetime.now().timestamp() // 60) // self._time_block_period + 1)
+            ((datetime.now(tz=UTC).timestamp() // 60) // self._time_block_period + 1)
             * self._time_block_period
-            * 60
+            * 60,
+            tz=UTC,
         )
 
     def _update_probability_attribute(self) -> None:
-        """
-        Updates the probability attribute.
-        """
+        """Updates the probability attribute."""
         self.probability = self.probabilities[self.current_time_block_index]
 
-    def _get_probabilities_attribute_default(self) -> List[float]:
+    def _get_probabilities_attribute_default(self) -> list[float]:
         """
         Gets the default value of probabilities attribute.
 
@@ -281,46 +286,43 @@ class BinarySensorPredictor(BinarySensorEntity, RestoreSensor):
         return self._period // self._time_block_period * [0.5]
 
     def _get_current_time_block_index(self) -> int:
-        """
-        Calculates the current time block's index.
-        """
-        current_minute = datetime.now().timestamp() // 60
-
+        """Calculates the current time block's index."""
         return int(
-            (datetime.now().timestamp() // 60 // self._time_block_period)
+            (datetime.now(tz=UTC).timestamp() // 60 // self._time_block_period)
             % (24 * 60 // self._time_block_period)
         )
 
-    def _update_state(self):
+    def _update_state(self) -> None:
         """
-        Updates the state based on the current probability attribute and the threshold parameter.
+        Updates the state based on the current probability
+        attribute and the threshold parameter.
         """
         self._attr_is_on = self.probability >= self._threshold
 
 
 async def async_setup_entry(
-    # pylint: disable=unused-argument
-    hass: HomeAssistantType,
+    hass: HomeAssistant,  # noqa: ARG001
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
-):
+) -> None:
     """
     Sets up of Binary Sensor Predictor binary sensor platform based on
     the specified config entry.
 
     Args:
-        hass:
-            The Home Assistant instance.
-        config_entry:
-            The config entry which is used to create sensors.
-        async_add_entities:
-            The callback which can be used to add new entities to Home Assistant.
+      hass:
+        The Home Assistant instance.
+      config_entry:
+        The config entry which is used to create sensors.
+      async_add_entities:
+        The callback which can be used to add new entities to Home Assistant.
 
     Returns:
-        The value indicates whether the setup succeeded.
+      The value indicates whether the setup succeeded.
     """
     _LOGGER.info(
-        f"Setting up Binary Sensor Predictor binary sensor for {config_entry.data[CONF_BINARY_SENSOR]}."
+        "Setting up Binary Sensor Predictor binary sensor for %s.",
+        config_entry.data[CONF_BINARY_SENSOR],
     )
 
     async_add_entities(
@@ -338,5 +340,6 @@ async def async_setup_entry(
     )
 
     _LOGGER.info(
-        f"Setting up Binary Sensor Predictor binary sensor for {config_entry.data[CONF_BINARY_SENSOR]} completed."
+        "Setting up Binary Sensor Predictor binary sensor for %s completed.",
+        config_entry.data[CONF_BINARY_SENSOR],
     )
