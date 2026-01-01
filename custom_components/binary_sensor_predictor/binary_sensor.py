@@ -128,11 +128,22 @@ class BinarySensorPredictor(BinarySensorEntity, RestoreSensor):
 
         last_state = await self.async_get_last_state()
         if last_state:
-            self.probabilities = last_state.attributes.get(
+            restored_probabilities = last_state.attributes.get(
                 ATTR_PROBABILITIES, self._get_probabilities_attribute_default()
             )
-
-            _LOGGER.debug("%s restored probabilities: %s", self.entity_id, self.probabilities)
+            expected_length = self._period // self._time_block_period
+            if len(restored_probabilities) == expected_length:
+                self.probabilities = restored_probabilities
+                _LOGGER.debug(
+                    "%s restored probabilities: %s", self.entity_id, self.probabilities
+                )
+            else:
+                _LOGGER.warning(
+                    "%s restored probabilities length mismatch (expected %d, got %d), using defaults",
+                    self.entity_id,
+                    expected_length,
+                    len(restored_probabilities),
+                )
 
         self._update_probability_attribute()
         self._update_state()
