@@ -63,7 +63,6 @@ class BinarySensorPredictor(BinarySensorEntity, RestoreSensor):
         self._period: Final[int] = period
         self._time_block_period: Final[int] = time_block_period
         self._attr_should_poll = False
-        self._attr_state = False
         self._first_time_block_elapsed = False
         self._attr_extra_state_attributes = {}
 
