@@ -70,6 +70,7 @@ class BinarySensorPredictor(BinarySensorEntity, RestoreSensor):
         self.current_time_block_index = self._get_current_time_block_index()
         self.probability = 0.5
         self.current_time_block_state = STATE_UNKNOWN
+        self.current_state = STATE_UNKNOWN
 
     @property
     def probabilities(self) -> list[float]:
