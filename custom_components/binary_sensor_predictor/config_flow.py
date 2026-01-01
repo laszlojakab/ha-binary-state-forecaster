@@ -7,7 +7,7 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_NAME, CONF_UNIQUE_ID
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.helpers.entity_registry import EntityRegistry, async_get
+from homeassistant.helpers import selector
 
 from .const import (
     CONF_BINARY_SENSOR,
@@ -25,27 +25,16 @@ class BinarySensorPredictorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> FlowResult:
-        """Handle a flow initiated by the user."""
-        entity_registry: EntityRegistry = await async_get(self.hass)
-
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Handles the step when integration added from the UI."""
         data_schema = vol.Schema(
             {
                 vol.Required(CONF_NAME): cv.string,
-                vol.Required(CONF_BINARY_SENSOR): vol.In(
-                    sorted(
-                        [
-                            entity_id
-                            for entity_id in entity_registry.entities
-                            if entity_id.startswith(
-                                (
-                                    "binary_sensor.",
-                                    "light.",
-                                    "switch.",
-                                    "input_boolean.",
-                                )
-                            )
-                        ]
+                vol.Required(CONF_BINARY_SENSOR): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain=["binary_sensor", "light", "switch", "input_boolean"]
                     )
                 ),
                 vol.Required(CONF_FADING): cv.small_float,
