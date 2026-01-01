@@ -194,7 +194,9 @@ class BinarySensorPredictor(BinarySensorEntity, RestoreSensor):
         if self.current_state != STATE_ON:
             self.current_time_block_state = STATE_OFF
 
-        self._update_time_block_probability(current_time_block_index, self.current_state)
+        self._update_time_block_probability(
+            current_time_block_index, self.current_state
+        )
 
         self._first_time_block_elapsed = True
 
