@@ -154,7 +154,12 @@ class BinarySensorPredictor(BinarySensorEntity, RestoreSensor):
             self._predicted_entity_state_changed_listener,
         )
 
-        self._schedule_update_for_next_time_block()
+        async def schedule_interval(datetime: datetime) -> None:
+            await self._time_block_changed_listener(datetime)
+
+        self._unsubscribe_time_change = async_track_time_change(
+            self.hass, schedule_interval, minute=f"/{self._time_block_period}", second=0
+        )
 
         return await super().async_added_to_hass()
 
@@ -244,30 +249,6 @@ class BinarySensorPredictor(BinarySensorEntity, RestoreSensor):
                 + self.probabilities[time_block] * self._fading,
                 6,
             )
-
-    def _schedule_update_for_next_time_block(self) -> None:
-        """Schedules tracking of the next time block start."""
-        next_time_block = self._get_next_time_block()
-        _LOGGER.debug(
-            "Scheduling interval starts at `%s` for `%s`.",
-            next_time_block,
-            self.entity_id,
-        )
-
-        async def schedule_interval(datetime: datetime) -> None:
-            await self._time_block_changed_listener(datetime)
-
-            self._unsubscribe_time_change = async_track_time_interval(
-                self.hass, self._time_block_changed_listener, timedelta(minutes=5)
-            )
-
-        self._unsubscribe_time_change = async_track_time_change(
-            self.hass,
-            schedule_interval,
-            next_time_block.hour,
-            next_time_block.minute,
-            next_time_block.second,
-        )
 
     def _get_next_time_block(self) -> datetime:
         """
