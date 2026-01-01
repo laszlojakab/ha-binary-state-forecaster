@@ -3,7 +3,8 @@
 from logging import getLogger
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import Config, HomeAssistant
+from homeassistant.core import HomeAssistant
+from homeassistant.core_config import Config
 
 _LOGGER = getLogger(__name__)
 
@@ -37,8 +38,8 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     Returns:
         The value indicates whether the setup succeeded.
     """
-    hass.async_create_task(
-        hass.config_entries.async_forward_entry_setup(config_entry, "binary_sensor")
+    await hass.config_entries.async_forward_entry_setups(
+        config_entry, ["binary_sensor"]
     )
     return True
 
