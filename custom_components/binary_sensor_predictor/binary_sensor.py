@@ -289,7 +289,7 @@ class BinarySensorPredictor(BinarySensorEntity, RestoreSensor):
         """Calculates the current time block's index."""
         return int(
             (datetime.now(tz=UTC).timestamp() // 60 // self._time_block_period)
-            % (24 * 60 // self._time_block_period)
+            % (self._period // self._time_block_period)
         )
 
     def _update_state(self) -> None:
