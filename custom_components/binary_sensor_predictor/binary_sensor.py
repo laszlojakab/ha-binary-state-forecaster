@@ -139,7 +139,8 @@ class BinarySensorPredictor(BinarySensorEntity, RestoreSensor):
                 )
             else:
                 _LOGGER.warning(
-                    "%s restored probabilities length mismatch (expected %d, got %d), using defaults",
+                    "%s restored probabilities length mismatch (expected %d, got %d), "
+                    "using defaults",
                     self.entity_id,
                     expected_length,
                     len(restored_probabilities),
