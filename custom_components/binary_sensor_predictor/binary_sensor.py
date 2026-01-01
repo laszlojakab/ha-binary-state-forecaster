@@ -212,7 +212,15 @@ class BinarySensorPredictor(BinarySensorEntity, RestoreSensor):
             event: The state change event.
 
         """
-        new_state = cast(State, event.data.get("new_state")).state
+        new_state_obj = event.data.get("new_state")
+        if new_state_obj is None:
+            _LOGGER.debug(
+                "Predicted entity for `%s` was removed, ignoring.",
+                self.entity_id,
+            )
+            return
+
+        new_state = cast(State, new_state_obj).state
         _LOGGER.debug(
             "Predicted entity has changed for `%s` to `%s`, updating.",
             self.entity_id,
