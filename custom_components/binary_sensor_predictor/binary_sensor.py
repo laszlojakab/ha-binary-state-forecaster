@@ -1,7 +1,7 @@
 """The binary sensor module for binary sensor predictor integration."""
 
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Final, cast
 
 from homeassistant.components.binary_sensor import BinarySensorEntity
@@ -19,7 +19,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import (
     async_track_state_change_event,
     async_track_time_change,
-    async_track_time_interval,
 )
 
 from .const import (
