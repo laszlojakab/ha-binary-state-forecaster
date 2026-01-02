@@ -1,18 +1,18 @@
 [project]
-name = "homeassistant-binary-sensor-predictor"
+name = "homeassistant-binary-sensor-forecaster"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.13.2"
 dependencies = []
 
 [tool.uv]
-dev-dependencies = ["homeassistant>=2024.9.2", "ruff>=0.6.6"]
+dev-dependencies = ["homeassistant>=2025.12.5", "ruff>=0.6.6"]
 
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py313"
 
 [tool.ruff.lint]
 select = [

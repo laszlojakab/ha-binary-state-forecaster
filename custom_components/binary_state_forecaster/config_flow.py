@@ -20,8 +20,8 @@ from .const import (
 
 
 @config_entries.HANDLERS.register(DOMAIN)
-class BinarySensorPredictorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Configuration flow handler for Binary sensor predictor integration."""
+class BinaryStateForecasterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+    """Configuration flow handler for Binary state forecaster integration."""
 
     VERSION = 1
 

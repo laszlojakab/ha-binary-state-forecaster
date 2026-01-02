@@ -1,4 +1,4 @@
-"""Binary sensor predictor integration module."""
+"""Binary state forecaster integration module."""
 
 from logging import getLogger
 
@@ -11,7 +11,7 @@ _LOGGER = getLogger(__name__)
 
 async def async_setup(hass: HomeAssistant, config: Config) -> bool:  # noqa: ARG001
     """
-    Set up the binary sensor predictor integration.
+    Set up the binary state forecaster integration.
 
     Args:
       hass:
@@ -27,7 +27,7 @@ async def async_setup(hass: HomeAssistant, config: Config) -> bool:  # noqa: ARG
 
 async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
     """
-    Initialize the predictor sensor based on the config entry.
+    Initialize the forecaster sensor based on the config entry.
 
     Args:
       hass:

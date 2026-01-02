@@ -1,6 +1,6 @@
 {
-  "name": "Binary sensor predictor",
+  "name": "Binary state forecaster",
   "render_readme": true,
   "zip_release": true,
-  "filename": "homeassistant-binary-sensor-predictor.zip"
+  "filename": "ha-binary-state-forecaster.zip"
 }

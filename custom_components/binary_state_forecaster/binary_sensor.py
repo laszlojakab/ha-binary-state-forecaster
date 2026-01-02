@@ -1,4 +1,4 @@
-"""The binary sensor module for binary sensor predictor integration."""
+"""The binary sensor module for binary state forecaster integration."""
 
 import logging
 from datetime import UTC, datetime
@@ -36,8 +36,8 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 
-class BinarySensorPredictor(BinarySensorEntity, RestoreSensor):
-    """Represents a binary sensor predictor binary sensor."""
+class BinaryStateForecaster(BinarySensorEntity, RestoreSensor):
+    """Represents a binary state forecaster binary sensor."""
 
     def __init__(  # noqa: PLR0913
         self,
@@ -49,7 +49,7 @@ class BinarySensorPredictor(BinarySensorEntity, RestoreSensor):
         fading: float,
         threshold: float,
     ):
-        """Initialize a new instance of `BinarySensorPredictor` class."""
+        """Initialize a new instance of `BinarySensorForecaster` class."""
         self._attr_unique_id = unique_id
         self._attr_name = name
         self._attr_state = False
@@ -307,7 +307,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """
-    Sets up of Binary Sensor Predictor binary sensor platform based on
+    Sets up of Binary State Forecaster binary sensor platform based on
     the specified config entry.
 
     Args:
@@ -322,14 +322,14 @@ async def async_setup_entry(
       The value indicates whether the setup succeeded.
     """
     _LOGGER.info(
-        "Setting up Binary Sensor Predictor binary sensor for %s.",
+        "Setting up Binary State Forecaster binary sensor for %s.",
         config_entry.data[CONF_BINARY_SENSOR],
     )
 
     async_add_entities(
         [
-            BinarySensorPredictor(
-                f"{config_entry.entry_id}_prediction",
+            BinaryStateForecaster(
+                f"{config_entry.entry_id}_forecaster",
                 config_entry.data[CONF_NAME],
                 config_entry.data[CONF_BINARY_SENSOR],
                 config_entry.data[CONF_PERIOD],
@@ -341,6 +341,6 @@ async def async_setup_entry(
     )
 
     _LOGGER.info(
-        "Setting up Binary Sensor Predictor binary sensor for %s completed.",
+        "Setting up Binary State Forecaster binary sensor for %s completed.",
         config_entry.data[CONF_BINARY_SENSOR],
     )

@@ -1,6 +1,6 @@
-"""Module of binary sensor predictor constants."""
+"""Module of binary state forecaster constants."""
 
-DOMAIN = "binary_sensor_predictor"
+DOMAIN = "binary_state_forecaster"
 
 CONF_BINARY_SENSOR = "binary_sensor"
 CONF_FADING = "fading"
