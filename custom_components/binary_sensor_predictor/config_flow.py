@@ -5,7 +5,7 @@ from typing import Any
 import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
 from homeassistant import config_entries
-from homeassistant.const import CONF_NAME, CONF_UNIQUE_ID
+from homeassistant.const import CONF_NAME
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import selector
 
@@ -39,17 +39,12 @@ class BinarySensorPredictorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 ),
                 vol.Required(CONF_FADING): cv.small_float,
                 vol.Required(CONF_THRESHOLD): cv.small_float,
-                vol.Required(CONF_UNIQUE_ID): cv.string,
             }
         )
 
         if user_input is not None:
-            await self.async_set_unique_id(user_input[CONF_UNIQUE_ID])
-            self._abort_if_unique_id_configured()
-
             data = {
                 CONF_NAME: user_input[CONF_NAME],
-                CONF_UNIQUE_ID: user_input[CONF_UNIQUE_ID],
                 CONF_BINARY_SENSOR: user_input[CONF_BINARY_SENSOR],
                 CONF_FADING: user_input[CONF_FADING],
                 CONF_THRESHOLD: user_input[CONF_THRESHOLD],

@@ -9,7 +9,6 @@ from homeassistant.components.sensor import RestoreSensor
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_NAME,
-    CONF_UNIQUE_ID,
     STATE_OFF,
     STATE_ON,
     STATE_UNKNOWN,
@@ -330,7 +329,7 @@ async def async_setup_entry(
     async_add_entities(
         [
             BinarySensorPredictor(
-                config_entry.data[CONF_UNIQUE_ID],
+                f"{config_entry.entry_id}_prediction",
                 config_entry.data[CONF_NAME],
                 config_entry.data[CONF_BINARY_SENSOR],
                 config_entry.data[CONF_PERIOD],
