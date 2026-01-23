@@ -3,10 +3,12 @@
       "step": {
         "user": {
           "data": {
-            "name": "Name",
             "binary_sensor": "Predicted entity",
             "fading": "Fading parameter",
-            "threshold": "Threshold"
+            "threshold": "Threshold",
+            "calendar_features": "Additional calendar feature entities",
+            "forecaster_features": "Additional forecaster feature entities",
+            "use_day_of_week_feature": "Use day of week as a feature"
           },
           "description": "You can set binary state forecaster here. For more information visit project's website.",
           "title": "Setup binary state forecaster"

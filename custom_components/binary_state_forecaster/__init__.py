@@ -1,12 +1,24 @@
 """Binary state forecaster integration module."""
 
-from logging import getLogger
+from dataclasses import dataclass
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.core_config import Config
 
-_LOGGER = getLogger(__name__)
+from .const import LOGGER
+from .coordinator import BinaryStateForecasterCoordinator
+
+
+@dataclass
+class BinaryStateForecasterRuntimeData:
+    """The runtime data for the binary state forecaster integration."""
+
+    coordinator: BinaryStateForecasterCoordinator
+
+
+type BinaryStateForecasterConfigEntry = ConfigEntry[BinaryStateForecasterRuntimeData]
+"""The config entry for the binary state forecaster integration."""
 
 
 async def async_setup(hass: HomeAssistant, config: Config) -> bool:  # noqa: ARG001
@@ -25,7 +37,9 @@ async def async_setup(hass: HomeAssistant, config: Config) -> bool:  # noqa: ARG
     return True
 
 
-async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
+async def async_setup_entry(
+    hass: HomeAssistant, config_entry: BinaryStateForecasterConfigEntry
+) -> bool:
     """
     Initialize the forecaster sensor based on the config entry.
 
@@ -38,13 +52,20 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     Returns:
         The value indicates whether the setup succeeded.
     """
+    coordinator = BinaryStateForecasterCoordinator(hass, config_entry, LOGGER)
+    config_entry.runtime_data = BinaryStateForecasterRuntimeData(coordinator)
+
+    await coordinator.async_start()
+
     await hass.config_entries.async_forward_entry_setups(
-        config_entry, ["binary_sensor"]
+        config_entry, ["binary_sensor", "sensor"]
     )
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
+async def async_unload_entry(
+    hass: HomeAssistant, config_entry: BinaryStateForecasterConfigEntry
+) -> bool:
     """
     Executed when a config entry unloaded by Home Assistant.
 
@@ -57,6 +78,9 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> 
     Returns:
       The value indicates whether the unloading succeeded.
     """
+    await config_entry.runtime_data.coordinator.async_stop()
+
     await hass.config_entries.async_forward_entry_unload(config_entry, "binary_sensor")
+    await hass.config_entries.async_forward_entry_unload(config_entry, "sensor")
 
     return True
