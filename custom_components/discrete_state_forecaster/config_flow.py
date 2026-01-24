@@ -15,7 +15,7 @@ from .const import (
     CONF_FORECASTER_FEATURES,
     CONF_STABILITY,
     CONF_TARGET_ENTITY_ID,
-    CONF_TIME_BUCKET_SIZE,
+    CONF_TIME_BUCKET_SIZE_IN_MINUTES,
     CONF_USE_DAY_OF_WEEK_FEATURE,
     DOMAIN,
     LOGGER,
@@ -42,10 +42,10 @@ class DiscreteStateForecasterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN
                         domain=SUPPORTED_TARGET_DOMAINS,
                     )
                 ),
-                vol.Required(CONF_TIME_BUCKET_SIZE): selector.SelectSelector(
+                vol.Required(CONF_TIME_BUCKET_SIZE_IN_MINUTES): selector.SelectSelector(
                     selector.SelectSelectorConfig(
                         options=SUPPORTED_BUCKET_SIZES,
-                        translation_key=CONF_TIME_BUCKET_SIZE,
+                        translation_key=CONF_TIME_BUCKET_SIZE_IN_MINUTES,
                         mode=selector.SelectSelectorMode.DROPDOWN,
                     )
                 ),
@@ -100,6 +100,7 @@ class DiscreteStateForecasterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN
                 CONF_DECAY_SECONDS: stability_to_decay_seconds(
                     user_input[CONF_STABILITY]
                 ),
+                CONF_TIME_BUCKET_SIZE_IN_MINUTES: int(user_input[CONF_TIME_BUCKET_SIZE_IN_MINUTES]),
                 CONF_USE_DAY_OF_WEEK_FEATURE: user_input.get(
                     CONF_USE_DAY_OF_WEEK_FEATURE, False
                 ),

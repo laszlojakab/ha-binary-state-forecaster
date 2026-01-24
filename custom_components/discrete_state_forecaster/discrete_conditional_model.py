@@ -2,7 +2,7 @@
 
 import math
 from collections import defaultdict
-from collections.abc import Hashable
+from collections.abc import Callable, Hashable
 from dataclasses import dataclass
 from itertools import combinations
 from typing import Self
@@ -78,6 +78,37 @@ class DriftWeights:
 
 
 @dataclass
+class ConfidenceWeights:
+    """
+    Weights for combining confidence signals.
+
+    Each weight determines the influence of a specific confidence indicator.
+    Weights must be in [0, 1] and sum to ≤ 1.0.
+    """
+
+    entropy: float = 0.5
+    """Weight for entropy-based confidence (prediction certainty)."""
+
+    max_p: float = 0.3
+    """Weight for maximum probability confidence."""
+
+    support: float = 0.2
+    """Weight for support-based confidence (data availability)."""
+
+    def __post_init__(self) -> None:
+        """Validate weights are in valid ranges."""
+        if not 0 <= self.entropy <= 1:
+            raise ValueError(f"entropy weight must be in [0, 1], got {self.entropy}")
+        if not 0 <= self.max_p <= 1:
+            raise ValueError(f"max_p weight must be in [0, 1], got {self.max_p}")
+        if not 0 <= self.support <= 1:
+            raise ValueError(f"support weight must be in [0, 1], got {self.support}")
+        total = self.entropy + self.max_p + self.support
+        if total > 1.0:
+            raise ValueError(f"confidence weights must sum to <= 1.0, got {total}")
+
+
+@dataclass
 class FeatureState:
     """
     State for a given feature subset.
@@ -131,6 +162,9 @@ class DiscreteConditionalModel:
         min_interaction_support: float = 1.0,
         min_interaction_score: float = 0.05,
         drift_weights: DriftWeights | None = None,
+        confidence_weights: ConfidenceWeights | None = None,
+        support_tau: float = 3600.0,
+        min_step_confidence: float = 0.0,
         _internal_state: dict | None = None,
     ) -> None:
         """
@@ -158,6 +192,15 @@ class DiscreteConditionalModel:
             drift_weights: Weights for combining drift signals.
                           If None, uses default: DriftWeights(entropy=0.4, max_p=0.4, support=0.2).
                           Higher weights give more influence to that signal.
+            confidence_weights: Weights for combining confidence signals
+                               (entropy, max_p, support).
+                               If None, uses default: ConfidenceWeights(
+                                   entropy=0.5, max_p=0.3, support=0.2
+                               ).
+            support_tau: Time scale for support confidence saturation (must be > 0).
+                        Higher values make confidence increase more slowly with support time.
+            min_step_confidence: Minimum rolling confidence threshold for forecast early stopping.
+                                Must be in [0, 1]. Set to 0.0 to disable early stopping.
             _internal_state: Internal state dict for deserialization. Not for public use.
 
         Example:
@@ -199,10 +242,20 @@ class DiscreteConditionalModel:
             raise ValueError(
                 f"min_interaction_score must be in [0, 1], got {min_interaction_score}"
             )
+        if not 0 <= min_step_confidence <= 1:
+            raise ValueError(
+                f"min_step_confidence must be in [0, 1], got {min_step_confidence}"
+            )
+        if support_tau <= 0:
+            raise ValueError(f"support_tau must be positive, got {support_tau}")
 
         # Validate and set drift_weights
         if drift_weights is None:
             drift_weights = DriftWeights()
+
+        # Validate and set confidence_weights
+        if confidence_weights is None:
+            confidence_weights = ConfidenceWeights()
 
         self.alpha = alpha
         """Smoothing parameter for probability estimates."""
@@ -227,6 +280,15 @@ class DiscreteConditionalModel:
 
         self.drift_weights: DriftWeights = drift_weights
         """Weights for combining drift detection signals."""
+
+        self.confidence_weights: ConfidenceWeights = confidence_weights
+        """Weights for combining confidence signals."""
+
+        self.support_tau = support_tau
+        """Time scale for support confidence saturation."""
+
+        self.min_step_confidence = min_step_confidence
+        """Optional early-stop threshold for rolling confidence."""
 
         # Initialize or restore internal state
         if _internal_state is not None:
@@ -255,9 +317,9 @@ class DiscreteConditionalModel:
             self._interaction_scores[(f1, f2)] = v
 
         # Restore interaction support
-        self._interaction_support: dict[
-            tuple[FeatureName, FeatureName], Duration
-        ] = defaultdict(float)
+        self._interaction_support: dict[tuple[FeatureName, FeatureName], Duration] = (
+            defaultdict(float)
+        )
         for k, v in state["_interaction_support"].items():
             f1, f2 = k.split("|")
             self._interaction_support[(f1, f2)] = v
@@ -433,12 +495,104 @@ class DiscreteConditionalModel:
         dist = self.distribution(features)
         return max(dist, key=dist.get) if dist else None
 
-    def confidence(self: Self, features: FeatureLabels) -> Confidence:
+    def forecast(
+        self: Self,
+        features: FeatureLabels,
+        horizon: int,
+        advance_time_features: Callable[[FeatureLabels, int], FeatureLabels],
+        return_distributions: bool = False,
+    ) -> list[dict]:
+        """
+        Produces rolling forecasts with confidence up to a given horizon.
+
+        Args:
+            features: Initial feature values to start forecasting from.
+            horizon: Number of steps ahead to forecast.
+            advance_time_features: Callback that advances time-dependent features.
+                                  Takes (current_features, step_number) and returns
+                                  updated features for that step.
+            return_distributions: If True, includes full probability distributions
+                                 in each forecast step.
+
+        Returns:
+            List of forecast dictionaries, one per step, each containing:
+            - step (int): Step number (1 to horizon)
+            - prediction: Most likely target label
+            - step_confidence (float): Confidence for this step [0, 1]
+            - rolling_confidence (float): Cumulative confidence [0, 1]
+            - used_features (dict): Features used for this prediction
+            - distribution (dict, optional): Full probability distribution if requested
+
+            Returns empty list if model has no data.
+            May return fewer than `horizon` steps if confidence drops below
+            `min_step_confidence`.
+
+        Example:
+            ```python
+            def advance_features(feats, step):
+                # Advance time bucket by step
+                new_feats = feats.copy()
+                new_feats['time_bucket'] = (feats['time_bucket'] + step) % 288
+                return new_feats
+
+            forecasts = model.forecast(
+                features={'temp': 'high', 'time_bucket': 100},
+                horizon=10,
+                advance_time_features=advance_features,
+                return_distributions=True
+            )
+            ```
+        """
+        if horizon <= 0:
+            raise ValueError(f"horizon must be positive, got {horizon}")
+
+        results = []
+
+        features_t = features.copy()
+        rolling_conf = 1.0
+
+        for step in range(1, horizon + 1):
+            dist = self.distribution(features_t)
+            if not dist:
+                break
+
+            y_hat = max(dist, key=dist.get)
+            conf = self.confidence(features_t, without_model_update=True)
+
+            step_conf = self._step_confidence(conf)
+            rolling_conf *= step_conf
+
+            row = {
+                "step": step,
+                "prediction": y_hat,
+                "step_confidence": step_conf,
+                "rolling_confidence": rolling_conf,
+                "used_features": conf.used_features,
+            }
+
+            if return_distributions:
+                row["distribution"] = dist
+
+            results.append(row)
+
+            # Early stop if forecast becomes unreliable
+            if rolling_conf < self.min_step_confidence:
+                break
+
+            features_t = advance_time_features(features_t, step)
+
+        return results
+
+    def confidence(
+        self: Self, features: FeatureLabels, without_model_update: bool = False
+    ) -> Confidence:
         """
         Gets confidence metrics for the given features.
 
         Args:
           features: Feature values to evaluate.
+          without_model_update: If True, skip updating drift state and max_depth.
+                               Use this for forecast simulations to avoid side effects.
 
         Returns:
           A `Confidence` object containing:
@@ -479,11 +633,13 @@ class DiscreteConditionalModel:
         max_entropy = math.log2(len(dist)) if len(dist) > 1 else 0.0
         entropy_conf = 1.0 - (entropy / max_entropy if max_entropy > 0 else 1.0)
 
-        self._update_drift(
-            entropy=entropy,
-            max_p=max_p,
-            support=support_time,
-        )
+        if not without_model_update:
+            # We update concept drift state based on this confidence evaluation
+            self._update_drift(
+                entropy=entropy,
+                max_p=max_p,
+                support=support_time,
+            )
 
         conf = Confidence(
             max_probability=max_p,
@@ -492,7 +648,9 @@ class DiscreteConditionalModel:
             used_features=dict(key),
         )
 
-        self._adapt_max_depth(features, conf)
+        if not without_model_update:
+            # We adapt the maximum feature subset depth based on drift and confidence
+            self._adapt_max_depth(features, conf)
 
         return conf
 
@@ -1070,6 +1228,13 @@ class DiscreteConditionalModel:
                 "max_p": self.drift_weights.max_p,
                 "support": self.drift_weights.support,
             },
+            "confidence_weights": {
+                "entropy": self.confidence_weights.entropy,
+                "max_p": self.confidence_weights.max_p,
+                "support": self.confidence_weights.support,
+            },
+            "support_tau": self.support_tau,
+            "min_step_confidence": self.min_step_confidence,
             # Internal state
             "_max_depth": self._max_depth,
             "_t": self._t,
@@ -1128,6 +1293,17 @@ class DiscreteConditionalModel:
             support=data["drift_weights"]["support"],
         )
 
+        # Create confidence weights
+        confidence_weights_data = data.get("confidence_weights")
+        if confidence_weights_data:
+            confidence_weights = ConfidenceWeights(
+                entropy=confidence_weights_data["entropy"],
+                max_p=confidence_weights_data["max_p"],
+                support=confidence_weights_data["support"],
+            )
+        else:
+            confidence_weights = None
+
         # Extract internal state
         internal_state = {
             "_max_depth": data["_max_depth"],
@@ -1151,5 +1327,38 @@ class DiscreteConditionalModel:
             min_interaction_support=data["min_interaction_support"],
             min_interaction_score=data["min_interaction_score"],
             drift_weights=drift_weights,
+            confidence_weights=confidence_weights,
+            support_tau=data.get("support_tau", 3600.0),
+            min_step_confidence=data.get("min_step_confidence", 0.0),
             _internal_state=internal_state,
         )
+
+    def _support_confidence(self: Self, support_time: float) -> float:
+        """Maps support time to [0, 1] using exponential saturation."""
+        if support_time <= 0:
+            return 0.0
+        return 1.0 - math.exp(-support_time / self.support_tau)
+
+    def _step_confidence(self: Self, conf: Confidence) -> float:
+        """Computes a single-step confidence scalar in [0, 1]."""
+        w = self.confidence_weights
+
+        # Entropy confidence already in [0, 1]
+        c_entropy = conf.entropy_confidence
+
+        # Max probability rescaled from [1/K, 1] → [0, 1]
+        k = max(1, len(self._y_domain))
+        min_p = 1.0 / k
+        c_max_p = (
+            (conf.max_probability - min_p) / (1.0 - min_p)
+            if conf.max_probability > min_p
+            else 0.0
+        )
+
+        # Support confidence (bounded)
+        c_support = self._support_confidence(conf.support_time)
+
+        c = w.entropy * c_entropy + w.max_p * c_max_p + w.support * c_support
+
+        # Hard clamp for safety
+        return max(0.0, min(1.0, c))

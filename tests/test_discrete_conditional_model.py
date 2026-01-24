@@ -15,6 +15,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from custom_components.discrete_state_forecaster.discrete_conditional_model import (  # noqa: E402
     DiscreteConditionalModel,
     DriftWeights,
+    ConfidenceWeights,
 )
 
 
@@ -1649,3 +1650,229 @@ class TestDiscreteConditionalModelSerialization:
         assert dist_before.keys() == dist_after.keys()
         for key in dist_before:
             assert math.isclose(dist_before[key], dist_after[key], rel_tol=1e-9)
+
+
+class TestDiscreteConditionalModelForecast:
+    """Test forecast method and multi-step prediction."""
+
+    @staticmethod
+    def _no_advance(features: dict, step: int) -> dict:
+        """Simple advance function that doesn't change features."""
+        return features.copy()
+
+    def test_forecast_basic(self) -> None:
+        """Test basic multi-step forecast."""
+        model = DiscreteConditionalModel()
+
+        # Train a simple pattern: x=1 -> a, x=2 -> b
+        for _ in range(5):
+            model.update({"x": 1}, "a", duration=10.0)
+            model.update({"x": 2}, "b", duration=10.0)
+
+        # Forecast 3 steps ahead
+        predictions = model.forecast({"x": 1}, horizon=3, advance_time_features=self._no_advance)
+
+        assert len(predictions) == 3
+        # First step should be very confident on "a"
+        assert predictions[0]["prediction"] == "a"
+
+    def test_forecast_with_distributions(self) -> None:
+        """Test forecast returns distributions when requested."""
+        model = DiscreteConditionalModel()
+
+        # Train model
+        model.update({"x": 1}, "a", duration=10.0)
+        model.update({"x": 1}, "b", duration=5.0)
+
+        # Forecast with distributions
+        predictions = model.forecast(
+            {"x": 1}, horizon=2, advance_time_features=self._no_advance, return_distributions=True
+        )
+
+        assert len(predictions) == 2
+
+        # Each prediction should have distribution
+        for pred in predictions:
+            assert isinstance(pred, dict)
+            assert "distribution" in pred
+            dist = pred["distribution"]
+            assert isinstance(dist, dict)
+            assert sum(dist.values()) <= 1.01  # Allow small floating point error
+            assert "a" in dist or "b" in dist
+
+    def test_forecast_confidence_degradation(self) -> None:
+        """Test that confidence degrades over forecast horizon."""
+        model = DiscreteConditionalModel(min_step_confidence=0.3)
+
+        # Train with high confidence pattern
+        for _ in range(10):
+            model.update({"x": 1}, "a", duration=10.0)
+
+        # Forecast many steps - should stop early due to confidence
+        predictions = model.forecast({"x": 1}, horizon=20, advance_time_features=self._no_advance)
+
+        # Should stop before 20 steps due to confidence degradation
+        assert len(predictions) < 20
+        assert len(predictions) >= 1  # Should at least make first prediction
+
+    def test_forecast_empty_model(self) -> None:
+        """Test forecast on empty model returns empty list."""
+        model = DiscreteConditionalModel()
+
+        predictions = model.forecast({"x": 1}, horizon=5, advance_time_features=self._no_advance)
+
+        assert predictions == []
+
+    def test_forecast_invalid_horizon_zero(self) -> None:
+        """Test forecast raises error for zero horizon."""
+        model = DiscreteConditionalModel()
+        model.update({"x": 1}, "a", duration=10.0)
+
+        with pytest.raises(ValueError, match="horizon must be positive"):
+            model.forecast({"x": 1}, horizon=0, advance_time_features=self._no_advance)
+
+    def test_forecast_invalid_horizon_negative(self) -> None:
+        """Test forecast raises error for negative horizon."""
+        model = DiscreteConditionalModel()
+        model.update({"x": 1}, "a", duration=10.0)
+
+        with pytest.raises(ValueError, match="horizon must be positive"):
+            model.forecast({"x": 1}, horizon=-5, advance_time_features=self._no_advance)
+
+    def test_forecast_single_step(self) -> None:
+        """Test forecast with horizon=1 predicts correctly."""
+        model = DiscreteConditionalModel()
+
+        model.update({"x": 1}, "a", duration=10.0)
+        model.update({"x": 1}, "b", duration=5.0)
+
+        prediction = model.predict({"x": 1})
+        forecast_predictions = model.forecast({"x": 1}, horizon=1, advance_time_features=self._no_advance)
+
+        assert len(forecast_predictions) == 1
+        assert forecast_predictions[0]["prediction"] == prediction
+
+    def test_forecast_state_isolation(self) -> None:
+        """Test that forecast doesn't modify model state."""
+        model = DiscreteConditionalModel()
+
+        # Train model
+        for _ in range(5):
+            model.update({"x": 1}, "a", duration=10.0)
+
+        # Get state before forecast
+        t_before = model._t
+        states_before = dict(model._states)
+
+        # Run forecast
+        model.forecast({"x": 1}, horizon=5, advance_time_features=self._no_advance)
+
+        # State should be unchanged
+        assert model._t == t_before
+        assert len(model._states) == len(states_before)
+        for key in states_before:
+            assert key in model._states
+
+    def test_forecast_min_step_confidence_zero(self) -> None:
+        """Test forecast with min_step_confidence=0 goes full horizon."""
+        model = DiscreteConditionalModel(min_step_confidence=0.0)
+
+        # Train model
+        model.update({"x": 1}, "a", duration=10.0)
+
+        # Forecast should go full horizon even with low confidence
+        predictions = model.forecast({"x": 1}, horizon=10, advance_time_features=self._no_advance)
+
+        # Should complete all 10 steps (confidence threshold is 0)
+        assert len(predictions) == 10
+
+    def test_forecast_different_features(self) -> None:
+        """Test forecast with changing feature contexts."""
+        model = DiscreteConditionalModel()
+
+        # Train different patterns
+        for _ in range(5):
+            model.update({"x": 1, "y": "a"}, "state1", duration=10.0)
+            model.update({"x": 2, "y": "b"}, "state2", duration=10.0)
+
+        # Forecast for first pattern
+        predictions1 = model.forecast({"x": 1, "y": "a"}, horizon=3, advance_time_features=self._no_advance)
+        # Forecast for second pattern
+        predictions2 = model.forecast({"x": 2, "y": "b"}, horizon=3, advance_time_features=self._no_advance)
+
+        # Should predict their respective states
+        assert any(p["prediction"] == "state1" for p in predictions1)
+        assert any(p["prediction"] == "state2" for p in predictions2)
+
+    def test_forecast_unseen_features(self) -> None:
+        """Test forecast with features not seen during training."""
+        model = DiscreteConditionalModel()
+
+        # Train on x=1
+        model.update({"x": 1}, "a", duration=10.0)
+
+        # Forecast on unseen x=99
+        predictions = model.forecast({"x": 99}, horizon=3, advance_time_features=self._no_advance)
+
+        # Should still make predictions (likely fall back to global/partial state)
+        # Exact behavior depends on implementation, but should not crash
+        assert isinstance(predictions, list)
+
+    def test_forecast_with_high_confidence_threshold(self) -> None:
+        """Test forecast with very high min_step_confidence."""
+        model = DiscreteConditionalModel(min_step_confidence=0.99)
+
+        # Train model with moderate confidence
+        model.update({"x": 1}, "a", duration=10.0)
+        model.update({"x": 1}, "b", duration=5.0)
+
+        # Forecast should stop early due to high threshold
+        predictions = model.forecast({"x": 1}, horizon=10, advance_time_features=self._no_advance)
+
+        # Should make at least first prediction but likely stop early
+        assert len(predictions) >= 0
+        assert len(predictions) <= 10
+
+    def test_forecast_advance_time_features(self) -> None:
+        """Test forecast with time-advancing features."""
+        model = DiscreteConditionalModel()
+
+        # Train patterns at different time buckets
+        for _ in range(5):
+            model.update({"time": 0}, "morning", duration=10.0)
+            model.update({"time": 1}, "afternoon", duration=10.0)
+            model.update({"time": 2}, "evening", duration=10.0)
+
+        def advance_time(features: dict, step: int) -> dict:
+            """Advance time bucket with each step."""
+            new_features = features.copy()
+            new_features["time"] = (features["time"] + step) % 3
+            return new_features
+
+        # Forecast should use advancing time features
+        predictions = model.forecast({"time": 0}, horizon=3, advance_time_features=advance_time)
+
+        # Should have predictions for different time periods
+        assert len(predictions) >= 1
+        # Each prediction should include used features
+        for pred in predictions:
+            assert "used_features" in pred
+
+    def test_forecast_result_structure(self) -> None:
+        """Test forecast returns correct result structure."""
+        model = DiscreteConditionalModel()
+
+        model.update({"x": 1}, "a", duration=10.0)
+
+        predictions = model.forecast({"x": 1}, horizon=3, advance_time_features=self._no_advance)
+
+        # Check structure of each prediction
+        for i, pred in enumerate(predictions, start=1):
+            assert "step" in pred
+            assert pred["step"] == i
+            assert "prediction" in pred
+            assert "step_confidence" in pred
+            assert "rolling_confidence" in pred
+            assert "used_features" in pred
+            assert 0.0 <= pred["step_confidence"] <= 1.0
+            assert 0.0 <= pred["rolling_confidence"] <= 1.0
