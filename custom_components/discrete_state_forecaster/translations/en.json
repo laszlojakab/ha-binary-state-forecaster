@@ -1,0 +1,46 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "data": {
+          "target_entity_id": "Forecasted entity",
+          "stability": "How often the forecasted entity changes behavior over time?",
+          "time_bucket_size": "Time bucket size",
+          "use_day_of_week_feature": "Use day of the week",
+          "calendar_features": "Include calendar entities",
+          "forecaster_features": "Include other forecasted entities"
+        },
+        "description": "You can set discrete state forecaster here. For more information visit project's website.",
+        "title": "Setup discrete state forecaster"
+      }
+    },
+    "error": {
+      "already_configured": "The unique ID is already used!"
+    },
+    "abort": {}
+  },
+  "selector": {
+    "stability": {
+      "options": {
+        "stable": "Rarely (days to weeks or more)",
+        "semi_stable": "Often (hours to days)",
+        "quick_changing": "Quickly (minutes to hours)"
+      }
+    },
+    "time_bucket_size": {
+      "options": {
+        "5": "5 minutes",
+        "10": "10 minutes",
+        "15": "15 minutes",
+        "30": "30 minutes",
+        "60": "1 hour",
+        "120": "2 hours",
+        "180": "3 hours",
+        "240": "4 hours",
+        "360": "6 hours",
+        "720": "12 hours",
+        "1440": "1 day"
+      }
+    }
+  }
+}

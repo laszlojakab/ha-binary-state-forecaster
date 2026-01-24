@@ -1,6 +1,6 @@
 {
-  "name": "Binary state forecaster",
+  "name": "Discrete state forecaster",
   "render_readme": true,
   "zip_release": true,
-  "filename": "ha-binary-state-forecaster.zip"
+  "filename": "ha-discrete-state-forecaster.zip"
 }

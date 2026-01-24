@@ -1,0 +1,46 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "data": {
+          "target_entity_id": "Előrejelezni kívánt entitás",
+          "stability": "Milyen gyakran változtatja meg viselkedését az előrejelezni kívánt entitás az idő múlásával?",
+          "time_bucket_size": "Időablak mérete",
+          "use_day_of_week_feature": "A hét napjának figyelembe vétele",
+          "calendar_features": "Figyelembe vett naptár entitások",
+          "forecaster_features": "Figyelembe vett egyéb előrejelzett entitások"
+        },
+        "description": "Előrejelző szenzor beállítás részleteiért látogasd meg az integráció weboldalát!",
+        "title": "Előrejelző szenzor beállítása"
+      }
+    },
+    "error": {
+      "already_configured": "Ez az egyedi azonosító már használva van!"
+    },
+    "abort": {}
+  },
+  "selector": {
+    "stability": {
+      "options": {
+        "stable": "Ritkán (napok vagy hetek vagy még több)",
+        "semi_stable": "Gyakran (órák vagy napok)",
+        "quick_changing": "Gyorsan (percek vagy órák)"
+      }
+    },
+    "time_bucket_size": {
+      "options": {
+        "5": "5 perc",
+        "10": "10 perc",
+        "15": "15 perc",
+        "30": "30 perc",
+        "60": "1 óra",
+        "120": "2 óra",
+        "180": "3 óra",
+        "240": "4 óra",
+        "360": "6 óra",
+        "720": "12 óra",
+        "1440": "1 nap"
+      }
+    }
+  }
+}

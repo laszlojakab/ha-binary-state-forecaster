@@ -1,0 +1,14 @@
+{
+  "domain": "discrete_state_forecaster",
+  "name": "Discrete state forecaster",
+  "iot_class": "local_polling",
+  "documentation": "https://github.com/laszlojakab/ha-discrete-state-forecaster#usage",
+  "issue_tracker": "https://github.com/laszlojakab/ha-discrete-state-forecaster/issues",
+  "dependencies": [],
+  "config_flow": true,
+  "version": "0.1.0",
+  "codeowners": [
+    "@laszlojakab"
+  ],
+  "requirements": []
+}
