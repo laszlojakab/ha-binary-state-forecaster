@@ -10,13 +10,10 @@ CONF_TARGET_ENTITY_ID: Final = "target_entity_id"
 CONF_STABILITY: Final = "stability"
 CONF_TIME_BUCKET_SIZE_IN_MINUTES: Final = "time_bucket_size_in_minutes"
 CONF_USE_DAY_OF_WEEK_FEATURE: Final = "use_day_of_week_feature"
+CONF_USE_MONTH_OF_YEAR_FEATURE: Final = "use_month_of_year_feature"
 CONF_CALENDAR_FEATURES: Final = "calendar_features"
 CONF_FORECASTER_FEATURES: Final = "forecaster_features"
 CONF_DECAY_SECONDS: Final = "decay_seconds"
-
-FEATURE_TIME_BUCKET: Final = "time_bucket"
-FEATURE_DAY_OF_WEEK: Final = "day_of_week"
-
 
 SUPPORTED_TARGET_DOMAINS: Final = [
     "alarm_control_panel",
@@ -45,6 +42,7 @@ SUPPORTED_STABILITY_OPTIONS: Final = [
 ]
 
 SUPPORTED_BUCKET_SIZES: Final = [
+    "1",  # TODO: remove?
     "5",
     "10",
     "15",

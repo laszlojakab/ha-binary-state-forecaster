@@ -7,6 +7,7 @@
           "stability": "Milyen gyakran változtatja meg viselkedését az előrejelezni kívánt entitás az idő múlásával?",
           "time_bucket_size": "Időablak mérete",
           "use_day_of_week_feature": "A hét napjának figyelembe vétele",
+          "use_month_of_year_feature": "Az év hónapjának figyelembe vétele",
           "calendar_features": "Figyelembe vett naptár entitások",
           "forecaster_features": "Figyelembe vett egyéb előrejelzett entitások"
         },

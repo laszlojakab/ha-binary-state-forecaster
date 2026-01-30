@@ -6,8 +6,14 @@ readme = "README.md"
 requires-python = ">=3.13.2"
 dependencies = []
 
+
 [tool.uv]
-dev-dependencies = ["homeassistant>=2025.12.5", "ruff>=0.6.6", "pytest>=8.0.0"]
+dev-dependencies = [
+    "homeassistant>=2025.12.5",
+ "ruff>=0.6.6",
+ "pytest>=8.0.0",
+ "ipykernel>=7.1.0",
+]
 
 
 [tool.ruff]
@@ -103,7 +109,7 @@ convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 "test_*.py" = [
-  "S101",  # Use of `assert` detected (allow `assert` statements only in test functions)
+  "S101",    # Use of `assert` detected (allow `assert` statements only in test functions)
   "PLR2004", # Magic value used in comparison, consider replacing `3600.0` with a constant variable
-  "SLF001", # Private member accessed: `_y_domain`
+  "SLF001",  # Private member accessed: `_y_domain`
 ]

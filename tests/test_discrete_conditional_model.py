@@ -1,1878 +1,2720 @@
 """Tests for DiscreteConditionalModel class."""
 
-import math
-import sys
-from pathlib import Path
+from datetime import UTC, datetime
 
 import pytest
 
-# Ensure project root is on sys.path so ``custom_components`` is importable.
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-
-
-from custom_components.discrete_state_forecaster.discrete_conditional_model import (  # noqa: E402
+from custom_components.discrete_state_forecaster.model.discrete_conditional_model import (
     DiscreteConditionalModel,
-    DriftWeights,
-    ConfidenceWeights,
 )
+from custom_components.discrete_state_forecaster.model.state_stats import StateStats
 
 
-class TestDiscreteConditionalModelBasics:
-    """Test basic initialization and simple operations."""
+class TestDiscreteConditionalModelInitialization:
+    """Test DiscreteConditionalModel initialization."""
 
     def test_initialization(self) -> None:
-        """Test model initializes with default parameters."""
+        """Test default initialization creates empty model."""
         model = DiscreteConditionalModel()
-        assert model.alpha == 1.0
-        assert model.decay == 3600.0
-        assert model._max_depth is None
-        assert model.priority_decay == 0.98
+        assert model._states == {}
 
-    def test_initialization_custom_params(self) -> None:
-        """Test model initializes with custom parameters."""
-        model = DiscreteConditionalModel(
-            alpha=0.5,
-            decay=0.95,
-            priority_decay=0.9,
-            interaction_decay=0.9,
-        )
-        assert model.alpha == 0.5
-        assert model.decay == 0.95
-        assert model._max_depth is None  # Starts as None, dynamically adjusted
-        assert model.priority_decay == 0.9
-        assert model.interaction_decay == 0.9
-
-    def test_initial_state(self) -> None:
-        """Test model starts with empty state."""
+    def test_initial_distribution_empty(self) -> None:
+        """Test distribution returns empty dict for unobserved keys."""
         model = DiscreteConditionalModel()
-        assert len(model._states) == 0
-        assert len(model._y_domain) == 0
-        assert len(model._feature_scores) == 0
-        assert len(model._interaction_scores) == 0
-        assert model._t == 0.0
+        key = (("time_of_day", 600),)
+        assert model.distribution(key) == {}
 
 
-class TestDiscreteConditionalModelUpdate:
-    """Test model update/training functionality."""
+class TestDiscreteConditionalModelUpdateDuration:
+    """Test DiscreteConditionalModel update_duration method."""
 
-    def test_single_update(self) -> None:
-        """Test model can be updated with a single observation."""
+    def test_update_single_state(self) -> None:
+        """Test updating a single state duration."""
         model = DiscreteConditionalModel()
-        features = {"weather": "sunny", "hour": 10}
-        y = "on"
+        key = (("time_of_day", 600),)
 
-        model.update(features, y)
-        assert "on" in model._y_domain
-        assert len(model._states) > 0
+        model.update_duration(key, "on", 100.0, timestamp=0.0)
 
-    def test_multiple_updates(self) -> None:
-        """Test model accumulates multiple observations."""
+        assert key in model._states
+        assert model._states[key].durations == {"on": 100.0}
+
+    def test_update_multiple_states_same_key(self) -> None:
+        """Test updating multiple states for same time key."""
         model = DiscreteConditionalModel()
+        key = (("time_of_day", 600),)
 
-        model.update({"weather": "sunny"}, "on")
-        model.update({"weather": "sunny"}, "on")
-        model.update({"weather": "rainy"}, "off")
+        model.update_duration(key, "on", 100.0, timestamp=0.0)
+        model.update_duration(key, "off", 200.0, timestamp=0.0)
 
-        assert "on" in model._y_domain
-        assert "off" in model._y_domain
+        assert model._states[key].durations == {"on": 100.0, "off": 200.0}
 
-    def test_update_with_none_features(self) -> None:
-        """Test model handles None values in features."""
+    def test_update_same_state_accumulates(self) -> None:
+        """Test updating same state multiple times accumulates duration."""
         model = DiscreteConditionalModel()
-        features = {"weather": "sunny", "temp": None}
+        key = (("time_of_day", 600),)
 
-        model.update(features, "on")
-        prediction = model.predict(features)
-        assert prediction == "on"
+        model.update_duration(key, "on", 100.0, timestamp=0.0)
+        model.update_duration(key, "on", 50.0, timestamp=0.0)
 
-    def test_y_domain_accumulation(self) -> None:
-        """Test y_domain accumulates all observed labels."""
+        assert model._states[key].durations == {"on": 150.0}
+
+    def test_update_different_keys(self) -> None:
+        """Test updating different time keys maintains separate statistics."""
         model = DiscreteConditionalModel()
+        key1 = (("time_of_day", 600),)
+        key2 = (("time_of_day", 700),)
 
-        model.update({"x": 1}, "a")
-        model.update({"x": 2}, "b")
-        model.update({"x": 3}, "c")
+        model.update_duration(key1, "on", 100.0, timestamp=0.0)
+        model.update_duration(key2, "off", 200.0, timestamp=0.0)
 
-        assert model._y_domain == {"a", "b", "c"}
+        assert model._states[key1].durations == {"on": 100.0}
+        assert model._states[key2].durations == {"off": 200.0}
 
-
-class TestDiscreteConditionalModelPrediction:
-    """Test prediction functionality."""
-
-    def test_predict_simple(self) -> None:
-        """Test basic prediction with clear pattern."""
+    def test_update_filters_short_durations(self) -> None:
+        """Test that durations less than 5 seconds are filtered."""
         model = DiscreteConditionalModel()
+        key = (("time_of_day", 600),)
 
-        for _ in range(10):
-            model.update({"weather": "sunny"}, "on")
+        model.update_duration(key, "on", 4.9, timestamp=0.0)
 
-        model.update({"weather": "rainy"}, "off")
+        assert key not in model._states
 
-        prediction = model.predict({"weather": "sunny"})
-        assert prediction == "on"
-
-    def test_predict_returns_most_likely(self) -> None:
-        """Test prediction returns the most likely outcome."""
+    def test_update_accepts_five_seconds(self) -> None:
+        """Test that duration of exactly 5 seconds is accepted."""
         model = DiscreteConditionalModel()
+        key = (("time_of_day", 600),)
 
-        # Use longer durations for 'work' to ensure it dominates
-        for _ in range(7):
-            model.update({"day": "weekday"}, "work", duration=2.0)
-        for _ in range(3):
-            model.update({"day": "weekday"}, "home", duration=1.0)
+        model.update_duration(key, "on", 5.0, timestamp=0.0)
 
-        prediction = model.predict({"day": "weekday"})
-        assert prediction == "work"  # Should favor higher total duration
+        assert model._states[key].durations == {"on": 5.0}
 
-    def test_predict_with_unseen_features(self) -> None:
-        """Test prediction with completely unseen features."""
+    def test_update_filters_zero_duration(self) -> None:
+        """Test that zero duration is filtered."""
         model = DiscreteConditionalModel()
+        key = (("time_of_day", 600),)
 
-        model.update({"x": 1}, "a")
-        model.update({"x": 2}, "a")
+        model.update_duration(key, "on", 0.0, timestamp=0.0)
 
-        prediction = model.predict({"z": 99})
-        assert prediction in model._y_domain
+        assert key not in model._states
 
-    def test_predict_empty_model(self) -> None:
-        """Test prediction on empty model returns None."""
+    def test_update_filters_negative_duration(self) -> None:
+        """Test that negative duration is filtered."""
         model = DiscreteConditionalModel()
-        prediction = model.predict({"x": 1})
-        assert prediction is None
+        key = (("time_of_day", 600),)
+
+        model.update_duration(key, "on", -10.0, timestamp=0.0)
+
+        assert key not in model._states
+
+    def test_update_with_composite_key(self) -> None:
+        """Test updating with composite time key."""
+        model = DiscreteConditionalModel()
+        key = (("day_of_week", 0), ("time_of_day", 600))
+
+        model.update_duration(key, "on", 100.0, timestamp=0.0)
+
+        assert model._states[key].durations == {"on": 100.0}
+
+    def test_update_with_string_states(self) -> None:
+        """Test updating with various string state values."""
+        model = DiscreteConditionalModel()
+        key = (("time_of_day", 600),)
+
+        model.update_duration(key, "heating", 100.0, timestamp=0.0)
+        model.update_duration(key, "cooling", 200.0, timestamp=0.0)
+        model.update_duration(key, "idle", 50.0, timestamp=0.0)
+
+        assert model._states[key].durations == {
+            "heating": 100.0,
+            "cooling": 200.0,
+            "idle": 50.0,
+        }
+
+    def test_update_with_numeric_states(self) -> None:
+        """Test updating with numeric state values."""
+        model = DiscreteConditionalModel()
+        key = (("time_of_day", 600),)
+
+        model.update_duration(key, 0, 100.0, timestamp=0.0)
+        model.update_duration(key, 1, 200.0, timestamp=0.0)
+
+        assert model._states[key].durations == {0: 100.0, 1: 200.0}
+
+    def test_update_with_tuple_states(self) -> None:
+        """Test updating with tuple state values."""
+        model = DiscreteConditionalModel()
+        key = (("time_of_day", 600),)
+
+        model.update_duration(key, ("on", "heating"), 100.0, timestamp=0.0)
+        model.update_duration(key, ("off", "idle"), 200.0, timestamp=0.0)
+
+        assert model._states[key].durations == {
+            ("on", "heating"): 100.0,
+            ("off", "idle"): 200.0,
+        }
+
+    def test_update_with_empty_key(self) -> None:
+        """Test updating with empty time key."""
+        model = DiscreteConditionalModel()
+        key = ()
+
+        model.update_duration(key, "on", 100.0, timestamp=0.0)
+
+        assert model._states[key].durations == {"on": 100.0}
 
 
 class TestDiscreteConditionalModelDistribution:
-    """Test probability distribution functionality."""
+    """Test DiscreteConditionalModel distribution method."""
 
-    def test_distribution_sums_to_one(self) -> None:
-        """Test returned distribution sums to approximately 1.0."""
+    def test_distribution_unobserved_key(self) -> None:
+        """Test distribution for unobserved key returns empty dict."""
         model = DiscreteConditionalModel()
+        key = (("time_of_day", 600),)
 
-        model.update({"x": 1}, "a")
-        model.update({"x": 1}, "b")
-        model.update({"x": 1}, "a")
+        assert model.distribution(key) == {}
 
-        dist, _ = model.distribution_with_key({"x": 1})
-        assert abs(sum(dist.values()) - 1.0) < 1e-10
-
-    def test_distribution_with_key(self) -> None:
-        """Test distribution_with_key returns distribution and key."""
+    def test_distribution_single_state(self) -> None:
+        """Test distribution with single state returns 100%."""
         model = DiscreteConditionalModel()
+        key = (("time_of_day", 600),)
 
-        model.update({"weather": "sunny", "hour": 10}, "on")
+        model.update_duration(key, "on", 100.0, timestamp=0.0)
 
-        dist, key = model.distribution_with_key({"weather": "sunny", "hour": 10})
-        assert isinstance(dist, dict)
-        assert isinstance(key, tuple)
-        assert sum(dist.values()) > 0
+        assert model.distribution(key) == {"on": 1.0}
 
-    def test_distribution_laplace_smoothing(self) -> None:
-        """Test distribution applies Laplace smoothing with alpha."""
-        model = DiscreteConditionalModel(alpha=1.0)
-
-        model.update({"x": 1}, "a")
-
-        dist, _ = model.distribution_with_key({"x": 1})
-        # All labels should have non-zero probability due to smoothing
-        assert all(p > 0 for p in dist.values())
-
-
-class TestDiscreteConditionalModelDurationWeighting:
-    """Test duration-weighted learning functionality."""
-
-    def test_duration_weighting(self) -> None:
-        """Test that longer duration states are weighted more heavily."""
+    def test_distribution_two_states(self) -> None:
+        """Test distribution with two states."""
         model = DiscreteConditionalModel()
+        key = (("time_of_day", 600),)
 
-        # Short duration for 'a'
-        model.update({"x": 1}, "a", duration=1.0)
-        # Long duration for 'b'
-        model.update({"x": 1}, "b", duration=10.0)
+        model.update_duration(key, "on", 100.0, timestamp=0.0)
+        model.update_duration(key, "off", 200.0, timestamp=0.0)
 
-        prediction = model.predict({"x": 1})
-        assert prediction == "b"  # Should favor longer duration state
+        dist = model.distribution(key)
+        assert dist == pytest.approx({"on": 1 / 3, "off": 2 / 3})
 
-    def test_default_duration(self) -> None:
-        """Test default duration is 1.0."""
+    def test_distribution_multiple_states(self) -> None:
+        """Test distribution with multiple states."""
         model = DiscreteConditionalModel()
+        key = (("time_of_day", 600),)
 
-        model.update({"x": 1}, "a")  # Default duration
+        model.update_duration(key, "on", 100.0, timestamp=0.0)
+        model.update_duration(key, "off", 200.0, timestamp=0.0)
+        model.update_duration(key, "idle", 300.0, timestamp=0.0)
 
-        key = (("x", 1),)
-        assert model._states[key].y["a"] == 1.0
-        assert model._t == 1.0  # Time should advance by default duration
+        dist = model.distribution(key)
+        expected = {"on": 100 / 600, "off": 200 / 600, "idle": 300 / 600}
+        assert dist == pytest.approx(expected)
 
-    def test_zero_duration_ignored(self) -> None:
-        """Test that zero or negative duration is ignored."""
+    def test_distribution_sum_equals_one(self) -> None:
+        """Test that distribution probabilities sum to 1."""
         model = DiscreteConditionalModel()
+        key = (("time_of_day", 600),)
 
-        model.update({"x": 1}, "a", duration=0.0)
-        model.update({"x": 1}, "b", duration=-1.0)
+        model.update_duration(key, "on", 100.0, timestamp=0.0)
+        model.update_duration(key, "off", 200.0, timestamp=0.0)
+        model.update_duration(key, "idle", 150.0, timestamp=0.0)
 
-        assert len(model._y_domain) == 0  # Nothing should be added
+        dist = model.distribution(key)
+        assert sum(dist.values()) == pytest.approx(1.0)
 
-
-class TestDiscreteConditionalModelBackoff:
-    """Test backoff mechanism for missing features."""
-
-    def test_backoff_to_simpler_features(self) -> None:
-        """Test model backs off to simpler feature combinations."""
+    def test_distribution_different_keys_independent(self) -> None:
+        """Test that distributions for different keys are independent."""
         model = DiscreteConditionalModel()
+        key1 = (("time_of_day", 600),)
+        key2 = (("time_of_day", 700),)
 
-        # Train on single features
-        model.update({"a": 1}, "x")
-        model.update({"b": 2}, "y")
+        model.update_duration(key1, "on", 100.0, timestamp=0.0)
+        model.update_duration(key2, "off", 200.0, timestamp=0.0)
 
-        # Query with combination not seen
-        dist, key = model.distribution_with_key({"a": 1, "b": 2})
+        assert model.distribution(key1) == {"on": 1.0}
+        assert model.distribution(key2) == {"off": 1.0}
 
-        # Should backoff to either a=1 or b=2, not empty tuple
-        assert len(key) >= 0
-
-    def test_feature_subsets_ordering(self) -> None:
-        """Test feature subsets are ordered by interaction scores."""
+    def test_distribution_after_accumulation(self) -> None:
+        """Test distribution after multiple updates to same state."""
         model = DiscreteConditionalModel()
+        key = (("time_of_day", 600),)
 
-        # Train to build up scores
-        model.update({"a": 1, "b": 2}, "x")
-        model.update({"a": 1, "b": 2}, "x")
+        model.update_duration(key, "on", 50.0, timestamp=0.0)
+        model.update_duration(key, "on", 50.0, timestamp=0.0)
+        model.update_duration(key, "off", 100.0, timestamp=0.0)
 
-        # Just verify it doesn't crash - internal method
-        subsets = list(model._feature_subsets({"a": 1, "b": 2}))
-        assert isinstance(subsets, list)
+        dist = model.distribution(key)
+        assert dist == pytest.approx({"on": 0.5, "off": 0.5})
 
-    def test_backoff_to_global(self) -> None:
-        """Test model backs off to global distribution when no matches."""
+    def test_distribution_ignores_filtered_durations(self) -> None:
+        """Test that filtered short durations don't affect distribution."""
         model = DiscreteConditionalModel()
+        key = (("time_of_day", 600),)
 
-        model.update({"x": 1}, "a")
-        model.update({"y": 2}, "a")
+        model.update_duration(key, "on", 100.0, timestamp=0.0)
+        model.update_duration(key, "off", 4.9, timestamp=0.0)  # Filtered
 
-        # Query with completely unseen features
-        dist, key = model.distribution_with_key({"z": 99})
+        # Only "on" should appear since "off" was filtered
+        assert model.distribution(key) == {"on": 1.0}
 
-        # Should use global distribution (empty key)
-        assert key == ()
-
-
-class TestDiscreteConditionalModelConfidence:
-    """Test confidence estimation."""
-
-    def test_confidence_structure(self) -> None:
-        """Test confidence returns expected structure."""
+    def test_distribution_with_composite_key(self) -> None:
+        """Test distribution with composite time key."""
         model = DiscreteConditionalModel()
+        key = (("day_of_week", 0), ("time_of_day", 600))
 
-        model.update({"x": 1}, "a")
+        model.update_duration(key, "on", 100.0, timestamp=0.0)
+        model.update_duration(key, "off", 100.0, timestamp=0.0)
 
-        conf = model.confidence({"x": 1})
-        assert hasattr(conf, "max_probability")
-        assert hasattr(conf, "entropy_confidence")
-        assert hasattr(conf, "support_time")
-        assert hasattr(conf, "used_features")
-
-    def test_confidence_high_certainty(self) -> None:
-        """Test confidence is high when data is certain."""
-        model = DiscreteConditionalModel()
-
-        # Create two labels but heavily weight one with duration
-        model.update({"x": 1}, "a", duration=100.0)
-        model.update({"x": 1}, "b", duration=1.0)  # Add one opposing example
-
-        conf = model.confidence({"x": 1})
-        assert conf.max_probability > 0.9
-        assert conf.entropy_confidence > 0.75  # Should be high with strong bias
-        assert conf.support_time > 50
-
-    def test_confidence_low_certainty(self) -> None:
-        """Test confidence is lower when data is uncertain."""
-        model = DiscreteConditionalModel()
-
-        # Equal distribution
-        model.update({"x": 1}, "a")
-        model.update({"x": 1}, "b")
-
-        conf = model.confidence({"x": 1})
-        assert conf.entropy_confidence < 0.5
-
-    def test_confidence_empty_model(self) -> None:
-        """Test confidence on empty model."""
-        model = DiscreteConditionalModel()
-        conf = model.confidence({"x": 1})
-        assert conf.entropy_confidence == 0.0
-        assert conf.max_probability == 0.0
-        assert conf.support_time == 0.0
-        assert conf.used_features == {}
-
-
-class TestDiscreteConditionalModelDecay:
-    """Test temporal decay functionality."""
-
-    def test_decay_applied_on_update(self) -> None:
-        """Test decay is applied to existing durations on update."""
-        model = DiscreteConditionalModel(decay=0.5)  # Half-life of 0.5 time units
-
-        model.update({"x": 1}, "a", duration=1.0)
-        key = (("x", 1),)
-        initial_duration = model._states[key].y["a"]
-
-        # Advance time significantly to see decay
-        model.update({"x": 1}, "b", duration=2.0)  # 2 time units pass
-
-        # First duration should have been decayed (2^(-2/0.5) = 2^-4 = 0.0625)
-        current_duration = model._states[key].y["a"]
-        assert (
-            current_duration < initial_duration * 0.2
-        )  # Should be significantly decayed
-
-    def test_recent_data_weighted_more(self) -> None:
-        """Test recent observations are weighted more heavily."""
-        model = DiscreteConditionalModel(decay=0.5)
-
-        # Old data
-        for _ in range(10):
-            model.update({"x": 1}, "a")
-
-        # Recent data
-        for _ in range(10):
-            model.update({"x": 1}, "b")
-
-        prediction = model.predict({"x": 1})
-        # Recent 'b' should dominate due to decay of 'a'
-        assert prediction == "b"
-
-
-class TestDiscreteConditionalModelFeaturePriority:
-    """Test adaptive feature prioritization."""
-
-    def test_feature_scores_updated(self) -> None:
-        """Test feature scores are updated during training."""
-        model = DiscreteConditionalModel()
-
-        # Feature 'a' is informative
-        model.update({"a": 1, "b": 1}, "x")
-        model.update({"a": 2, "b": 1}, "y")
-        model.update({"a": 1, "b": 1}, "x")
-
-        # Feature scores should be non-zero
-        assert len(model._feature_scores) > 0
-
-    def test_informative_features_prioritized(self) -> None:
-        """Test informative features get higher scores."""
-        model = DiscreteConditionalModel()
-
-        # Feature 'good' is perfectly predictive
-        for _ in range(10):
-            model.update({"good": 1, "noise": 1}, "a")
-            model.update({"good": 2, "noise": 1}, "b")
-
-        # 'good' should have higher score than 'noise'
-        assert model._feature_scores.get("good", 0) > model._feature_scores.get(
-            "noise", 0
-        )
-
-
-class TestDiscreteConditionalModelMaxDepth:
-    """Test adaptive max_depth behavior."""
-
-    def test_max_depth_adapts_to_feature_count(self) -> None:
-        """Test max_depth adapts based on number of features."""
-        model = DiscreteConditionalModel()
-
-        # With few features (<=5), should use all features
-        features_small = {"a": 1, "b": 2, "c": 3}
-        model.update(features_small, "x")
-        model.confidence(features_small)
-        # _max_depth should be set after confidence() call
-        assert model._max_depth is not None
-        assert model._max_depth <= len(features_small)
-
-    def test_max_depth_reduces_on_drift(self) -> None:
-        """Test max_depth reduces when drift is detected."""
-        model = DiscreteConditionalModel()
-
-        # Build baseline
-        for _ in range(50):
-            model.update({"a": 1, "b": 2}, "x")
-
-        # Establish baseline
-        for _ in range(10):
-            model.confidence({"a": 1, "b": 2})
-
-        # Introduce drift
-        for _ in range(50):
-            model.update({"a": 1, "b": 2}, "y")
-
-        # Check confidence and verify depth adjustment
-        model.confidence({"a": 1, "b": 2})
-        drift = model.drift_level()
-
-        # If drift is high, _max_depth should be reduced
-        if drift > 0.3:
-            # With 2 features and high drift, should reduce to 1
-            assert model._max_depth == 1
-
-
-class TestDiscreteConditionalModelInteractionLearning:
-    """Test interaction learning features."""
-
-    def test_interaction_scores_updated(self) -> None:
-        """Test interaction scores are updated during training."""
-        # Disable pruning to ensure interactions are retained for inspection
-        model = DiscreteConditionalModel(
-            min_interaction_score=0.0,
-            min_interaction_support=0.0,
-        )
-
-        # Train with feature interactions
-        model.update({"a": 1, "b": 2}, "x")
-        model.update({"a": 1, "b": 2}, "x")
-
-        # Interaction scores should be present
-        assert len(model._interaction_scores) >= 0  # May or may not have interactions
-
-    def test_interaction_contributions(self) -> None:
-        """Test interaction_contributions shows feature interactions."""
-        model = DiscreteConditionalModel()
-
-        # Train with clear interaction pattern
-        model.update({"a": 1, "b": 2}, "x")
-        model.update({"a": 1, "b": 2}, "x")
-        model.update({"a": 1}, "y")
-        model.update({"b": 2}, "y")
-
-        contributions = model.interaction_contributions({"a": 1, "b": 2})
-        # Should return dict of interactions
-        assert isinstance(contributions, dict)
-
-    def test_interaction_contributions_single_feature(self) -> None:
-        """Test interaction_contributions returns empty for single feature."""
-        model = DiscreteConditionalModel()
-
-        model.update({"a": 1}, "x")
-
-        contributions = model.interaction_contributions({"a": 1})
-        # No interactions with single feature
-        assert contributions == {}
-
-
-class TestDiscreteConditionalModelEdgeCases:
-    """Test edge cases and boundary conditions."""
-
-    def test_empty_features(self) -> None:
-        """Test model handles empty feature dict."""
-        model = DiscreteConditionalModel()
-
-        model.update({}, "a")
-        prediction = model.predict({})
-        assert prediction == "a"
-
-    def test_all_none_features(self) -> None:
-        """Test model handles all None values."""
-        model = DiscreteConditionalModel()
-
-        model.update({"a": None, "b": None}, "x")
-        prediction = model.predict({"a": None, "b": None})
-        assert prediction == "x"
-
-    def test_large_number_of_features(self) -> None:
-        """Test model handles many features."""
-        model = DiscreteConditionalModel()
-
-        features = {f"f{i}": i for i in range(20)}
-        model.update(features, "x")
-
-        prediction = model.predict(features)
-        assert prediction == "x"
-
-    def test_many_labels(self) -> None:
-        """Test model handles many different labels."""
-        model = DiscreteConditionalModel()
-
-        for i in range(100):
-            model.update({"x": 1}, f"label_{i}")
-
-        dist, _ = model.distribution_with_key({"x": 1})
-        assert len(dist) == 100
-
-    def test_numeric_and_string_labels(self) -> None:
-        """Test model handles mixed label types."""
-        model = DiscreteConditionalModel()
-
-        model.update({"x": 1}, 0)
-        model.update({"x": 2}, "on")
-        model.update({"x": 3}, True)
-
-        assert 0 in model._y_domain
-        assert "on" in model._y_domain
-        assert True in model._y_domain
-
-
-class TestDiscreteConditionalModelEntropy:
-    """Test entropy calculations."""
-
-    def test_entropy_uniform_distribution(self) -> None:
-        """Test entropy calculation for uniform distribution."""
-        model = DiscreteConditionalModel()
-
-        # Create uniform distribution
-        model.update({"x": 1}, "a")
-        model.update({"x": 1}, "b")
-        model.update({"x": 1}, "c")
-        model.update({"x": 1}, "d")
-
-        dist, _ = model.distribution_with_key({"x": 1})
-        entropy = model._entropy(dist)
-
-        # Entropy should be close to log2(4) for uniform
-        expected = math.log2(len(dist))
-        assert abs(entropy - expected) < 0.5  # Some smoothing affects this
-
-    def test_entropy_deterministic(self) -> None:
-        """Test entropy is low for deterministic distribution."""
-        model = DiscreteConditionalModel()
-
-        for _ in range(100):
-            model.update({"x": 1}, "a")
-
-        dist, _ = model.distribution_with_key({"x": 1})
-        entropy = model._entropy(dist)
-
-        # Should be very low entropy
-        assert entropy < 0.5
-
-
-class TestDiscreteConditionalModelNormalization:
-    """Test score normalization functions."""
-
-    def test_normalize_feature_score_zero(self) -> None:
-        """Test feature score normalization with zero input."""
-        model = DiscreteConditionalModel()
-        result = model._normalize_feature_score(0.0)
-        assert result == 0.0
-
-    def test_normalize_feature_score_positive(self) -> None:
-        """Test feature score normalization with positive values."""
-        model = DiscreteConditionalModel()
-
-        # Small positive value
-        result = model._normalize_feature_score(1.0)
-        assert abs(result - 0.5) < 0.001  # 1/(1+1) = 0.5
-
-        # Larger positive value
-        result = model._normalize_feature_score(10.0)
-        assert abs(result - 0.909) < 0.01  # 10/(1+10) ≈ 0.909
-
-        # Very large value should approach 1
-        result = model._normalize_feature_score(1000.0)
-        assert 0.999 < result < 1.0
-
-    def test_normalize_feature_score_negative(self) -> None:
-        """Test feature score normalization with negative values."""
-        model = DiscreteConditionalModel()
-
-        # Small negative value
-        result = model._normalize_feature_score(-1.0)
-        assert abs(result - (-0.5)) < 0.001  # -1/(1+1) = -0.5
-
-        # Larger negative value
-        result = model._normalize_feature_score(-10.0)
-        assert abs(result - (-0.909)) < 0.01  # -10/(1+10) ≈ -0.909
-
-        # Very large negative should approach -1
-        result = model._normalize_feature_score(-1000.0)
-        assert -1.0 < result < -0.999
-
-    def test_normalize_feature_score_bounded(self) -> None:
-        """Test that feature score normalization stays in (-1, 1) bounds."""
-        model = DiscreteConditionalModel()
-
-        test_values = [-1000, -100, -10, -1, -0.1, 0, 0.1, 1, 10, 100, 1000]
-        for value in test_values:
-            result = model._normalize_feature_score(value)
-            assert -1.0 < result < 1.0, f"Failed for value {value}: {result}"
-
-    def test_normalize_interaction_score_zero(self) -> None:
-        """Test interaction score normalization with zero input."""
-        model = DiscreteConditionalModel()
-        result = model._normalize_interaction_score(0.0)
-        assert abs(result) < 0.001  # tanh(0) = 0
-
-    def test_normalize_interaction_score_positive(self) -> None:
-        """Test interaction score normalization with positive values."""
-        model = DiscreteConditionalModel()
-
-        # Small positive value
-        result = model._normalize_interaction_score(1.0)
-        assert abs(result - 0.762) < 0.01  # tanh(1) ≈ 0.762
-
-        # Larger positive value
-        result = model._normalize_interaction_score(3.0)
-        assert abs(result - 0.995) < 0.01  # tanh(3) ≈ 0.995
-
-        # Very large value should approach 1
-        result = model._normalize_interaction_score(10.0)
-        assert result > 0.999
-
-    def test_normalize_interaction_score_negative(self) -> None:
-        """Test interaction score normalization with negative values."""
-        model = DiscreteConditionalModel()
-
-        # Small negative value
-        result = model._normalize_interaction_score(-1.0)
-        assert abs(result - (-0.762)) < 0.01  # tanh(-1) ≈ -0.762
-
-        # Larger negative value
-        result = model._normalize_interaction_score(-3.0)
-        assert abs(result - (-0.995)) < 0.01  # tanh(-3) ≈ -0.995
-
-        # Very large negative should approach -1
-        result = model._normalize_interaction_score(-10.0)
-        assert result < -0.999
-
-    def test_normalize_interaction_score_bounded(self) -> None:
-        """Test that interaction score normalization stays in [-1, 1] bounds."""
-        model = DiscreteConditionalModel()
-
-        test_values = [-100, -10, -3, -1, -0.1, 0, 0.1, 1, 3, 10, 100]
-        for value in test_values:
-            result = model._normalize_interaction_score(value)
-            # tanh can reach exactly ±1.0 for extreme values
-            assert -1.0 <= result <= 1.0, f"Failed for value {value}: {result}"
-
-    def test_normalize_preserves_sign(self) -> None:
-        """Test that normalization preserves the sign of the input."""
-        model = DiscreteConditionalModel()
-
-        # Feature scores
-        assert model._normalize_feature_score(5.0) > 0
-        assert model._normalize_feature_score(-5.0) < 0
-
-        # Interaction scores
-        assert model._normalize_interaction_score(5.0) > 0
-        assert model._normalize_interaction_score(-5.0) < 0
-
-    def test_normalize_monotonic(self) -> None:
-        """Test that normalization is monotonic (larger input → larger output)."""
-        model = DiscreteConditionalModel()
-
-        # Feature scores should be monotonically increasing
-        scores = [model._normalize_feature_score(x) for x in [-10, -1, 0, 1, 10]]
-        assert scores == sorted(scores)
-
-        # Interaction scores should be monotonically increasing
-        scores = [model._normalize_interaction_score(x) for x in [-10, -1, 0, 1, 10]]
-        assert scores == sorted(scores)
-
-    def test_normalization_prevents_score_dominance(self) -> None:
-        """Test that normalization prevents extreme scores from dominating."""
-        model = DiscreteConditionalModel()
-
-        # Without normalization, a score of 100 would dominate a score of 1
-        # With normalization, they should be more comparable
-        norm_large = model._normalize_feature_score(100.0)
-        norm_small = model._normalize_feature_score(1.0)
-
-        # The ratio should be much smaller than 100:1
-        ratio = norm_large / norm_small
-        assert ratio < 3.0  # Much less than 100
-
-
-class TestDiscreteConditionalModelTimeAwareEMA:
-    """Test time-aware exponential moving average for feature and interaction scores."""
-
-    def test_last_duration_tracking(self) -> None:
-        """Test that _last_duration is correctly tracked."""
-        model = DiscreteConditionalModel()
-
-        # Initial value
-        assert model._last_duration == 1.0
-
-        # Update with custom duration
-        model.update({"x": 1}, "a", duration=5.0)
-        assert model._last_duration == 5.0
-
-        model.update({"x": 1}, "a", duration=0.5)
-        assert model._last_duration == 0.5
-
-    def test_feature_scores_adapt_faster_with_long_duration(self) -> None:
-        """Test that feature scores adapt faster when duration is large."""
-        model_short = DiscreteConditionalModel(priority_decay=0.98)
-        model_long = DiscreteConditionalModel(priority_decay=0.98)
-
-        # Establish baseline pattern
-        for _ in range(10):
-            model_short.update({"temp": "high"}, "on", duration=1.0)
-            model_long.update({"temp": "high"}, "on", duration=1.0)
-
-        baseline_score_short = model_short._feature_scores["temp"]
-        baseline_score_long = model_long._feature_scores["temp"]
-        assert abs(baseline_score_short - baseline_score_long) < 0.001
-
-        # Introduce concept drift with different durations
-        # Short duration (many updates needed)
-        for _ in range(5):
-            model_short.update({"temp": "high"}, "off", duration=1.0)
-
-        # Long duration (single update should have more impact)
-        model_long.update({"temp": "high"}, "off", duration=60.0)
-
-        # The long-duration model should have adapted more
-        # (lower feature score since "temp" is now less predictive)
-        score_after_short = model_short._feature_scores["temp"]
-        score_after_long = model_long._feature_scores["temp"]
-
-        # Long duration should cause more change from baseline
-        change_short = abs(baseline_score_short - score_after_short)
-        change_long = abs(baseline_score_long - score_after_long)
-        assert change_long > change_short * 2  # Significantly more adaptation
-
-    def test_max_duration_prevents_over_dampening_short_updates(self) -> None:
-        """Test that max(1.0, duration) prevents over-dampening for duration < 1.0."""
-        model = DiscreteConditionalModel(priority_decay=0.98)
-
-        # Establish pattern
-        for _ in range(10):
-            model.update({"x": 1}, "a", duration=1.0)
-
-        baseline_score = model._feature_scores["x"]
-
-        # Short duration update should still have reasonable impact
-        model.update({"x": 1}, "b", duration=0.1)
-        score_after_short = model._feature_scores["x"]
-
-        # Should have changed (not over-dampened)
-        assert abs(baseline_score - score_after_short) > 0.001
-
-        # Compare with duration=1.0
-        model2 = DiscreteConditionalModel(priority_decay=0.98)
-        for _ in range(10):
-            model2.update({"x": 1}, "a", duration=1.0)
-        model2.update({"x": 1}, "b", duration=1.0)
-
-        # Short duration (0.1) should have similar impact as duration=1.0
-        # because of max(1.0, duration)
-        change_short = abs(baseline_score - score_after_short)
-        change_normal = abs(baseline_score - model2._feature_scores["x"])
-        assert abs(change_short - change_normal) < 0.01  # Very similar
-
-    def test_concept_drift_with_infrequent_updates(self) -> None:
-        """Test that time-aware EMA handles concept drift better with infrequent updates."""
-        model = DiscreteConditionalModel(priority_decay=0.98)
-
-        # Establish initial pattern with short durations
-        for _ in range(20):
-            model.update({"sensor": "motion"}, "lights_on", duration=1.0)
-
-        # Initial prediction should be strong
-        dist = model.distribution({"sensor": "motion"})
-        initial_prob = dist.get("lights_on", 0.0)
-        assert initial_prob > 0.8
-
-        # Concept drift: pattern changes, but updates are rare (long duration)
-        # A single long-duration update should significantly shift the distribution
-        model.update({"sensor": "motion"}, "lights_off", duration=100.0)
-
-        # Check that the model adapted significantly
-        dist_after = model.distribution({"sensor": "motion"})
-        prob_after = dist_after.get("lights_on", 0.0)
-
-        # Should have decreased significantly due to long duration
-        assert prob_after < initial_prob * 0.7
-
-    def test_time_aware_ema_formula_correctness(self) -> None:
-        """Test the mathematical correctness of time-aware EMA formula."""
-        model = DiscreteConditionalModel(priority_decay=0.98)
-
-        # Set up initial state
-        model.update({"x": 1}, "a", duration=1.0)
-        model.update({"x": 1}, "b", duration=1.0)
-
-        # Get baseline score
-        model._feature_scores["x"]
-
-        # Calculate expected d_eff for different durations
-        # d_eff = priority_decay ^ max(1.0, duration)  # noqa: ERA001
-
-        # For duration = 1.0
-        expected_d_eff_1 = 0.98**1.0
-        assert abs(expected_d_eff_1 - 0.98) < 0.001
-
-        # For duration = 10.0
-        expected_d_eff_10 = 0.98**10.0
-        assert abs(expected_d_eff_10 - 0.817) < 0.01
-
-        # For duration = 0.5 (should use max, so = 1.0)
-        expected_d_eff_05 = 0.98**1.0
-        assert abs(expected_d_eff_05 - 0.98) < 0.001
-
-        # Verify the formula gives more weight to new data with longer durations
-        new_weight_1 = 1.0 - expected_d_eff_1
-        new_weight_10 = 1.0 - expected_d_eff_10
-
-        # Much more weight for long duration (around 9x more)
-        assert new_weight_10 > new_weight_1 * 8
-
-    def test_zero_duration_ignored(self) -> None:
-        """Test that zero or negative duration is ignored (no _last_duration update)."""
-        model = DiscreteConditionalModel()
-
-        model.update({"x": 1}, "a", duration=5.0)
-        assert model._last_duration == 5.0
-
-        # Zero duration should be ignored
-        model.update({"x": 1}, "a", duration=0.0)
-        assert model._last_duration == 5.0  # Should not change
-
-        # Negative duration should be ignored
-        model.update({"x": 1}, "a", duration=-1.0)
-        assert model._last_duration == 5.0  # Should not change
+        dist = model.distribution(key)
+        assert dist == pytest.approx({"on": 0.5, "off": 0.5})
 
 
 class TestDiscreteConditionalModelIntegration:
-    """Integration tests with realistic scenarios."""
+    """Test integration scenarios and workflows."""
 
-    def test_weather_prediction_scenario(self) -> None:
-        """Test realistic weather-based prediction scenario."""
+    def test_complete_workflow(self) -> None:
+        """Test complete workflow: initialize, update, query."""
+        model = DiscreteConditionalModel()
+        morning_key = (("time_of_day", 600),)
+        evening_key = (("time_of_day", 1080),)
+
+        # Morning: mostly on
+        model.update_duration(morning_key, "on", 300.0, timestamp=0.0)
+        model.update_duration(morning_key, "off", 100.0, timestamp=0.0)
+
+        # Evening: mostly off
+        model.update_duration(evening_key, "on", 100.0, timestamp=0.0)
+        model.update_duration(evening_key, "off", 300.0, timestamp=0.0)
+
+        # Check distributions
+        morning_dist = model.distribution(morning_key)
+        evening_dist = model.distribution(evening_key)
+
+        assert morning_dist == pytest.approx({"on": 0.75, "off": 0.25})
+        assert evening_dist == pytest.approx({"on": 0.25, "off": 0.75})
+
+    def test_multi_dimensional_temporal_pattern(self) -> None:
+        """Test learning patterns across multiple temporal dimensions."""
         model = DiscreteConditionalModel()
 
-        # Train on patterns
-        training_data = [
-            ({"weather": "sunny", "temp": "hot"}, "ac_on"),
-            ({"weather": "sunny", "temp": "hot"}, "ac_on"),
-            ({"weather": "rainy", "temp": "cold"}, "heater_on"),
-            ({"weather": "rainy", "temp": "cold"}, "heater_on"),
-            ({"weather": "cloudy", "temp": "mild"}, "off"),
-        ]
+        # Weekday morning: busy
+        weekday_morning = (("day_of_week", 1), ("time_of_day", 600))
+        model.update_duration(weekday_morning, "busy", 200.0, timestamp=0.0)
+        model.update_duration(weekday_morning, "idle", 50.0, timestamp=0.0)
 
-        for features, label in training_data:
-            model.update(features, label)
+        # Weekend morning: idle
+        weekend_morning = (("day_of_week", 6), ("time_of_day", 600))
+        model.update_duration(weekend_morning, "busy", 50.0, timestamp=0.0)
+        model.update_duration(weekend_morning, "idle", 200.0, timestamp=0.0)
 
-        # Test predictions
-        assert model.predict({"weather": "sunny", "temp": "hot"}) == "ac_on"
-        assert model.predict({"weather": "rainy", "temp": "cold"}) == "heater_on"
+        weekday_dist = model.distribution(weekday_morning)
+        weekend_dist = model.distribution(weekend_morning)
+
+        assert weekday_dist == pytest.approx({"busy": 0.8, "idle": 0.2})
+        assert weekend_dist == pytest.approx({"busy": 0.2, "idle": 0.8})
 
     def test_incremental_learning(self) -> None:
-        """Test model adapts to changing patterns."""
-        model = DiscreteConditionalModel(decay=0.9)
+        """Test that model updates incrementally as new data arrives."""
+        model = DiscreteConditionalModel()
+        key = (("time_of_day", 600),)
 
-        # Initial pattern
-        for _ in range(20):
-            model.update({"x": 1}, "old")
+        # Initial observation
+        model.update_duration(key, "on", 100.0, timestamp=0.0)
+        assert model.distribution(key) == {"on": 1.0}
 
-        assert model.predict({"x": 1}) == "old"
+        # Add more data
+        model.update_duration(key, "off", 100.0, timestamp=0.0)
+        assert model.distribution(key) == pytest.approx({"on": 0.5, "off": 0.5})
 
-        # Pattern changes
-        for _ in range(30):
-            model.update({"x": 1}, "new")
+        # Add even more data
+        model.update_duration(key, "off", 200.0, timestamp=0.0)
+        expected = {"on": 100 / 400, "off": 300 / 400}
+        assert model.distribution(key) == pytest.approx(expected)
 
-        # Should adapt to new pattern
-        assert model.predict({"x": 1}) == "new"
-
-    def test_multi_feature_interaction(self) -> None:
-        """Test model captures multi-feature interactions."""
+    def test_many_time_buckets(self) -> None:
+        """Test model with many different time buckets."""
         model = DiscreteConditionalModel()
 
-        # Complex interaction pattern
-        model.update({"a": 1, "b": 1}, "positive")
-        model.update({"a": 1, "b": 2}, "negative")
-        model.update({"a": 2, "b": 1}, "negative")
-        model.update({"a": 2, "b": 2}, "positive")
+        # Create 24 hourly buckets
+        for hour in range(24):
+            key = (("time_of_day", hour * 60),)
+            # Night hours (0-6): mostly off
+            if 0 <= hour < 6:
+                model.update_duration(key, "off", 200.0, timestamp=0.0)
+                model.update_duration(key, "on", 50.0, timestamp=0.0)
+            # Day hours (6-22): mostly on
+            elif 6 <= hour < 22:
+                model.update_duration(key, "on", 200.0, timestamp=0.0)
+                model.update_duration(key, "off", 50.0, timestamp=0.0)
+            # Late night (22-24): mostly off
+            else:
+                model.update_duration(key, "off", 200.0, timestamp=0.0)
+                model.update_duration(key, "on", 50.0, timestamp=0.0)
 
-        # Model should learn the XOR-like pattern
-        assert model.predict({"a": 1, "b": 1}) == "positive"
-        assert model.predict({"a": 2, "b": 2}) == "positive"
+        # Verify night distribution
+        night_dist = model.distribution((("time_of_day", 180),))
+        assert night_dist == pytest.approx({"off": 0.8, "on": 0.2})
 
+        # Verify day distribution
+        day_dist = model.distribution((("time_of_day", 720),))
+        assert day_dist == pytest.approx({"on": 0.8, "off": 0.2})
 
-class TestDiscreteConditionalModelInteractionPruning:
-    """Test interaction pruning functionality."""
-
-    def test_initialization_with_pruning_params(self) -> None:
-        """Test model initializes with custom pruning parameters."""
-        model = DiscreteConditionalModel(
-            max_interactions=50,
-            min_interaction_support=2.0,
-            min_interaction_score=0.1,
-        )
-        assert model.max_interactions == 50
-        assert model.min_interaction_support == 2.0
-        assert model.min_interaction_score == 0.1
-
-    def test_invalid_max_interactions(self) -> None:
-        """Test validation rejects invalid max_interactions."""
-        with pytest.raises(ValueError, match="max_interactions must be at least 1"):
-            DiscreteConditionalModel(max_interactions=0)
-
-    def test_invalid_min_interaction_support(self) -> None:
-        """Test validation rejects negative min_interaction_support."""
-        with pytest.raises(
-            ValueError, match="min_interaction_support must be non-negative"
-        ):
-            DiscreteConditionalModel(min_interaction_support=-1.0)
-
-    def test_invalid_min_interaction_score(self) -> None:
-        """Test validation rejects out-of-range min_interaction_score."""
-        with pytest.raises(
-            ValueError, match="min_interaction_score must be in \\[0, 1\\]"
-        ):
-            DiscreteConditionalModel(min_interaction_score=1.5)
-
-    def test_prune_by_low_score(self) -> None:
-        """Test pruning removes interactions with weak scores."""
-        # Use a very low threshold first to see interactions being created
-        model = DiscreteConditionalModel(
-            min_interaction_score=0.0,  # Start with no filtering
-            min_interaction_support=0.0,
-            max_interactions=100,
-        )
-
-        # Create a pattern where a+b together strongly predicts outcome
-        # This should create a strong interaction score
-        for _ in range(15):
-            model.update({"a": "on", "b": "hot"}, "yes", duration=1.0)
-        for _ in range(15):
-            model.update({"a": "off", "b": "cold"}, "no", duration=1.0)
-        # Individual features are less predictive
-        for _ in range(5):
-            model.update({"a": "on", "b": "cold"}, "no", duration=1.0)
-        for _ in range(5):
-            model.update({"a": "off", "b": "hot"}, "yes", duration=1.0)
-
-        # This creates interaction signal between a and b
-        initial_count = len(model._interaction_scores)
-        assert initial_count > 0, "Should have created interactions"
-
-        # Now test that high threshold would prune weak interactions
-        # by manually adjusting the threshold and calling prune
-        model.min_interaction_score = 0.5
-
-        # Create some very weak interactions
-        for i in range(10):
-            model.update({f"n{i}": i % 2, f"m{i}": "x"}, f"r{i % 3}", duration=0.001)
-
-        # Manually call prune to test filtering
-        model._prune_interactions()
-
-        # Should have pruned some interactions based on score
-        final_count = len(model._interaction_scores)
-        assert final_count <= initial_count + 10  # Some should be pruned
-
-    def test_prune_by_low_support(self) -> None:
-        """Test pruning removes interactions with insufficient support."""
-        model = DiscreteConditionalModel(
-            min_interaction_support=5.0,  # Require at least 5.0 total duration
-            min_interaction_score=0.0,  # Don't filter by score
-            max_interactions=100,
-        )
-
-        # Create multiple interactions with varying support levels
-        # High support interaction
-        for _ in range(10):
-            model.update({"high": "a", "feat": "x"}, "yes", duration=1.0)
-
-        # Low support interaction
-        for _ in range(2):
-            model.update({"low": "b", "other": "y"}, "no", duration=1.0)
-
-        # Check that low support ones get pruned
-        # Note: support is accumulated per interaction pair, not per update
-        # So we need to check the support dict
-        low_keys = [("low", "other"), ("other", "low")]
-        has_low_support = any(key in model._interaction_support for key in low_keys)
-
-        # High support should be kept if score is non-zero
-        # Low support should not be kept
-        assert not has_low_support, "Low support interaction should be pruned"
-
-    def test_top_k_pruning(self) -> None:
-        """Test top-K pruning keeps only strongest interactions."""
-        model = DiscreteConditionalModel(
-            max_interactions=3,
-            min_interaction_support=0.0,
-            min_interaction_score=0.0,
-        )
-
-        # Create many different interactions
-        # Each should create an interaction pair
-        for i in range(10):
-            for _ in range(5):
-                model.update({f"f{i}": "a", "common": "x"}, "yes", duration=1.0)
-
-        # After creating many interactions, pruning should limit to top 3
-        # (pruning is called after each update)
-        assert (
-            len(model._interaction_scores) <= 3
-        ), "Should keep at most max_interactions"
-
-    def test_pruning_maintains_sync(self) -> None:
-        """Test pruning keeps _interaction_scores and _interaction_support in sync."""
-        model = DiscreteConditionalModel(
-            max_interactions=10,
-            min_interaction_support=2.0,
-            min_interaction_score=0.1,
-        )
-
-        # Create various interactions
-        for i in range(20):
-            model.update({f"a{i}": 1, f"b{i}": 1}, "yes", duration=1.0)
-
-        # After pruning, both dicts should have same keys
-        assert set(model._interaction_scores.keys()) == set(
-            model._interaction_support.keys()
-        )
-
-    def test_no_pruning_when_under_limit(self) -> None:
-        """Test pruning doesn't remove interactions when under max_interactions."""
-        model = DiscreteConditionalModel(
-            max_interactions=100,
-            min_interaction_support=0.0,
-            min_interaction_score=0.0,
-        )
-
-        # Create just 3 interactions (well under limit)
-        for i in range(3):
-            for _ in range(5):
-                model.update({f"a{i}": "x", "b": "y"}, "yes", duration=1.0)
-
-        # All should be kept since we're under the limit
-        assert len(model._interaction_scores) <= 3
-        assert len(model._interaction_scores) > 0
-
-    def test_pruning_with_all_criteria(self) -> None:
-        """Test pruning works correctly with all criteria active."""
-        model = DiscreteConditionalModel(
-            max_interactions=5,
-            min_interaction_support=3.0,
-            min_interaction_score=0.0,
-        )
-
-        # Create some interactions with sufficient support
-        for i in range(8):
-            for _ in range(5):  # 5 duration total per interaction
-                model.update({f"f{i}": "a", "x": "b"}, "yes", duration=1.0)
-
-        # Should apply both support filter and top-K limit
-        assert len(model._interaction_scores) <= 5, "Should respect max_interactions"
-        assert len(model._interaction_scores) == len(
-            model._interaction_support
-        ), "Should stay in sync"
-
-    def test_pruning_preserves_strongest_signals(self) -> None:
-        """Test that pruning keeps the most informative interactions."""
-        model = DiscreteConditionalModel(
-            max_interactions=2,
-            min_interaction_support=0.0,
-            min_interaction_score=0.0,
-        )
-
-        # Create several interactions
-        for i in range(5):
-            for _ in range(3):
-                model.update({f"feat{i}": "val", "common": "x"}, "label", duration=1.0)
-
-        # Should keep only top 2
-        assert len(model._interaction_scores) <= 2, "Should keep at most 2 interactions"
-        assert (
-            len(model._interaction_scores) > 0
-        ), "Should keep at least some interactions"
-
-
-class TestDiscreteConditionalModelDriftDetection:
-    """Test concept drift detection functionality."""
-
-    def test_initialization_with_drift_weights(self) -> None:
-        """Test model initializes with custom drift weights."""
-        weights = DriftWeights(entropy=0.6, max_p=0.3, support=0.1)
-        model = DiscreteConditionalModel(drift_weights=weights)
-        assert model.drift_weights.entropy == 0.6
-        assert model.drift_weights.max_p == 0.3
-        assert model.drift_weights.support == 0.1
-
-    def test_default_drift_weights(self) -> None:
-        """Test model uses default drift weights when not specified."""
+    def test_noise_filtering_prevents_contamination(self) -> None:
+        """Test that noise filtering keeps distributions clean."""
         model = DiscreteConditionalModel()
-        assert model.drift_weights.entropy == 0.4
-        assert model.drift_weights.max_p == 0.4
-        assert model.drift_weights.support == 0.2
+        key = (("time_of_day", 600),)
 
-    def test_invalid_drift_weights_missing_keys(self) -> None:
-        """Test DriftWeights dataclass enforces all fields."""
-        # DriftWeights has default values, so this checks TypeError for missing required param
-        # All fields have defaults so this test validates dataclass structure
-        weights = DriftWeights()  # Should work with all defaults
-        assert weights.entropy == 0.4
-        assert weights.max_p == 0.4
-        assert weights.support == 0.2
+        # Add significant duration
+        model.update_duration(key, "on", 1000.0, timestamp=0.0)
 
-    def test_invalid_drift_weights_out_of_range(self) -> None:
-        """Test validation rejects out-of-range drift weights."""
-        with pytest.raises(ValueError, match="must be in \\[0, 1\\]"):
-            DriftWeights(entropy=1.5, max_p=0.3)
+        # Try to add noise
+        for _ in range(100):
+            model.update_duration(key, "noise", 1.0, timestamp=0.0)  # Filtered
 
-    def test_invalid_drift_weights_sum_too_large(self) -> None:
-        """Test validation rejects drift weights summing > 1.0."""
-        with pytest.raises(ValueError, match="must sum to <= 1.0"):
-            DriftWeights(entropy=0.8, max_p=0.8)
+        # Distribution should only contain "on"
+        assert model.distribution(key) == {"on": 1.0}
 
-    def test_drift_level_initial_state(self) -> None:
-        """Test drift level starts at zero."""
+    def test_multiple_states_workflow(self) -> None:
+        """Test workflow with many different states."""
         model = DiscreteConditionalModel()
-        assert model.drift_level() == 0.0
+        key = (("time_of_day", 600),)
 
-    def test_drift_level_stable_predictions(self) -> None:
-        """Test drift level remains low with stable predictions."""
+        states = ["heating", "cooling", "fan", "idle", "off"]
+        durations = [100.0, 150.0, 75.0, 200.0, 25.0]
+
+        for state, duration in zip(states, durations, strict=True):
+            model.update_duration(key, state, duration, timestamp=0.0)
+
+        dist = model.distribution(key)
+        total = sum(durations)
+        expected = {state: dur / total for state, dur in zip(states, durations, strict=True)}
+
+        assert dist == pytest.approx(expected)
+        assert sum(dist.values()) == pytest.approx(1.0)
+
+    def test_empty_model_queries(self) -> None:
+        """Test querying empty model returns empty distributions."""
         model = DiscreteConditionalModel()
 
-        # Train with consistent pattern
-        for _ in range(20):
-            model.update({"temp": "hot"}, "sunny", duration=1.0)
-            model.update({"temp": "cold"}, "rainy", duration=1.0)
+        # Query various keys
+        assert model.distribution((("time_of_day", 600),)) == {}
+        assert model.distribution((("day_of_week", 0),)) == {}
+        assert model.distribution((("month", 1),)) == {}
+        assert model.distribution(()) == {}
 
-        # Check confidence to update drift
-        for _ in range(10):
-            model.confidence({"temp": "hot"})
-            model.confidence({"temp": "cold"})
-
-        # Drift should be very low with stable pattern
-        drift = model.drift_level()
-        assert drift < 0.1, f"Expected low drift, got {drift}"
-
-    def test_drift_detection_entropy_increase(self) -> None:
-        """Test drift detection when entropy increases (less certain predictions)."""
+    def test_edge_case_exactly_five_seconds(self) -> None:
+        """Test boundary condition at 5 second threshold."""
         model = DiscreteConditionalModel()
+        key = (("time_of_day", 600),)
 
-        # Establish baseline with deterministic pattern
-        for _ in range(30):
-            model.update({"x": 1}, "a", duration=1.0)
+        # 4.99 seconds should be filtered
+        model.update_duration(key, "filtered", 4.99, timestamp=0.0)
+        assert model.distribution(key) == {}
 
-        # Check confidence to establish baseline
-        for _ in range(5):
-            model.confidence({"x": 1})
+        # 5.0 seconds should be accepted
+        model.update_duration(key, "accepted", 5.0, timestamp=0.0)
+        assert model.distribution(key) == {"accepted": 1.0}
 
-        baseline_drift = model.drift_level()
+        # 5.01 seconds should be accepted
+        model.update_duration(key, "also_accepted", 5.01, timestamp=0.0)
+        expected = {"accepted": 5.0 / 10.01, "also_accepted": 5.01 / 10.01}
+        assert model.distribution(key) == pytest.approx(expected)
 
-        # Introduce uncertainty - same features now produce different outcomes
-        for _ in range(10):
-            model.update({"x": 1}, "b", duration=1.0)
-            model.update({"x": 1}, "c", duration=1.0)
 
-        # Check confidence to update drift
-        for _ in range(5):
-            model.confidence({"x": 1})
+class TestDiscreteConditionalModelPredict:
+    """Test DiscreteConditionalModel predict method."""
 
-        new_drift = model.drift_level()
-
-        # Drift should increase due to higher entropy
-        assert (
-            new_drift > baseline_drift
-        ), f"Expected drift increase, got {baseline_drift} -> {new_drift}"
-
-    def test_drift_detection_maxp_decrease(self) -> None:
-        """Test drift detection when max probability decreases."""
+    def test_predict_unobserved_key(self) -> None:
+        """Test predict for unobserved key returns None."""
         model = DiscreteConditionalModel()
+        key = (("time_of_day", 600),)
 
-        # Establish baseline with strong pattern (90% "sunny")
-        for _ in range(90):
-            model.update({"weather": "clear"}, "sunny", duration=1.0)
-        for _ in range(10):
-            model.update({"weather": "clear"}, "cloudy", duration=1.0)
+        prediction = model.predict(key)
 
-        # Establish baseline
-        for _ in range(5):
-            model.confidence({"weather": "clear"})
+        assert prediction.state is None
+        assert prediction.distribution == {}
+        assert prediction.confidence.max_probability == 0
+        assert prediction.confidence.entropy_confidence == 0
+        assert prediction.confidence.support_time == 0
 
-        baseline_drift = model.drift_level()
-
-        # Pattern shifts - distribution becomes more balanced
-        for _ in range(40):
-            model.update({"weather": "clear"}, "cloudy", duration=1.0)
-
-        # Check confidence to update drift
-        for _ in range(5):
-            model.confidence({"weather": "clear"})
-
-        new_drift = model.drift_level()
-
-        # Drift should increase due to decreasing max probability
-        assert (
-            new_drift > baseline_drift
-        ), f"Expected drift increase, got {baseline_drift} -> {new_drift}"
-
-    def test_is_drifting_with_threshold(self) -> None:
-        """Test is_drifting method with custom threshold."""
+    def test_predict_single_state(self) -> None:
+        """Test predict with single state returns that state with 100% confidence."""
         model = DiscreteConditionalModel()
+        key = (("time_of_day", 600),)
 
-        # Train initial pattern
-        for _ in range(50):
-            model.update({"feature": "A"}, "label1", duration=1.0)
+        model.update_duration(key, "on", 100.0, timestamp=0.0)
 
-        # Establish baseline
-        for _ in range(5):
-            model.confidence({"feature": "A"})
+        prediction = model.predict(key)
 
-        assert not model.is_drifting(threshold=0.2), "Should not detect drift initially"
+        assert prediction.state == "on"
+        assert prediction.distribution == {"on": 1.0}
+        assert prediction.confidence.max_probability == 1.0
+        assert prediction.confidence.entropy_confidence == 1.0  # Single state has zero entropy
+        assert prediction.confidence.support_time == 100.0
 
-        # Introduce significant drift
-        for _ in range(30):
-            model.update({"feature": "A"}, "label2", duration=1.0)
-            model.update({"feature": "A"}, "label3", duration=1.0)
-
-        # Update drift
-        for _ in range(10):
-            model.confidence({"feature": "A"})
-
-        # Should detect drift with reasonable threshold
-        # Note: May not always exceed 0.2 depending on exact dynamics
-        # Just verify the method works
-        result = model.is_drifting(threshold=0.5)
-        assert isinstance(result, bool)
-
-    def test_drift_level_bounded(self) -> None:
-        """Test drift level is always bounded to [0, 1]."""
+    def test_predict_returns_highest_probability_state(self) -> None:
+        """Test predict returns the state with highest probability."""
         model = DiscreteConditionalModel()
+        key = (("time_of_day", 600),)
 
-        # Create extreme drift scenario
-        for _ in range(20):
-            model.update({"x": 1}, "a", duration=1.0)
+        model.update_duration(key, "on", 300.0, timestamp=0.0)
+        model.update_duration(key, "off", 100.0, timestamp=0.0)
 
-        for _ in range(5):
-            model.confidence({"x": 1})
+        prediction = model.predict(key)
 
-        # Completely flip the pattern
-        for _ in range(50):
-            model.update({"x": 1}, "b", duration=1.0)
-            model.update({"x": 1}, "c", duration=1.0)
-            model.update({"x": 1}, "d", duration=1.0)
+        assert prediction.state == "on"
+        assert prediction.distribution == pytest.approx({"on": 0.75, "off": 0.25})
+        assert prediction.confidence.max_probability == pytest.approx(0.75)
+        assert prediction.confidence.support_time == 400.0
 
-        for _ in range(10):
-            model.confidence({"x": 1})
+    def test_predict_with_three_states(self) -> None:
+        """Test predict with three states."""
+        model = DiscreteConditionalModel()
+        key = (("time_of_day", 600),)
 
-        drift = model.drift_level()
-        assert 0.0 <= drift <= 1.0, f"Drift should be in [0, 1], got {drift}"
+        model.update_duration(key, "heating", 500.0, timestamp=0.0)
+        model.update_duration(key, "cooling", 300.0, timestamp=0.0)
+        model.update_duration(key, "idle", 200.0, timestamp=0.0)
 
-    def test_drift_weights_affect_score(self) -> None:
-        """Test that drift weights affect the final drift score."""
-        model_entropy_heavy = DiscreteConditionalModel(
-            drift_weights=DriftWeights(entropy=0.9, max_p=0.1, support=0.0)
+        prediction = model.predict(key)
+
+        assert prediction.state == "heating"
+        assert prediction.distribution == pytest.approx(
+            {"heating": 0.5, "cooling": 0.3, "idle": 0.2}
         )
-        model_maxp_heavy = DiscreteConditionalModel(
-            drift_weights=DriftWeights(entropy=0.1, max_p=0.9, support=0.0)
-        )
+        assert prediction.confidence.max_probability == pytest.approx(0.5)
+        assert prediction.confidence.support_time == 1000.0
 
-        # Create same pattern in both
-        for _ in range(30):
-            model_entropy_heavy.update({"x": 1}, "a", duration=1.0)
-            model_maxp_heavy.update({"x": 1}, "a", duration=1.0)
+    def test_predict_distribution_matches_distribution_method(self) -> None:
+        """Test that predict's distribution matches distribution() method."""
+        model = DiscreteConditionalModel()
+        key = (("time_of_day", 600),)
 
-        # Establish baselines
-        for _ in range(5):
-            model_entropy_heavy.confidence({"x": 1})
-            model_maxp_heavy.confidence({"x": 1})
+        model.update_duration(key, "on", 100.0, timestamp=0.0)
+        model.update_duration(key, "off", 200.0, timestamp=0.0)
 
-        # Introduce drift
-        for _ in range(15):
-            model_entropy_heavy.update({"x": 1}, "b", duration=1.0)
-            model_maxp_heavy.update({"x": 1}, "b", duration=1.0)
+        prediction = model.predict(key)
+        direct_dist = model.distribution(key)
 
-        # Update drift
-        for _ in range(5):
-            model_entropy_heavy.confidence({"x": 1})
-            model_maxp_heavy.confidence({"x": 1})
+        assert prediction.distribution == direct_dist
 
-        # Both should detect some drift, but exact values may differ
-        # due to different weighting schemes
-        drift1 = model_entropy_heavy.drift_level()
-        drift2 = model_maxp_heavy.drift_level()
+    def test_predict_with_equal_probabilities(self) -> None:
+        """Test predict when multiple states have equal probability."""
+        model = DiscreteConditionalModel()
+        key = (("time_of_day", 600),)
 
-        assert drift1 >= 0.0, "First model should have non-negative drift"
-        assert drift2 >= 0.0, "Second model should have non-negative drift"
+        model.update_duration(key, "on", 100.0, timestamp=0.0)
+        model.update_duration(key, "off", 100.0, timestamp=0.0)
 
-    def test_drift_with_multiple_labels(self) -> None:
-        """Test drift detection works with multiple target labels."""
+        prediction = model.predict(key)
+
+        # Should return one of the states (deterministic based on max())
+        assert prediction.state in ["on", "off"]
+        assert prediction.distribution == pytest.approx({"on": 0.5, "off": 0.5})
+        assert prediction.confidence.max_probability == pytest.approx(0.5)
+
+    def test_predict_confidence_decreases_with_uniformity(self) -> None:
+        """Test that entropy confidence decreases as distribution becomes more uniform."""
+        model = DiscreteConditionalModel()
+        key1 = (("time_of_day", 600),)
+        key2 = (("time_of_day", 700),)
+
+        # Very skewed distribution (high confidence)
+        model.update_duration(key1, "on", 950.0, timestamp=0.0)
+        model.update_duration(key1, "off", 50.0, timestamp=0.0)
+
+        # Uniform distribution (low confidence)
+        model.update_duration(key2, "on", 100.0, timestamp=0.0)
+        model.update_duration(key2, "off", 100.0, timestamp=0.0)
+
+        prediction1 = model.predict(key1)
+        prediction2 = model.predict(key2)
+
+        assert prediction1.confidence.entropy_confidence > prediction2.confidence.entropy_confidence
+
+    def test_predict_with_composite_key(self) -> None:
+        """Test predict with composite time key."""
+        model = DiscreteConditionalModel()
+        key = (("day_of_week", 0), ("time_of_day", 600))
+
+        model.update_duration(key, "busy", 200.0, timestamp=0.0)
+        model.update_duration(key, "idle", 100.0, timestamp=0.0)
+
+        prediction = model.predict(key)
+
+        assert prediction.state == "busy"
+        assert prediction.distribution == pytest.approx({"busy": 2 / 3, "idle": 1 / 3})
+
+
+class TestDiscreteConditionalModelEntropy:
+    """Test DiscreteConditionalModel _entropy method."""
+
+    def test_entropy_single_state_is_zero(self) -> None:
+        """Test entropy of single state distribution is zero."""
+        model = DiscreteConditionalModel()
+        dist = {"on": 1.0}
+
+        ent = model._entropy(dist)
+
+        assert ent == 0.0
+
+    def test_entropy_uniform_two_states(self) -> None:
+        """Test entropy of uniform distribution over two states is 1 bit."""
+        model = DiscreteConditionalModel()
+        dist = {"on": 0.5, "off": 0.5}
+
+        ent = model._entropy(dist)
+
+        assert ent == pytest.approx(1.0)
+
+    def test_entropy_uniform_four_states(self) -> None:
+        """Test entropy of uniform distribution over four states is 2 bits."""
+        model = DiscreteConditionalModel()
+        dist = {"a": 0.25, "b": 0.25, "c": 0.25, "d": 0.25}
+
+        ent = model._entropy(dist)
+
+        assert ent == pytest.approx(2.0)
+
+    def test_entropy_skewed_distribution(self) -> None:
+        """Test entropy of skewed distribution."""
+        model = DiscreteConditionalModel()
+        dist = {"on": 0.9, "off": 0.1}
+
+        ent = model._entropy(dist)
+
+        # Should be low but not zero
+        assert 0 < ent < 1.0
+        assert ent == pytest.approx(0.469, abs=0.001)
+
+    def test_entropy_increases_with_uniformity(self) -> None:
+        """Test that entropy increases as distribution becomes more uniform."""
         model = DiscreteConditionalModel()
 
-        # Create pattern with 3 labels
-        for _ in range(20):
-            model.update({"x": 1}, "label_a", duration=1.0)
-        for _ in range(10):
-            model.update({"x": 1}, "label_b", duration=1.0)
-        for _ in range(5):
-            model.update({"x": 1}, "label_c", duration=1.0)
+        dist1 = {"on": 0.99, "off": 0.01}  # Very skewed
+        dist2 = {"on": 0.75, "off": 0.25}  # Moderately skewed
+        dist3 = {"on": 0.5, "off": 0.5}  # Uniform
 
-        # Establish baseline
-        for _ in range(5):
-            model.confidence({"x": 1})
+        ent1 = model._entropy(dist1)
+        ent2 = model._entropy(dist2)
+        ent3 = model._entropy(dist3)
 
-        baseline_drift = model.drift_level()
+        assert ent1 < ent2 < ent3
 
-        # Change distribution
-        for _ in range(20):
-            model.update({"x": 1}, "label_c", duration=1.0)
-
-        # Update drift
-        for _ in range(5):
-            model.confidence({"x": 1})
-
-        new_drift = model.drift_level()
-
-        # Should detect the distribution change
-        assert new_drift >= baseline_drift
-
-
-class TestDiscreteConditionalModelSerialization:
-    """Test model serialization and deserialization."""
-
-    def test_to_dict_basic(self) -> None:
-        """Test to_dict returns a dictionary with expected keys."""
-        model = DiscreteConditionalModel(alpha=1.5, decay=7200.0)
-        data = model.to_dict()
-
-        assert isinstance(data, dict)
-        assert data["alpha"] == 1.5
-        assert data["decay"] == 7200.0
-        assert "_states" in data
-        assert "_y_domain" in data
-        assert "_drift" in data
-
-    def test_from_dict_basic(self) -> None:
-        """Test from_dict recreates a model from dictionary."""
-        original = DiscreteConditionalModel(alpha=1.5, decay=7200.0)
-        data = original.to_dict()
-        restored = DiscreteConditionalModel.from_dict(data)
-
-        assert restored.alpha == original.alpha
-        assert restored.decay == original.decay
-        assert restored._t == original._t
-
-    def test_serialization_empty_model(self) -> None:
-        """Test serialization of an untrained model."""
+    def test_entropy_ignores_zero_probabilities(self) -> None:
+        """Test that entropy correctly handles zero probabilities."""
         model = DiscreteConditionalModel()
-        data = model.to_dict()
-        restored = DiscreteConditionalModel.from_dict(data)
+        dist = {"on": 1.0, "off": 0.0}
 
-        assert len(restored._states) == 0
-        assert len(restored._y_domain) == 0
-        assert restored._t == 0.0
+        ent = model._entropy(dist)
 
-    def test_serialization_with_training_data(self) -> None:
-        """Test serialization preserves trained model state."""
+        # Should be zero (effectively single state)
+        assert ent == 0.0
+
+    def test_entropy_with_many_states(self) -> None:
+        """Test entropy with many states."""
         model = DiscreteConditionalModel()
+        # Uniform distribution over 8 states
+        dist = {str(i): 0.125 for i in range(8)}
 
-        # Train the model
-        model.update({"weather": "sunny", "temp": "high"}, "on", duration=100.0)
-        model.update({"weather": "sunny", "temp": "high"}, "on", duration=50.0)
-        model.update({"weather": "rainy", "temp": "low"}, "off", duration=75.0)
-        model.update({"weather": "cloudy"}, "on", duration=25.0)
+        ent = model._entropy(dist)
 
-        # Get predictions before serialization
-        dist_before = model.distribution({"weather": "sunny", "temp": "high"})
-        conf_before = model.confidence({"weather": "sunny", "temp": "high"})
+        assert ent == pytest.approx(3.0)  # log2(8) = 3
 
-        # Serialize and deserialize
-        data = model.to_dict()
-        restored = DiscreteConditionalModel.from_dict(data)
 
-        # Get predictions after deserialization
-        dist_after = restored.distribution({"weather": "sunny", "temp": "high"})
-        conf_after = restored.confidence({"weather": "sunny", "temp": "high"})
+class TestDiscreteConditionalModelConfidenceFromStats:
+    """Test DiscreteConditionalModel _confidence_from_stats method."""
 
-        # Verify predictions match
-        assert dist_before.keys() == dist_after.keys()
-        for key in dist_before:
-            assert math.isclose(
-                dist_before[key], dist_after[key], rel_tol=1e-9
-            ), f"Probability mismatch for {key}"
+    def test_confidence_empty_stats(self) -> None:
+        """Test confidence from empty stats returns all zeros."""
+        model = DiscreteConditionalModel()
+        stats = StateStats()
 
-        assert math.isclose(
-            conf_before.max_probability, conf_after.max_probability, rel_tol=1e-9
-        )
-        assert math.isclose(
-            conf_before.entropy_confidence,
-            conf_after.entropy_confidence,
-            rel_tol=1e-9,
-        )
-        assert math.isclose(
-            conf_before.support_time, conf_after.support_time, rel_tol=1e-9
-        )
+        conf = model._confidence_from_stats(stats)
 
-    def test_serialization_preserves_y_domain(self) -> None:
-        """Test serialization preserves the target domain."""
+        assert conf.max_probability == 0
+        assert conf.entropy_confidence == 0
+        assert conf.support_time == 0
+
+    def test_confidence_single_state(self) -> None:
+        """Test confidence with single state has max values."""
+        model = DiscreteConditionalModel()
+        stats = StateStats()
+        stats.durations = {"on": 100.0}
+
+        conf = model._confidence_from_stats(stats)
+
+        assert conf.max_probability == 1.0
+        assert conf.entropy_confidence == 1.0
+        assert conf.support_time == 100.0
+
+    def test_confidence_uniform_distribution(self) -> None:
+        """Test confidence with uniform distribution has low entropy confidence."""
+        model = DiscreteConditionalModel()
+        stats = StateStats()
+        stats.durations = {"on": 100.0, "off": 100.0}
+
+        conf = model._confidence_from_stats(stats)
+
+        assert conf.max_probability == pytest.approx(0.5)
+        assert conf.entropy_confidence == pytest.approx(0.0)  # Max entropy normalized to 0
+        assert conf.support_time == 200.0
+
+    def test_confidence_skewed_distribution(self) -> None:
+        """Test confidence with skewed distribution."""
+        model = DiscreteConditionalModel()
+        stats = StateStats()
+        stats.durations = {"on": 900.0, "off": 100.0}
+
+        conf = model._confidence_from_stats(stats)
+
+        assert conf.max_probability == pytest.approx(0.9)
+        assert 0 < conf.entropy_confidence < 1.0  # Between uniform and certain
+        assert conf.support_time == 1000.0
+
+    def test_confidence_entropy_confidence_range(self) -> None:
+        """Test that entropy confidence is always between 0 and 1."""
         model = DiscreteConditionalModel()
 
-        model.update({"x": 1}, "label_a", duration=10.0)
-        model.update({"x": 2}, "label_b", duration=20.0)
-        model.update({"x": 3}, "label_c", duration=30.0)
-
-        data = model.to_dict()
-        restored = DiscreteConditionalModel.from_dict(data)
-
-        assert restored._y_domain == model._y_domain
-        assert restored._y_domain == {"label_a", "label_b", "label_c"}
-
-    def test_serialization_preserves_feature_scores(self) -> None:
-        """Test serialization preserves feature importance scores."""
-        model = DiscreteConditionalModel()
-
-        # Train to build up feature scores
-        for _ in range(10):
-            model.update({"weather": "sunny", "temp": "high"}, "on", duration=10.0)
-            model.update({"weather": "rainy", "temp": "low"}, "off", duration=10.0)
-
-        data = model.to_dict()
-        restored = DiscreteConditionalModel.from_dict(data)
-
-        # Feature scores should match
-        assert set(restored._feature_scores.keys()) == set(
-            model._feature_scores.keys()
-        )
-        for key in model._feature_scores:
-            assert math.isclose(
-                restored._feature_scores[key],
-                model._feature_scores[key],
-                rel_tol=1e-9,
-            )
-
-    def test_serialization_preserves_interaction_scores(self) -> None:
-        """Test serialization preserves feature interaction scores."""
-        model = DiscreteConditionalModel()
-
-        # Train to build up interaction scores
-        for _ in range(15):
-            model.update(
-                {"weather": "sunny", "temp": "high", "humidity": "low"},
-                "on",
-                duration=10.0,
-            )
-            model.update(
-                {"weather": "rainy", "temp": "low", "humidity": "high"},
-                "off",
-                duration=10.0,
-            )
-
-        data = model.to_dict()
-        restored = DiscreteConditionalModel.from_dict(data)
-
-        # Interaction scores should match
-        assert len(restored._interaction_scores) == len(model._interaction_scores)
-        for key in model._interaction_scores:
-            assert math.isclose(
-                restored._interaction_scores[key],
-                model._interaction_scores[key],
-                rel_tol=1e-9,
-            )
-
-    def test_serialization_preserves_drift_state(self) -> None:
-        """Test serialization preserves drift detection state."""
-        model = DiscreteConditionalModel()
-
-        # Build up drift state
-        for _ in range(20):
-            model.update({"x": 1}, "a", duration=5.0)
-
-        # Establish baseline
-        for _ in range(5):
-            model.confidence({"x": 1})
-
-        # Introduce drift
-        for _ in range(10):
-            model.update({"x": 1}, "b", duration=5.0)
-
-        # Update drift
-        for _ in range(3):
-            model.confidence({"x": 1})
-
-        drift_before = model.drift_level()
-
-        # Serialize and deserialize
-        data = model.to_dict()
-        restored = DiscreteConditionalModel.from_dict(data)
-
-        drift_after = restored.drift_level()
-
-        assert math.isclose(drift_before, drift_after, rel_tol=1e-9)
-        assert math.isclose(
-            model._drift.entropy_ema, restored._drift.entropy_ema, rel_tol=1e-9
-        )
-        assert math.isclose(
-            model._drift.maxp_ema, restored._drift.maxp_ema, rel_tol=1e-9
-        )
-        assert math.isclose(
-            model._drift.support_ema, restored._drift.support_ema, rel_tol=1e-9
-        )
-
-    def test_serialization_preserves_time(self) -> None:
-        """Test serialization preserves internal model time."""
-        model = DiscreteConditionalModel()
-
-        model.update({"x": 1}, "a", duration=100.0)
-        model.update({"x": 2}, "b", duration=50.0)
-        model.update({"x": 3}, "c", duration=25.0)
-
-        assert model._t == 175.0
-
-        data = model.to_dict()
-        restored = DiscreteConditionalModel.from_dict(data)
-
-        assert restored._t == 175.0
-
-    def test_serialization_with_custom_drift_weights(self) -> None:
-        """Test serialization preserves custom drift weights."""
-        drift_weights = DriftWeights(entropy=0.5, max_p=0.3, support=0.2)
-        model = DiscreteConditionalModel(drift_weights=drift_weights)
-
-        data = model.to_dict()
-        restored = DiscreteConditionalModel.from_dict(data)
-
-        assert restored.drift_weights.entropy == 0.5
-        assert restored.drift_weights.max_p == 0.3
-        assert restored.drift_weights.support == 0.2
-
-    def test_serialization_with_all_custom_params(self) -> None:
-        """Test serialization preserves all custom parameters."""
-        drift_weights = DriftWeights(entropy=0.6, max_p=0.3, support=0.1)
-        model = DiscreteConditionalModel(
-            alpha=2.0,
-            decay=1800.0,
-            priority_decay=0.95,
-            interaction_decay=0.92,
-            max_interactions=50,
-            min_interaction_support=2.0,
-            min_interaction_score=0.1,
-            drift_weights=drift_weights,
-        )
-
-        data = model.to_dict()
-        restored = DiscreteConditionalModel.from_dict(data)
-
-        assert restored.alpha == 2.0
-        assert restored.decay == 1800.0
-        assert restored.priority_decay == 0.95
-        assert restored.interaction_decay == 0.92
-        assert restored.max_interactions == 50
-        assert restored.min_interaction_support == 2.0
-        assert restored.min_interaction_score == 0.1
-        assert restored.drift_weights.entropy == 0.6
-        assert restored.drift_weights.max_p == 0.3
-        assert restored.drift_weights.support == 0.1
-
-    def test_serialization_roundtrip_predictions(self) -> None:
-        """Test multiple predict calls work the same after serialization."""
-        model = DiscreteConditionalModel()
-
-        # Train the model
-        training_data = [
-            ({"weather": "sunny", "temp": "high"}, "on", 100.0),
-            ({"weather": "sunny", "temp": "low"}, "off", 50.0),
-            ({"weather": "rainy", "temp": "high"}, "off", 75.0),
-            ({"weather": "rainy", "temp": "low"}, "off", 25.0),
-            ({"weather": "cloudy", "temp": "medium"}, "on", 60.0),
+        # Test various distributions
+        distributions = [
+            {"on": 100.0, "off": 100.0},  # Uniform (should be ~0)
+            {"on": 100.0},  # Single state (should be 1)
+            {"on": 75.0, "off": 25.0},  # Skewed
+            {"a": 25.0, "b": 25.0, "c": 25.0, "d": 25.0},  # Uniform 4-way
         ]
 
-        for features, label, duration in training_data:
-            model.update(features, label, duration)
+        for durations in distributions:
+            stats = StateStats()
+            stats.durations = durations
+            conf = model._confidence_from_stats(stats)
 
-        # Test various predictions
-        test_cases = [
-            {"weather": "sunny", "temp": "high"},
-            {"weather": "rainy", "temp": "low"},
-            {"weather": "cloudy", "temp": "medium"},
-            {"weather": "sunny"},
-            {"temp": "high"},
-        ]
+            assert 0 <= conf.entropy_confidence <= 1.0
 
-        predictions_before = [model.predict(features) for features in test_cases]
-        distributions_before = [
-            model.distribution(features) for features in test_cases
-        ]
+    def test_confidence_support_time_equals_total(self) -> None:
+        """Test that support_time equals total duration."""
+        model = DiscreteConditionalModel()
+        stats = StateStats()
+        stats.durations = {"on": 123.0, "off": 456.0, "idle": 789.0}
 
-        # Serialize and deserialize
-        data = model.to_dict()
-        restored = DiscreteConditionalModel.from_dict(data)
+        conf = model._confidence_from_stats(stats)
 
-        predictions_after = [restored.predict(features) for features in test_cases]
-        distributions_after = [
-            restored.distribution(features) for features in test_cases
-        ]
+        assert conf.support_time == pytest.approx(123.0 + 456.0 + 789.0)
 
-        # All predictions should match
-        assert predictions_before == predictions_after
+    def test_confidence_four_state_uniform(self) -> None:
+        """Test confidence with four equally likely states."""
+        model = DiscreteConditionalModel()
+        stats = StateStats()
+        stats.durations = {"a": 100.0, "b": 100.0, "c": 100.0, "d": 100.0}
 
-        # All distributions should match
-        for dist_before, dist_after in zip(distributions_before, distributions_after, strict=True):
-            assert dist_before.keys() == dist_after.keys()
-            for key in dist_before:
-                assert math.isclose(dist_before[key], dist_after[key], rel_tol=1e-9)
+        conf = model._confidence_from_stats(stats)
 
-    def test_serialization_continues_training(self) -> None:
-        """Test that a deserialized model can continue training."""
+        assert conf.max_probability == pytest.approx(0.25)
+        assert conf.entropy_confidence == pytest.approx(0.0)  # Maximum entropy
+        assert conf.support_time == 400.0
+
+
+class TestDiscreteConditionalModelPredictIntegration:
+    """Test integration scenarios for predict method."""
+
+    def test_predict_workflow_complete(self) -> None:
+        """Test complete workflow: update, predict, verify."""
+        model = DiscreteConditionalModel()
+        morning_key = (("time_of_day", 600),)
+
+        # Learn pattern
+        model.update_duration(morning_key, "on", 300.0, timestamp=0.0)
+        model.update_duration(morning_key, "off", 100.0, timestamp=0.0)
+
+        # Make prediction
+        prediction = model.predict(morning_key)
+
+        # Verify prediction
+        assert prediction.state == "on"
+        assert prediction.distribution["on"] > prediction.distribution["off"]
+        assert prediction.confidence.max_probability > 0.5
+        assert prediction.confidence.support_time == 400.0
+
+    def test_predict_multi_dimensional_pattern(self) -> None:
+        """Test prediction with multi-dimensional temporal patterns."""
         model = DiscreteConditionalModel()
 
-        # Initial training
-        model.update({"x": 1}, "a", duration=50.0)
-        model.update({"x": 2}, "b", duration=30.0)
+        # Weekday morning: busy
+        weekday_morning = (("day_of_week", 1), ("time_of_day", 600))
+        model.update_duration(weekday_morning, "busy", 200.0, timestamp=0.0)
+        model.update_duration(weekday_morning, "idle", 50.0, timestamp=0.0)
 
-        # Serialize
-        data = model.to_dict()
-        restored = DiscreteConditionalModel.from_dict(data)
+        # Weekend morning: idle
+        weekend_morning = (("day_of_week", 6), ("time_of_day", 600))
+        model.update_duration(weekend_morning, "busy", 50.0, timestamp=0.0)
+        model.update_duration(weekend_morning, "idle", 200.0, timestamp=0.0)
 
-        # Continue training on restored model
-        restored.update({"x": 1}, "a", duration=20.0)
-        restored.update({"x": 3}, "c", duration=40.0)
+        weekday_prediction = model.predict(weekday_morning)
+        weekend_prediction = model.predict(weekend_morning)
 
-        # Should have all three labels
-        assert "a" in restored._y_domain
-        assert "b" in restored._y_domain
-        assert "c" in restored._y_domain
+        assert weekday_prediction.state == "busy"
+        assert weekend_prediction.state == "idle"
+        assert weekday_prediction.confidence.support_time == 250.0
+        assert weekend_prediction.confidence.support_time == 250.0
 
-        # Time should have advanced
-        assert restored._t == 140.0  # 50 + 30 + 20 + 40
+    def test_predict_confidence_reflects_data_amount(self) -> None:
+        """Test that support_time reflects amount of training data."""
+        model = DiscreteConditionalModel()
+        key1 = (("time_of_day", 600),)
+        key2 = (("time_of_day", 700),)
 
-        # Should still be able to predict
-        prediction = restored.predict({"x": 1})
-        assert prediction == "a"
+        # Lots of data
+        model.update_duration(key1, "on", 10000.0, timestamp=0.0)
 
-    def test_serialization_with_empty_state_key(self) -> None:
-        """Test serialization handles empty state keys (global state)."""
+        # Little data
+        model.update_duration(key2, "on", 100.0, timestamp=0.0)
+
+        prediction1 = model.predict(key1)
+        prediction2 = model.predict(key2)
+
+        assert prediction1.confidence.support_time > prediction2.confidence.support_time
+
+    def test_predict_after_incremental_updates(self) -> None:
+        """Test that predictions update as model learns incrementally."""
+        model = DiscreteConditionalModel()
+        key = (("time_of_day", 600),)
+
+        # Initial state: mostly on
+        model.update_duration(key, "on", 100.0, timestamp=0.0)
+        prediction1 = model.predict(key)
+        assert prediction1.state == "on"
+
+        # Add more off observations
+        model.update_duration(key, "off", 500.0, timestamp=0.0)
+        prediction2 = model.predict(key)
+        assert prediction2.state == "off"
+
+    def test_predict_tie_breaking_is_deterministic(self) -> None:
+        """Test that predict breaks ties deterministically."""
+        model = DiscreteConditionalModel()
+        key = (("time_of_day", 600),)
+
+        model.update_duration(key, "a", 100.0, timestamp=0.0)
+        model.update_duration(key, "b", 100.0, timestamp=0.0)
+        model.update_duration(key, "c", 100.0, timestamp=0.0)
+
+        # Multiple predictions should return the same state
+        prediction1 = model.predict(key)
+        prediction2 = model.predict(key)
+        prediction3 = model.predict(key)
+
+        assert prediction1.state == prediction2.state == prediction3.state
+
+
+class TestPredictWithDecayBasicBehavior:
+    """Test predict method with decay enabled."""
+
+    def test_predict_applies_decay_when_half_life_set(self) -> None:
+        """Predict applies decay to state statistics when half_life > 0."""
+        model = DiscreteConditionalModel(half_life=3600.0)  # 1 hour
+        key = (("hour", 10),)
+
+        model.update_duration(key, "on", 1000.0, timestamp=0.0)
+        model.update_duration(key, "off", 500.0, timestamp=0.0)
+
+        # After 1 half-life (1 hour), durations should be halved
+        prediction = model.predict(key, timestamp=3600.0)
+
+        # Check that decay was applied (support_time should be ~750)
+        assert prediction.confidence.support_time == pytest.approx(750.0, rel=1e-6)
+
+    def test_predict_no_decay_when_half_life_zero(self) -> None:
+        """Predict does not apply decay when half_life is 0."""
+        model = DiscreteConditionalModel(half_life=0.0)
+        key = (("hour", 10),)
+
+        model.update_duration(key, "on", 1000.0, timestamp=0.0)
+
+        # Much later timestamp should not affect durations
+        prediction = model.predict(key, timestamp=100000.0)
+
+        assert prediction.confidence.support_time == 1000.0
+
+    def test_predict_uses_current_time_when_timestamp_none(self) -> None:
+        """Predict uses current time when timestamp is None."""
+        model = DiscreteConditionalModel(half_life=3600.0)
+        key = (("hour", 10),)
+
+        # Use a recent timestamp (current time)
+        recent_ts = datetime.now(tz=UTC).timestamp()
+        model.update_duration(key, "on", 1000.0, timestamp=recent_ts)
+
+        # Should not raise error and return valid prediction with None timestamp
+        prediction = model.predict(key, timestamp=None)
+
+        assert prediction.state == "on"
+        assert prediction.confidence.support_time > 0
+
+    def test_predict_decay_affects_distribution(self) -> None:
+        """Decay changes probability distribution in prediction."""
+        model = DiscreteConditionalModel(half_life=3600.0)
+        key = (("hour", 10),)
+
+        # Old observation: mostly 'off'
+        model.update_duration(key, "off", 1000.0, timestamp=0.0)
+        model.update_duration(key, "on", 100.0, timestamp=0.0)
+
+        # After 2 half-lives: off ~250, on ~25
+        # Recent observation: mostly 'on'
+        model.update_duration(key, "on", 400.0, timestamp=7200.0)
+
+        # Predict at same time
+        prediction = model.predict(key, timestamp=7200.0)
+
+        # on: ~25 + 400 = ~425, off: ~250
+        # on should now be predicted
+        assert prediction.state == "on"
+        assert prediction.distribution["on"] > prediction.distribution["off"]
+
+    def test_predict_empty_bucket_returns_none(self) -> None:
+        """Predict returns None for non-existent bucket even with decay."""
+        model = DiscreteConditionalModel(half_life=3600.0)
+        key = (("hour", 10),)
+
+        prediction = model.predict(key, timestamp=1000.0)
+
+        assert prediction.state is None
+        assert prediction.distribution == {}
+        assert prediction.confidence.support_time == 0
+
+
+class TestPredictWithDecayChangesState:
+    """Test how decay affects predicted state over time."""
+
+    def test_predict_recent_pattern_overrides_old(self) -> None:
+        """Recent observations override old ones after decay."""
+        model = DiscreteConditionalModel(half_life=86400.0)  # 1 day
+        key = (("hour", 10),)
+
+        # Week 1: Always 'heating'
+        model.update_duration(key, "heating", 5000.0, timestamp=0.0)
+
+        # Prediction at t=0 should be heating
+        pred1 = model.predict(key, timestamp=0.0)
+        assert pred1.state == "heating"
+
+        # Week 2 (7 days = ~0.78% of original): Switch to 'cooling'
+        model.update_duration(key, "cooling", 1000.0, timestamp=7 * 86400.0)
+
+        # heating decayed to ~39, cooling is 1000
+        pred2 = model.predict(key, timestamp=7 * 86400.0)
+        assert pred2.state == "cooling"
+
+    def test_predict_tie_broken_by_recent_data(self) -> None:
+        """Tie in old data broken by recent observation."""
+        model = DiscreteConditionalModel(half_life=3600.0)
+        key = (("hour", 10),)
+
+        # Old: equal durations
+        model.update_duration(key, "on", 1000.0, timestamp=0.0)
+        model.update_duration(key, "off", 1000.0, timestamp=0.0)
+
+        # Add small recent 'on' observation
+        model.update_duration(key, "on", 100.0, timestamp=7200.0)
+
+        # After 2 half-lives: on ~250 + 100 = ~350, off ~250
+        pred = model.predict(key, timestamp=7200.0)
+        assert pred.state == "on"
+
+    def test_predict_state_changes_as_decay_progresses(self) -> None:
+        """Predicted state can change as observations decay."""
+        model = DiscreteConditionalModel(half_life=3600.0)
+        key = (("hour", 10),)
+
+        model.update_duration(key, "on", 1000.0, timestamp=0.0)
+        model.update_duration(key, "off", 900.0, timestamp=0.0)
+
+        # Initially on wins
+        pred1 = model.predict(key, timestamp=0.0)
+        assert pred1.state == "on"
+
+        # Add recent off observation
+        model.update_duration(key, "off", 100.0, timestamp=3600.0)
+
+        # After 1 half-life: on ~500, off ~450 + 100 = ~550
+        pred2 = model.predict(key, timestamp=3600.0)
+        assert pred2.state == "off"
+
+
+class TestPredictWithDecayConfidence:
+    """Test how decay affects confidence metrics in predictions."""
+
+    def test_predict_support_time_reflects_decay(self) -> None:
+        """Support time in prediction reflects decayed totals."""
+        model = DiscreteConditionalModel(half_life=3600.0)
+        key = (("hour", 10),)
+
+        model.update_duration(key, "on", 1000.0, timestamp=0.0)
+        model.update_duration(key, "off", 600.0, timestamp=0.0)
+
+        # After 1 half-life: total should be ~800
+        pred = model.predict(key, timestamp=3600.0)
+        assert pred.confidence.support_time == pytest.approx(800.0, rel=1e-6)
+
+        # After 2 half-lives: total should be ~400
+        pred2 = model.predict(key, timestamp=7200.0)
+        assert pred2.confidence.support_time == pytest.approx(400.0, rel=1e-6)
+
+    def test_predict_max_probability_unchanged_by_decay(self) -> None:
+        """Decay reduces totals but preserves probability ratios."""
+        model = DiscreteConditionalModel(half_life=3600.0)
+        key = (("hour", 10),)
+
+        model.update_duration(key, "on", 900.0, timestamp=0.0)
+        model.update_duration(key, "off", 100.0, timestamp=0.0)
+
+        # Initial max probability
+        pred1 = model.predict(key, timestamp=0.0)
+        max_prob1 = pred1.confidence.max_probability
+
+        # After decay, max probability should stay same (90%)
+        pred2 = model.predict(key, timestamp=3600.0)
+        max_prob2 = pred2.confidence.max_probability
+
+        assert max_prob1 == pytest.approx(max_prob2, rel=1e-6)
+        assert max_prob1 == pytest.approx(0.9, rel=1e-6)
+
+    def test_predict_entropy_confidence_unchanged_by_pure_decay(self) -> None:
+        """Entropy confidence unchanged when only decay applied."""
+        model = DiscreteConditionalModel(half_life=3600.0)
+        key = (("hour", 10),)
+
+        model.update_duration(key, "on", 800.0, timestamp=0.0)
+        model.update_duration(key, "off", 200.0, timestamp=0.0)
+
+        pred1 = model.predict(key, timestamp=0.0)
+        entropy_conf1 = pred1.confidence.entropy_confidence
+
+        # After decay without new data
+        pred2 = model.predict(key, timestamp=7200.0)
+        entropy_conf2 = pred2.confidence.entropy_confidence
+
+        # Entropy confidence should be identical (distribution ratios unchanged)
+        assert entropy_conf1 == pytest.approx(entropy_conf2, rel=1e-6)
+
+    def test_predict_confidence_with_new_data_after_decay(self) -> None:
+        """Confidence changes when new data added after decay."""
+        model = DiscreteConditionalModel(half_life=3600.0)
+        key = (("hour", 10),)
+
+        # Old: 90% on, 10% off
+        model.update_duration(key, "on", 900.0, timestamp=0.0)
+        model.update_duration(key, "off", 100.0, timestamp=0.0)
+
+        pred1 = model.predict(key, timestamp=0.0)
+        assert pred1.confidence.max_probability == pytest.approx(0.9)
+
+        # Add off data, making it more balanced
+        model.update_duration(key, "off", 400.0, timestamp=3600.0)
+
+        # on decayed to ~450, off decayed to ~50 + 400 new = ~450
+        # Now 50/50, max_probability should be ~0.5
+        pred2 = model.predict(key, timestamp=3600.0)
+        assert pred2.confidence.max_probability == pytest.approx(0.5, rel=1e-6)
+
+
+class TestPredictWithDecayMultipleBuckets:
+    """Test predict with decay across multiple time buckets."""
+
+    def test_predict_decay_applied_per_bucket(self) -> None:
+        """Each bucket has decay applied independently."""
+        model = DiscreteConditionalModel(half_life=3600.0)
+        key1 = (("hour", 10),)
+        key2 = (("hour", 11),)
+
+        # Both buckets start with same data at t=0
+        model.update_duration(key1, "on", 1000.0, timestamp=0.0)
+        model.update_duration(key2, "on", 1000.0, timestamp=0.0)
+
+        # Update key1 at t=3600 (triggers decay for key1)
+        model.update_duration(key1, "off", 100.0, timestamp=3600.0)
+
+        # key1 decayed and updated
+        pred1 = model.predict(key1, timestamp=3600.0)
+        assert pred1.confidence.support_time == pytest.approx(600.0, rel=1e-6)
+
+        # key2 not yet decayed (no updates since t=0)
+        pred2 = model.predict(key2, timestamp=3600.0)
+        # Decay applied during predict
+        assert pred2.confidence.support_time == pytest.approx(500.0, rel=1e-6)
+
+    def test_predict_different_timestamps_per_bucket(self) -> None:
+        """Buckets can have different last update timestamps."""
+        model = DiscreteConditionalModel(half_life=3600.0)
+        key1 = (("hour", 10),)
+        key2 = (("hour", 11),)
+
+        model.update_duration(key1, "on", 1000.0, timestamp=0.0)
+        model.update_duration(key2, "on", 1000.0, timestamp=1800.0)  # 30 min later
+
+        # Predict both at t=3600
+        pred1 = model.predict(key1, timestamp=3600.0)
+        pred2 = model.predict(key2, timestamp=3600.0)
+
+        # key1: 1 half-life elapsed -> ~500
+        assert pred1.confidence.support_time == pytest.approx(500.0, rel=1e-6)
+
+        # key2: 0.5 half-lives elapsed -> ~707
+        assert pred2.confidence.support_time == pytest.approx(707.1, rel=1e-2)
+
+
+class TestPredictWithDecayEdgeCases:
+    """Test edge cases for predict with decay."""
+
+    def test_predict_first_call_sets_timestamp(self) -> None:
+        """First predict call initializes last_update_ts."""
+        model = DiscreteConditionalModel(half_life=3600.0)
+        key = (("hour", 10),)
+
+        model.update_duration(key, "on", 1000.0, timestamp=0.0)
+
+        # Predict should set/update timestamp
+        prediction = model.predict(key, timestamp=1000.0)
+
+        assert prediction.state == "on"
+        assert model._states[key].last_update_ts == 1000.0
+
+    def test_predict_no_elapsed_time_no_decay(self) -> None:
+        """Predict at same timestamp doesn't apply decay."""
+        model = DiscreteConditionalModel(half_life=3600.0)
+        key = (("hour", 10),)
+
+        model.update_duration(key, "on", 1000.0, timestamp=5000.0)
+
+        # Predict at exact same timestamp
+        pred = model.predict(key, timestamp=5000.0)
+
+        assert pred.confidence.support_time == 1000.0
+
+    def test_predict_negative_elapsed_no_decay(self) -> None:
+        """Predict with earlier timestamp doesn't apply decay."""
+        model = DiscreteConditionalModel(half_life=3600.0)
+        key = (("hour", 10),)
+
+        model.update_duration(key, "on", 1000.0, timestamp=5000.0)
+
+        # Predict at earlier timestamp
+        pred = model.predict(key, timestamp=4000.0)
+
+        # Should not decay (elapsed < 0)
+        assert pred.confidence.support_time == 1000.0
+
+    def test_predict_very_heavy_decay(self) -> None:
+        """Predict after many half-lives reduces values to near zero."""
+        model = DiscreteConditionalModel(half_life=3600.0)
+        key = (("hour", 10),)
+
+        model.update_duration(key, "on", 10000.0, timestamp=0.0)
+
+        # After 20 half-lives: factor = 0.5^20 ≈ 0.00000095
+        pred = model.predict(key, timestamp=20 * 3600.0)
+
+        # Support time should be very small but still have prediction
+        assert pred.confidence.support_time < 0.1
+        assert pred.state == "on"
+
+    def test_predict_after_all_states_decay_to_zero(self) -> None:
+        """Predict handles case where all states decay to effectively zero."""
+        model = DiscreteConditionalModel(half_life=1.0)  # Very short half-life
+        key = (("hour", 10),)
+
+        model.update_duration(key, "on", 100.0, timestamp=0.0)
+        model.update_duration(key, "off", 50.0, timestamp=0.0)
+
+        # After 50 half-lives, values essentially zero
+        pred = model.predict(key, timestamp=50.0)
+
+        # Should still return valid prediction with very small support
+        assert pred.state in ["on", "off"]
+        assert pred.confidence.support_time < 1e-10
+
+    def test_predict_modifies_internal_state(self) -> None:
+        """Predict with decay modifies internal state statistics."""
+        model = DiscreteConditionalModel(half_life=3600.0)
+        key = (("hour", 10),)
+
+        model.update_duration(key, "on", 1000.0, timestamp=0.0)
+
+        # Check initial state
+        assert model._states[key].durations["on"] == 1000.0
+
+        # Predict applies decay
+        model.predict(key, timestamp=3600.0)
+
+        # Internal state should be modified
+        assert model._states[key].durations["on"] == pytest.approx(500.0, rel=1e-6)
+
+    def test_predict_successive_calls_with_same_timestamp(self) -> None:
+        """Successive predict calls with same timestamp don't re-apply decay."""
+        model = DiscreteConditionalModel(half_life=3600.0)
+        key = (("hour", 10),)
+
+        model.update_duration(key, "on", 1000.0, timestamp=0.0)
+
+        # First predict applies decay
+        pred1 = model.predict(key, timestamp=3600.0)
+        support1 = pred1.confidence.support_time
+
+        # Second predict at same timestamp
+        pred2 = model.predict(key, timestamp=3600.0)
+        support2 = pred2.confidence.support_time
+
+        # Should be identical (no additional decay)
+        assert support1 == pytest.approx(support2, rel=1e-6)
+        assert support1 == pytest.approx(500.0, rel=1e-6)
+
+
+class TestDecayInitialization:
+    """Test half_life parameter initialization."""
+
+    def test_default_no_decay(self) -> None:
+        """Default initialization has no decay."""
+        model = DiscreteConditionalModel()
+        assert model.half_life == 0.0
+
+    def test_explicit_half_life(self) -> None:
+        """Explicit half-life is stored correctly."""
+        model = DiscreteConditionalModel(half_life=3600.0)
+        assert model.half_life == 3600.0
+
+    def test_zero_half_life(self) -> None:
+        """Explicit zero half-life works."""
+        model = DiscreteConditionalModel(half_life=0.0)
+        assert model.half_life == 0.0
+
+    def test_large_half_life(self) -> None:
+        """Large half-life for slow forgetting."""
+        model = DiscreteConditionalModel(half_life=86400.0)
+        assert model.half_life == 86400.0
+
+
+class TestDecayBasicBehavior:
+    """Test basic decay application during updates."""
+
+    def test_no_decay_when_half_life_zero(self) -> None:
+        """No decay applied when half_life is 0."""
+        model = DiscreteConditionalModel(half_life=0.0)
+        key = (("time_of_day", 600),)
+
+        model.update_duration(key, "on", 100.0, timestamp=0.0)
+        model.update_duration(key, "off", 200.0, timestamp=10.0)
+
+        # No decay, so durations are simply summed
+        assert model._states[key].durations["on"] == 100.0
+        assert model._states[key].durations["off"] == 200.0
+
+    def test_first_update_sets_timestamp(self) -> None:
+        """First update sets timestamp without applying decay."""
+        model = DiscreteConditionalModel(half_life=100.0)
+        key = (("time_of_day", 600),)
+
+        model.update_duration(key, "on", 100.0, timestamp=5.0)
+
+        # First call: no decay applied, only timestamp set
+        assert model._states[key].last_update_ts == 5.0
+        assert model._states[key].durations["on"] == 100.0
+
+    def test_second_update_applies_decay(self) -> None:
+        """Second update applies decay based on elapsed time."""
+        model = DiscreteConditionalModel(half_life=10.0)
+        key = (("time_of_day", 600),)
+
+        # First update at t=0
+        model.update_duration(key, "on", 100.0, timestamp=0.0)
+        # Second update at t=10 (elapsed = 10 = 1 half-life)
+        model.update_duration(key, "off", 50.0, timestamp=10.0)
+
+        # First duration should be decayed to 50% after 1 half-life
+        assert model._states[key].durations["on"] == pytest.approx(50.0)
+        assert model._states[key].durations["off"] == 50.0
+
+    def test_no_elapsed_time_no_decay(self) -> None:
+        """No decay when updates happen at same timestamp."""
+        model = DiscreteConditionalModel(half_life=100.0)
+        key = (("time_of_day", 600),)
+
+        model.update_duration(key, "on", 100.0, timestamp=5.0)
+        model.update_duration(key, "off", 50.0, timestamp=5.0)
+
+        # Same timestamp: no decay
+        assert model._states[key].durations["on"] == 100.0
+        assert model._states[key].durations["off"] == 50.0
+
+    def test_negative_elapsed_no_decay(self) -> None:
+        """No decay when timestamp goes backward."""
+        model = DiscreteConditionalModel(half_life=100.0)
+        key = (("time_of_day", 600),)
+
+        model.update_duration(key, "on", 100.0, timestamp=10.0)
+        model.update_duration(key, "off", 50.0, timestamp=5.0)
+
+        # Backward time: no decay applied
+        assert model._states[key].durations["on"] == 100.0
+        assert model._states[key].durations["off"] == 50.0
+
+
+class TestDecayCumulative:
+    """Test cumulative decay across multiple updates."""
+
+    def test_multiple_updates_accumulate_decay(self) -> None:
+        """Decay accumulates across multiple updates."""
+        model = DiscreteConditionalModel(half_life=10.0)
+        key = (("time_of_day", 600),)
+
+        # Update 1: t=0
+        model.update_duration(key, "on", 100.0, timestamp=0.0)
+        # Update 2: t=10 (decay on first, elapsed=10=1 half-life)
+        model.update_duration(key, "off", 50.0, timestamp=10.0)
+        # Update 3: t=20 (decay on both, elapsed=10=1 half-life)
+        model.update_duration(key, "idle", 25.0, timestamp=20.0)
+
+        # After first update: on=100
+        # After second update: on=50 (halved), off=50
+        # After third update: on=25 (halved again), off=25 (halved)
+        assert model._states[key].durations["on"] == pytest.approx(25.0)
+        assert model._states[key].durations["off"] == pytest.approx(25.0)
+        assert model._states[key].durations["idle"] == 25.0
+
+    def test_same_state_updates_with_decay(self) -> None:
+        """Same state can be updated multiple times with decay."""
+        model = DiscreteConditionalModel(half_life=20.0)
+        key = (("time_of_day", 600),)
+
+        model.update_duration(key, "on", 100.0, timestamp=0.0)
+        model.update_duration(key, "on", 50.0, timestamp=10.0)
+
+        # After 10 seconds (0.5 half-lives): 100 * 0.5^0.5 + 50
+        decayed_first = 100.0 * (0.5 ** 0.5)
+        expected = decayed_first + 50.0
+
+        assert model._states[key].durations["on"] == pytest.approx(expected)
+
+
+class TestDecayDistribution:
+    """Test that decay preserves probability ratios."""
+
+    def test_decay_preserves_distribution_ratios(self) -> None:
+        """Decay scales all durations equally, preserving ratios."""
+        model = DiscreteConditionalModel(half_life=100.0)
+        key = (("time_of_day", 600),)
+
+        # Initial: 75% on, 25% off
+        model.update_duration(key, "on", 300.0, timestamp=0.0)
+        model.update_duration(key, "off", 100.0, timestamp=0.0)
+
+        dist1 = model.distribution(key)
+        assert dist1["on"] == pytest.approx(0.75)
+        assert dist1["off"] == pytest.approx(0.25)
+
+        # Apply decay by adding new observation
+        model.update_duration(key, "idle", 10.0, timestamp=20.0)
+
+        # Ratios between on/off should still be 3:1
+        dist2 = model.distribution(key)
+        ratio = dist2["on"] / dist2["off"]
+        assert ratio == pytest.approx(3.0)
+
+
+class TestDecayPredictions:
+    """Test how decay affects predictions."""
+
+    def test_old_observations_decay_affecting_predictions(self) -> None:
+        """Old observations lose influence due to decay."""
+        model = DiscreteConditionalModel(half_life=10.0)
+        key = (("time_of_day", 600),)
+
+        # Old observation: mostly "on"
+        model.update_duration(key, "on", 1000.0, timestamp=0.0)
+        model.update_duration(key, "off", 100.0, timestamp=0.0)
+
+        # Recent observation after 3 half-lives: mostly "off"
+        model.update_duration(key, "off", 500.0, timestamp=30.0)
+
+        prediction = model.predict(key, timestamp=30.0)
+
+        # Due to decay, old "on" observations should have less weight
+        # After 3 half-lives: on = 1000 * 0.5^3 = 125, off = 100 * 0.5^3 + 500 ≈ 512.5
+        # The recent "off" observation should dominate
+        dist = prediction.distribution
+        assert dist["off"] > dist["on"]
+
+    def test_recent_pattern_overrides_old_with_decay(self) -> None:
+        """Recent patterns override old ones when decay is active."""
+        model = DiscreteConditionalModel(half_life=20.0)
+        key = (("time_of_day", 600),)
+
+        # Old pattern: state A dominant
+        model.update_duration(key, "A", 1000.0, timestamp=0.0)
+        model.update_duration(key, "B", 10.0, timestamp=0.0)
+
+        prediction1 = model.predict(key, timestamp=0.0)
+        assert prediction1.state == "A"
+
+        # New pattern after 5 half-lives: state B becomes dominant
+        model.update_duration(key, "B", 800.0, timestamp=100.0)
+
+        prediction2 = model.predict(key, timestamp=100.0)
+        # After 5 half-lives: A = 1000 * 0.5^5 ≈ 31.25, B = 10 * 0.5^5 + 800 ≈ 800.3
+        assert prediction2.state == "B"
+
+
+class TestDecayEdgeCases:
+    """Test edge cases and boundary conditions."""
+
+    def test_very_short_half_life(self) -> None:
+        """Very short half-life causes rapid forgetting."""
+        model = DiscreteConditionalModel(half_life=1.0)
+        key = (("time_of_day", 600),)
+
+        model.update_duration(key, "on", 1000.0, timestamp=0.0)
+        model.update_duration(key, "off", 100.0, timestamp=10.0)
+
+        # After 10 half-lives: 0.5^10 ≈ 0.00098
+        # Old observation essentially forgotten
+        expected_on = 1000.0 * (0.5 ** 10.0)
+        assert model._states[key].durations["on"] == pytest.approx(expected_on)
+        assert model._states[key].durations["on"] < 1.0  # Nearly zero
+
+    def test_very_long_half_life(self) -> None:
+        """Very long half-life causes slow forgetting."""
+        model = DiscreteConditionalModel(half_life=100000.0)
+        key = (("time_of_day", 600),)
+
+        model.update_duration(key, "on", 100.0, timestamp=0.0)
+        model.update_duration(key, "off", 50.0, timestamp=1000.0)
+
+        # After 0.01 half-lives: 0.5^0.01 ≈ 0.993
+        # Very little decay
+        expected_on = 100.0 * (0.5 ** (1000.0 / 100000.0))
+        assert model._states[key].durations["on"] == pytest.approx(expected_on)
+        assert model._states[key].durations["on"] > 99.0
+
+    def test_decay_with_multiple_keys(self) -> None:
+        """Decay is tracked independently per time key."""
+        model = DiscreteConditionalModel(half_life=10.0)
+        key1 = (("time_of_day", 600),)
+        key2 = (("time_of_day", 700),)
+
+        # Both keys at t=0
+        model.update_duration(key1, "on", 100.0, timestamp=0.0)
+        model.update_duration(key2, "on", 100.0, timestamp=0.0)
+
+        # Only key1 updated at t=10 (1 half-life)
+        model.update_duration(key1, "off", 50.0, timestamp=10.0)
+
+        # key1 should have decayed to 50%, key2 should not
+        assert model._states[key1].durations["on"] == pytest.approx(50.0)
+        assert model._states[key2].durations["on"] == 100.0
+
+    def test_decay_with_timestamp_none_uses_current_time(self) -> None:
+        """When timestamp=None, current time is used (no assertion on exact value)."""
+        model = DiscreteConditionalModel(half_life=100.0)
+        key = (("time_of_day", 600),)
+
+        # This should not raise an error
+        model.update_duration(key, "on", 100.0, timestamp=None)
+        assert key in model._states
+        assert model._states[key].last_update_ts is not None
+
+    def test_filtered_short_durations_dont_trigger_decay(self) -> None:
+        """Short durations (<5s) are filtered before decay is applied."""
+        model = DiscreteConditionalModel(half_life=10.0)
+        key = (("time_of_day", 600),)
+
+        model.update_duration(key, "on", 100.0, timestamp=0.0)
+
+        # Short duration at t=10 should be filtered (not trigger decay)
+        model.update_duration(key, "off", 2.0, timestamp=10.0)
+
+        # "on" should still be 100.0 (no decay applied since update was filtered)
+        assert model._states[key].durations["on"] == 100.0
+        assert "off" not in model._states[key].durations
+
+
+class TestDecayIntegration:
+    """Integration tests combining decay with other model features."""
+
+    def test_decay_with_confidence_calculation(self) -> None:
+        """Decay affects support_time in confidence metrics."""
+        model = DiscreteConditionalModel(half_life=20.0)
+        key = (("time_of_day", 600),)
+
+        model.update_duration(key, "on", 500.0, timestamp=0.0)
+
+        # Add observation after 1 half-life
+        model.update_duration(key, "off", 100.0, timestamp=20.0)
+        prediction2 = model.predict(key, timestamp=20.0)
+        support2 = prediction2.confidence.support_time
+
+        # Support should reflect decayed total: 500 * 0.5 + 100 = 350
+        expected_support = 250.0 + 100.0
+        assert support2 == pytest.approx(expected_support)
+
+    def test_decay_workflow_realistic_scenario(self) -> None:
+        """Realistic workflow: model adapts to changing patterns over time."""
+        model = DiscreteConditionalModel(half_life=345600.0)  # 4 days
+        key = (("time_of_day", 600),)
+
+        # Week 1: Device mostly on (old pattern)
+        for day in range(7):
+            timestamp = day * 86400.0  # Days as seconds
+            model.update_duration(key, "on", 3600.0, timestamp=timestamp)
+            model.update_duration(key, "off", 400.0, timestamp=timestamp)
+
+        prediction_week1 = model.predict(key, timestamp=6 * 86400.0)
+        assert prediction_week1.state == "on"
+
+        # Week 2: Pattern changes, device mostly off (new pattern)
+        for day in range(7, 14):
+            timestamp = day * 86400.0
+            model.update_duration(key, "on", 400.0, timestamp=timestamp)
+            model.update_duration(key, "off", 3600.0, timestamp=timestamp)
+
+        prediction_week2 = model.predict(key, timestamp=13 * 86400.0)
+        # With decay (half-life 4 days), old "on" observations should have less weight
+        # New "off" pattern should dominate
+        assert prediction_week2.state == "off"
+
+
+class TestPruneBasicBehavior:
+    """Test basic prune functionality in DiscreteConditionalModel."""
+
+    def test_prune_removes_low_duration_states(self) -> None:
+        """Prune removes states below duration threshold."""
+        model = DiscreteConditionalModel()
+        key = (("hour", 10),)
+
+        model.update_duration(key, "on", 100.0, timestamp=0.0)
+        model.update_duration(key, "off", 5.0, timestamp=0.0)
+        model.update_duration(key, "idle", 50.0, timestamp=0.0)
+
+        model.prune(min_state_duration=10.0, min_bucket_support=0.0)
+
+        assert model._states[key].durations == {"on": 100.0, "idle": 50.0}
+        assert "off" not in model._states[key].durations
+
+    def test_prune_removes_buckets_below_support_threshold(self) -> None:
+        """Prune removes entire buckets with insufficient total duration."""
+        model = DiscreteConditionalModel()
+        key1 = (("hour", 10),)
+        key2 = (("hour", 11),)
+
+        model.update_duration(key1, "on", 100.0, timestamp=0.0)
+        model.update_duration(key2, "off", 20.0, timestamp=0.0)
+
+        model.prune(min_state_duration=0.0, min_bucket_support=50.0)
+
+        assert key1 in model._states
+        assert key2 not in model._states
+
+    def test_prune_two_level_state_then_bucket(self) -> None:
+        """Prune applies state-level pruning before bucket-level check."""
+        model = DiscreteConditionalModel()
+        key = (("hour", 10),)
+
+        model.update_duration(key, "on", 80.0, timestamp=0.0)
+        model.update_duration(key, "off", 5.0, timestamp=0.0)  # Will be pruned
+
+        # After state pruning: only "on" with 80.0 remains
+        # Bucket support check: 80.0 < 100.0, so bucket removed
+        model.prune(min_state_duration=10.0, min_bucket_support=100.0)
+
+        assert key not in model._states
+
+    def test_prune_keeps_bucket_meeting_both_thresholds(self) -> None:
+        """Prune keeps buckets where states and total meet thresholds."""
+        model = DiscreteConditionalModel()
+        key = (("hour", 10),)
+
+        model.update_duration(key, "on", 100.0, timestamp=0.0)
+        model.update_duration(key, "off", 50.0, timestamp=0.0)
+
+        model.prune(min_state_duration=10.0, min_bucket_support=50.0)
+
+        assert key in model._states
+        assert model._states[key].durations == {"on": 100.0, "off": 50.0}
+
+    def test_prune_empty_model_safe(self) -> None:
+        """Prune on empty model is safe."""
+        model = DiscreteConditionalModel()
+        model.prune(min_state_duration=10.0, min_bucket_support=50.0)
+        assert model._states == {}
+
+    def test_prune_with_zero_thresholds_keeps_all(self) -> None:
+        """Prune with zero thresholds keeps all data."""
+        model = DiscreteConditionalModel()
+        key = (("hour", 10),)
+
+        model.update_duration(key, "on", 5.0, timestamp=0.0)
+        model.update_duration(key, "off", 10.0, timestamp=0.0)
+
+        model.prune(min_state_duration=0.0, min_bucket_support=0.0)
+
+        assert key in model._states
+        assert len(model._states[key].durations) == 2
+
+
+class TestPruneMultipleBuckets:
+    """Test prune behavior with multiple time buckets."""
+
+    def test_prune_affects_multiple_buckets_independently(self) -> None:
+        """Prune processes each bucket independently."""
+        model = DiscreteConditionalModel()
+        key1 = (("hour", 10),)
+        key2 = (("hour", 11),)
+        key3 = (("hour", 12),)
+
+        model.update_duration(key1, "on", 100.0, timestamp=0.0)
+        model.update_duration(key1, "off", 5.0, timestamp=0.0)
+
+        model.update_duration(key2, "on", 200.0, timestamp=0.0)
+
+        model.update_duration(key3, "on", 10.0, timestamp=0.0)
+
+        model.prune(min_state_duration=10.0, min_bucket_support=50.0)
+
+        # key1: off removed, bucket kept (100 >= 50)
+        assert key1 in model._states
+        assert model._states[key1].durations == {"on": 100.0}
+
+        # key2: no states removed, bucket kept
+        assert key2 in model._states
+        assert model._states[key2].durations == {"on": 200.0}
+
+        # key3: bucket removed (10 < 50)
+        assert key3 not in model._states
+
+    def test_prune_removes_multiple_buckets(self) -> None:
+        """Prune can remove multiple buckets in one call."""
         model = DiscreteConditionalModel()
 
-        # Update with no features to create global state
-        model.update({}, "label_a", duration=10.0)
-        model.update({}, "label_b", duration=20.0)
+        for hour in range(5):
+            key = (("hour", hour),)
+            model.update_duration(key, "on", float(hour * 20), timestamp=0.0)
 
-        data = model.to_dict()
-        restored = DiscreteConditionalModel.from_dict(data)
+        # Only hours 3 and 4 have support >= 50
+        model.prune(min_state_duration=0.0, min_bucket_support=50.0)
 
-        # Should predict the same with no features
-        dist_before = model.distribution({})
-        dist_after = restored.distribution({})
+        assert len(model._states) == 2
+        assert (("hour", 3),) in model._states
+        assert (("hour", 4),) in model._states
 
-        assert dist_before.keys() == dist_after.keys()
-        for key in dist_before:
-            assert math.isclose(dist_before[key], dist_after[key], rel_tol=1e-9)
+    def test_prune_preserves_unaffected_buckets(self) -> None:
+        """Prune doesn't modify buckets that meet thresholds."""
+        model = DiscreteConditionalModel()
+        key1 = (("hour", 10),)
+        key2 = (("hour", 11),)
+
+        model.update_duration(key1, "on", 100.0, timestamp=0.0)
+        model.update_duration(key1, "off", 50.0, timestamp=0.0)
+
+        model.update_duration(key2, "idle", 200.0, timestamp=0.0)
+
+        original_key1_durations = model._states[key1].durations.copy()
+        original_key2_durations = model._states[key2].durations.copy()
+
+        model.prune(min_state_duration=10.0, min_bucket_support=50.0)
+
+        assert model._states[key1].durations == original_key1_durations
+        assert model._states[key2].durations == original_key2_durations
 
 
-class TestDiscreteConditionalModelForecast:
-    """Test forecast method and multi-step prediction."""
+class TestPruneWithDecay:
+    """Test prune interaction with decay functionality."""
 
-    @staticmethod
-    def _no_advance(features: dict, step: int) -> dict:
-        """Simple advance function that doesn't change features."""
-        return features.copy()
+    def test_prune_after_decay_removes_low_weight_states(self) -> None:
+        """Prune removes states that decayed below threshold."""
+        model = DiscreteConditionalModel(half_life=10.0)
+        key = (("hour", 10),)
 
-    def test_forecast_basic(self) -> None:
-        """Test basic multi-step forecast."""
+        model.update_duration(key, "on", 100.0, timestamp=0.0)
+        model.update_duration(key, "off", 200.0, timestamp=0.0)
+
+        # After 3 half-lives: durations multiplied by 0.5^3 = 0.125
+        # on: 12.5, off: 25.0
+        model.update_duration(key, "idle", 50.0, timestamp=30.0)
+
+        model.prune(min_state_duration=15.0, min_bucket_support=0.0)
+
+        # on (12.5) removed, off (25.0) and idle (50.0) kept
+        assert "on" not in model._states[key].durations
+        assert "off" in model._states[key].durations
+        assert "idle" in model._states[key].durations
+
+    def test_prune_removes_bucket_after_all_states_decay(self) -> None:
+        """Prune removes bucket when all states decay below thresholds."""
+        model = DiscreteConditionalModel(half_life=5.0)
+        key = (("hour", 10),)
+
+        model.update_duration(key, "on", 100.0, timestamp=0.0)
+        model.update_duration(key, "off", 100.0, timestamp=0.0)
+
+        # After 10 half-lives: durations multiplied by 0.5^10 ≈ 0.00098
+        # Both states < 1.0, so bucket total < 50
+        # Add another observation to trigger decay
+        model.update_duration(key, "heating", 5.0, timestamp=50.0)
+
+        model.prune(min_state_duration=1.0, min_bucket_support=50.0)
+
+        assert key not in model._states
+
+    def test_decay_prune_workflow(self) -> None:
+        """Realistic workflow: decay old data, then prune insignificant states."""
+        model = DiscreteConditionalModel(half_life=86400.0)  # 1 day
+        key = (("hour", 10),)
+
+        # Week 1: Heavy usage
+        model.update_duration(key, "on", 1000.0, timestamp=0.0)
+        model.update_duration(key, "off", 500.0, timestamp=0.0)
+        model.update_duration(key, "idle", 100.0, timestamp=0.0)
+
+        # Week 2 (7 days later): Add new observation, triggering decay
+        timestamp_week2 = 7 * 86400.0
+        model.update_duration(key, "heating", 200.0, timestamp=timestamp_week2)
+
+        # After 7 half-lives: factor ≈ 0.5^7 ≈ 0.0078
+        # on: ~7.8, off: ~3.9, idle: ~0.78, heating: 200
+        model.prune(min_state_duration=5.0, min_bucket_support=100.0)
+
+        # Only on and heating should remain
+        assert set(model._states[key].durations.keys()) == {"on", "heating"}
+
+
+class TestPruneDistributionImpact:
+    """Test how prune affects distributions and predictions."""
+
+    def test_prune_changes_distribution_by_removing_states(self) -> None:
+        """Prune changes distribution by removing low-duration states."""
+        model = DiscreteConditionalModel()
+        key = (("hour", 10),)
+
+        model.update_duration(key, "on", 100.0, timestamp=0.0)
+        model.update_duration(key, "off", 100.0, timestamp=0.0)
+        model.update_duration(key, "idle", 5.0, timestamp=0.0)
+
+        # Before: on=0.488, off=0.488, idle=0.024
+
+        model.prune(min_state_duration=10.0, min_bucket_support=0.0)
+
+        dist_after = model.distribution(key)
+        # After: on=0.5, off=0.5 (idle removed)
+
+        assert "idle" not in dist_after
+        assert dist_after["on"] == pytest.approx(0.5)
+        assert dist_after["off"] == pytest.approx(0.5)
+
+    def test_prune_can_change_prediction(self) -> None:
+        """Prune can change predicted state if dominant state is removed."""
+        model = DiscreteConditionalModel()
+        key = (("hour", 10),)
+
+        model.update_duration(key, "on", 65.0, timestamp=0.0)
+        model.update_duration(key, "off", 45.0, timestamp=0.0)
+
+        pred_before = model.predict(key)
+        assert pred_before.state == "on"
+
+        # Remove "on" state (< 70), off remains
+        model.prune(min_state_duration=70.0, min_bucket_support=0.0)
+
+        pred_after = model.predict(key)
+        # Bucket removed entirely since off (45) < 70 too, so total < min_bucket_support
+        assert pred_after.state is None
+
+    def test_prune_bucket_returns_empty_distribution(self) -> None:
+        """After bucket is pruned, distribution returns empty dict."""
+        model = DiscreteConditionalModel()
+        key = (("hour", 10),)
+
+        model.update_duration(key, "on", 30.0, timestamp=0.0)
+
+        model.prune(min_state_duration=0.0, min_bucket_support=50.0)
+
+        assert model.distribution(key) == {}
+
+    def test_prune_bucket_returns_none_prediction(self) -> None:
+        """After bucket is pruned, predict returns None state."""
+        model = DiscreteConditionalModel()
+        key = (("hour", 10),)
+
+        model.update_duration(key, "on", 30.0, timestamp=0.0)
+
+        model.prune(min_state_duration=0.0, min_bucket_support=50.0)
+
+        pred = model.predict(key)
+        assert pred.state is None
+        assert pred.distribution == {}
+        assert pred.confidence.support_time == 0
+
+
+class TestPruneEdgeCases:
+    """Test prune edge cases and corner scenarios."""
+
+    def test_prune_bucket_at_exact_support_threshold(self) -> None:
+        """Bucket at exact support threshold is kept (uses < not <=)."""
+        model = DiscreteConditionalModel()
+        key = (("hour", 10),)
+
+        model.update_duration(key, "on", 50.0, timestamp=0.0)
+
+        model.prune(min_state_duration=0.0, min_bucket_support=50.0)
+
+        assert key in model._states
+
+    def test_prune_bucket_just_above_support_threshold(self) -> None:
+        """Bucket just above support threshold is kept."""
+        model = DiscreteConditionalModel()
+        key = (("hour", 10),)
+
+        model.update_duration(key, "on", 50.1, timestamp=0.0)
+
+        model.prune(min_state_duration=0.0, min_bucket_support=50.0)
+
+        assert key in model._states
+
+    def test_prune_successive_calls_with_increasing_thresholds(self) -> None:
+        """Multiple prune calls with increasing thresholds progressively remove data."""
+        model = DiscreteConditionalModel()
+        key = (("hour", 10),)
+
+        model.update_duration(key, "a", 100.0, timestamp=0.0)
+        model.update_duration(key, "b", 50.0, timestamp=0.0)
+        model.update_duration(key, "c", 25.0, timestamp=0.0)
+        model.update_duration(key, "d", 10.0, timestamp=0.0)
+
+        model.prune(min_state_duration=15.0, min_bucket_support=0.0)
+        assert len(model._states[key].durations) == 3  # a, b, c
+
+        model.prune(min_state_duration=30.0, min_bucket_support=0.0)
+        assert len(model._states[key].durations) == 2  # a, b
+
+        model.prune(min_state_duration=60.0, min_bucket_support=0.0)
+        assert len(model._states[key].durations) == 1  # a
+
+        model.prune(min_state_duration=0.0, min_bucket_support=150.0)
+        assert key not in model._states  # Bucket removed
+
+    def test_prune_preserves_last_update_timestamp(self) -> None:
+        """Prune doesn't modify last_update_ts in remaining buckets."""
+        model = DiscreteConditionalModel(half_life=10.0)
+        key = (("hour", 10),)
+
+        model.update_duration(key, "on", 100.0, timestamp=12345.0)
+
+        original_ts = model._states[key].last_update_ts
+
+        model.prune(min_state_duration=10.0, min_bucket_support=50.0)
+
+        assert model._states[key].last_update_ts == original_ts
+
+    def test_prune_all_states_from_bucket_removes_bucket(self) -> None:
+        """If all states are pruned, bucket is removed (total becomes 0)."""
+        model = DiscreteConditionalModel()
+        key = (("hour", 10),)
+
+        model.update_duration(key, "on", 5.0, timestamp=0.0)
+        model.update_duration(key, "off", 3.0, timestamp=0.0)
+
+        # All states < 10, so total becomes 0 < 1
+        model.prune(min_state_duration=10.0, min_bucket_support=1.0)
+
+        assert key not in model._states
+
+    def test_prune_very_large_thresholds_removes_everything(self) -> None:
+        """Prune with very large thresholds removes all data."""
         model = DiscreteConditionalModel()
 
-        # Train a simple pattern: x=1 -> a, x=2 -> b
-        for _ in range(5):
-            model.update({"x": 1}, "a", duration=10.0)
-            model.update({"x": 2}, "b", duration=10.0)
+        for hour in range(5):
+            key = (("hour", hour),)
+            model.update_duration(key, "on", 100.0, timestamp=0.0)
 
-        # Forecast 3 steps ahead
-        predictions = model.forecast({"x": 1}, horizon=3, advance_time_features=self._no_advance)
+        model.prune(min_state_duration=1e10, min_bucket_support=1e10)
 
-        assert len(predictions) == 3
-        # First step should be very confident on "a"
-        assert predictions[0]["prediction"] == "a"
+        assert model._states == {}
 
-    def test_forecast_with_distributions(self) -> None:
-        """Test forecast returns distributions when requested."""
+    def test_prune_with_complex_time_keys(self) -> None:
+        """Prune works with complex multi-dimensional time keys."""
         model = DiscreteConditionalModel()
+        key1 = (("hour", 10), ("day_of_week", 1), ("month", 3))
+        key2 = (("hour", 10), ("day_of_week", 2), ("month", 3))
 
-        # Train model
-        model.update({"x": 1}, "a", duration=10.0)
-        model.update({"x": 1}, "b", duration=5.0)
+        model.update_duration(key1, "on", 100.0, timestamp=0.0)
+        model.update_duration(key2, "off", 20.0, timestamp=0.0)
 
-        # Forecast with distributions
-        predictions = model.forecast(
-            {"x": 1}, horizon=2, advance_time_features=self._no_advance, return_distributions=True
+        model.prune(min_state_duration=0.0, min_bucket_support=50.0)
+
+        assert key1 in model._states
+        assert key2 not in model._states
+
+
+class TestPruneAdaptiveBasicBehavior:
+    """Test basic prune_adaptive functionality in DiscreteConditionalModel."""
+
+    def test_prune_adaptive_removes_low_contribution_states(self) -> None:
+        """Prune adaptive removes states below epsilon threshold within buckets."""
+        model = DiscreteConditionalModel()
+        key = (("hour", 10),)
+
+        model.update_duration(key, "on", 7000.0, timestamp=0.0)
+        model.update_duration(key, "off", 800.0, timestamp=0.0)
+        model.update_duration(key, "idle", 20.0, timestamp=0.0)
+
+        # State threshold: max(7820 x 0.003, 20) = 23.46
+        # Bucket threshold: 8000 x 0.05 = 400
+        model.prune_adaptive()
+
+        assert model._states[key].durations == {"on": 7000.0, "off": 800.0}
+        assert "idle" not in model._states[key].durations
+
+    def test_prune_adaptive_removes_buckets_below_threshold(self) -> None:
+        """Prune adaptive removes buckets below expected time threshold."""
+        model = DiscreteConditionalModel()
+        key1 = (("hour", 10),)
+        key2 = (("hour", 11),)
+
+        model.update_duration(key1, "on", 7000.0, timestamp=0.0)
+        model.update_duration(key1, "off", 800.0, timestamp=0.0)
+
+        model.update_duration(key2, "on", 300.0, timestamp=0.0)
+
+        # Bucket threshold: 8000 x 0.05 = 400
+        model.prune_adaptive()
+
+        assert key1 in model._states
+        assert key2 not in model._states  # 300 < 400
+
+    def test_prune_adaptive_two_level_state_then_bucket(self) -> None:
+        """Prune adaptive applies state pruning before bucket check."""
+        model = DiscreteConditionalModel()
+        key = (("hour", 10),)
+
+        model.update_duration(key, "on", 350.0, timestamp=0.0)
+        model.update_duration(key, "off", 100.0, timestamp=0.0)
+
+        # After state pruning: both kept (both >= 20)
+        # Bucket total: 450, threshold = 400
+        # Bucket kept
+        model.prune_adaptive()
+
+        assert key in model._states
+        assert len(model._states[key].durations) == 2
+
+        # Now with threshold that removes state first
+        model2 = DiscreteConditionalModel()
+        key2 = (("hour", 10),)
+        model2.update_duration(key2, "on", 380.0, timestamp=0.0)
+        model2.update_duration(key2, "off", 15.0, timestamp=0.0)
+
+        # State threshold: max(395 x 0.003, 20) = 20
+        # off (15) < 20, removed
+        # After state pruning: total = 380 < 400
+        model2.prune_adaptive()
+
+        assert key2 not in model2._states
+
+    def test_prune_adaptive_empty_model_safe(self) -> None:
+        """Prune adaptive on empty model is safe."""
+        model = DiscreteConditionalModel()
+        model.prune_adaptive()
+        assert model._states == {}
+
+    def test_prune_adaptive_default_parameters(self) -> None:
+        """Prune adaptive with default parameters works correctly."""
+        model = DiscreteConditionalModel()
+        key = (("hour", 10),)
+
+        model.update_duration(key, "on", 10000.0, timestamp=0.0)
+        model.update_duration(key, "off", 25.0, timestamp=0.0)
+        model.update_duration(key, "idle", 15.0, timestamp=0.0)
+
+        # State threshold: max(10040 x 0.003, 20) = 30.12
+        # Bucket threshold: 8000 x 0.05 = 400
+        model.prune_adaptive()
+
+        assert "on" in model._states[key].durations
+        assert "off" not in model._states[key].durations
+        assert "idle" not in model._states[key].durations
+
+
+class TestPruneAdaptiveParameters:
+    """Test prune_adaptive with various parameter configurations."""
+
+    def test_prune_adaptive_custom_bucket_epsilon(self) -> None:
+        """Custom bucket_epsilon changes bucket threshold."""
+        model = DiscreteConditionalModel()
+        key1 = (("hour", 10),)
+        key2 = (("hour", 11),)
+
+        model.update_duration(key1, "on", 900.0, timestamp=0.0)
+        model.update_duration(key2, "on", 600.0, timestamp=0.0)
+
+        # Bucket threshold: 8000 x 0.1 = 800
+        model.prune_adaptive(bucket_epsilon=0.1)
+
+        assert key1 in model._states  # 900 >= 800
+        assert key2 not in model._states  # 600 < 800
+
+    def test_prune_adaptive_custom_state_epsilon(self) -> None:
+        """Custom state_epsilon changes state threshold."""
+        model = DiscreteConditionalModel()
+        key = (("hour", 10),)
+
+        model.update_duration(key, "on", 1000.0, timestamp=0.0)
+        model.update_duration(key, "off", 100.0, timestamp=0.0)
+        model.update_duration(key, "idle", 50.0, timestamp=0.0)
+
+        # State threshold: max(1150 x 0.05, 20) = 57.5
+        model.prune_adaptive(state_epsilon=0.05)
+
+        assert model._states[key].durations == {"on": 1000.0, "off": 100.0}
+        assert "idle" not in model._states[key].durations
+
+    def test_prune_adaptive_custom_absolute_state_min(self) -> None:
+        """Custom absolute_state_min provides floor for state pruning."""
+        model = DiscreteConditionalModel()
+        key = (("hour", 10),)
+
+        model.update_duration(key, "on", 1000.0, timestamp=0.0)
+        model.update_duration(key, "off", 55.0, timestamp=0.0)
+        model.update_duration(key, "idle", 45.0, timestamp=0.0)
+
+        # State threshold: max(1100 x 0.003, 60) = 60
+        model.prune_adaptive(absolute_state_min=60.0)
+
+        assert model._states[key].durations == {"on": 1000.0}
+
+    def test_prune_adaptive_custom_expected_bucket_time(self) -> None:
+        """Custom expected_bucket_time changes bucket threshold."""
+        model = DiscreteConditionalModel()
+        key1 = (("hour", 10),)
+        key2 = (("hour", 11),)
+
+        model.update_duration(key1, "on", 200.0, timestamp=0.0)
+        model.update_duration(key2, "on", 150.0, timestamp=0.0)
+
+        # Bucket threshold: 3600 x 0.05 = 180
+        model.prune_adaptive(expected_bucket_time=3600.0)
+
+        assert key1 in model._states  # 200 >= 180
+        assert key2 not in model._states  # 150 < 180
+
+    def test_prune_adaptive_all_custom_parameters(self) -> None:
+        """Prune adaptive with all custom parameters."""
+        model = DiscreteConditionalModel()
+        key = (("hour", 10),)
+
+        model.update_duration(key, "on", 500.0, timestamp=0.0)
+        model.update_duration(key, "off", 80.0, timestamp=0.0)
+        model.update_duration(key, "idle", 40.0, timestamp=0.0)
+
+        model.prune_adaptive(
+            bucket_epsilon=0.1,
+            state_epsilon=0.1,
+            absolute_state_min=50.0,
+            expected_bucket_time=5000.0,
         )
 
-        assert len(predictions) == 2
+        # State threshold: max(620 x 0.1, 50) = 62
+        # Bucket threshold: 5000 x 0.1 = 500
+        # on (500) and off (80) kept, idle (40) removed
+        # Bucket total after state pruning: 580 >= 500
+        assert model._states[key].durations == {"on": 500.0, "off": 80.0}
 
-        # Each prediction should have distribution
-        for pred in predictions:
-            assert isinstance(pred, dict)
-            assert "distribution" in pred
-            dist = pred["distribution"]
-            assert isinstance(dist, dict)
-            assert sum(dist.values()) <= 1.01  # Allow small floating point error
-            assert "a" in dist or "b" in dist
 
-    def test_forecast_confidence_degradation(self) -> None:
-        """Test that confidence degrades over forecast horizon."""
-        model = DiscreteConditionalModel(min_step_confidence=0.3)
+class TestPruneAdaptiveMultipleBuckets:
+    """Test prune_adaptive with multiple time buckets."""
 
-        # Train with high confidence pattern
-        for _ in range(10):
-            model.update({"x": 1}, "a", duration=10.0)
+    def test_prune_adaptive_independent_bucket_processing(self) -> None:
+        """Each bucket is processed independently."""
+        model = DiscreteConditionalModel()
+        key1 = (("hour", 10),)
+        key2 = (("hour", 11),)
+        key3 = (("hour", 12),)
 
-        # Forecast many steps - should stop early due to confidence
-        predictions = model.forecast({"x": 1}, horizon=20, advance_time_features=self._no_advance)
+        model.update_duration(key1, "on", 7000.0, timestamp=0.0)
+        model.update_duration(key1, "off", 15.0, timestamp=0.0)
 
-        # Should stop before 20 steps due to confidence degradation
-        assert len(predictions) < 20
-        assert len(predictions) >= 1  # Should at least make first prediction
+        model.update_duration(key2, "on", 5000.0, timestamp=0.0)
+        model.update_duration(key2, "off", 500.0, timestamp=0.0)
 
-    def test_forecast_empty_model(self) -> None:
-        """Test forecast on empty model returns empty list."""
+        model.update_duration(key3, "on", 300.0, timestamp=0.0)
+
+        model.prune_adaptive()
+
+        # key1: off removed, bucket kept
+        assert key1 in model._states
+        assert model._states[key1].durations == {"on": 7000.0}
+
+        # key2: both states kept
+        assert key2 in model._states
+        assert len(model._states[key2].durations) == 2
+
+        # key3: bucket removed (300 < 400)
+        assert key3 not in model._states
+
+    def test_prune_adaptive_removes_multiple_buckets(self) -> None:
+        """Prune adaptive can remove multiple buckets."""
         model = DiscreteConditionalModel()
 
-        predictions = model.forecast({"x": 1}, horizon=5, advance_time_features=self._no_advance)
+        for hour in range(10):
+            key = (("hour", hour),)
+            model.update_duration(key, "on", float(hour * 50), timestamp=0.0)
 
-        assert predictions == []
+        # Bucket threshold: 8000 x 0.05 = 400
+        # Only hours 8-9 have >= 400
+        model.prune_adaptive()
 
-    def test_forecast_invalid_horizon_zero(self) -> None:
-        """Test forecast raises error for zero horizon."""
+        assert len(model._states) == 2
+        assert (("hour", 8),) in model._states
+        assert (("hour", 9),) in model._states
+
+    def test_prune_adaptive_preserves_unaffected_buckets(self) -> None:
+        """Prune adaptive doesn't modify buckets meeting thresholds."""
         model = DiscreteConditionalModel()
-        model.update({"x": 1}, "a", duration=10.0)
+        key1 = (("hour", 10),)
+        key2 = (("hour", 11),)
 
-        with pytest.raises(ValueError, match="horizon must be positive"):
-            model.forecast({"x": 1}, horizon=0, advance_time_features=self._no_advance)
+        model.update_duration(key1, "on", 5000.0, timestamp=0.0)
+        model.update_duration(key1, "off", 3000.0, timestamp=0.0)
 
-    def test_forecast_invalid_horizon_negative(self) -> None:
-        """Test forecast raises error for negative horizon."""
+        model.update_duration(key2, "on", 6000.0, timestamp=0.0)
+
+        original_key1 = model._states[key1].durations.copy()
+        original_key2 = model._states[key2].durations.copy()
+
+        model.prune_adaptive()
+
+        assert model._states[key1].durations == original_key1
+        assert model._states[key2].durations == original_key2
+
+
+class TestPruneAdaptiveWithDecay:
+    """Test prune_adaptive interaction with decay functionality."""
+
+    def test_prune_adaptive_after_decay_auto_adjusts(self) -> None:
+        """Prune adaptive automatically adjusts to decayed totals."""
+        model = DiscreteConditionalModel(half_life=43200.0)
+        key = (("hour", 10),)
+
+        model.update_duration(key, "heating", 10000.0, timestamp=0.0)
+        model.update_duration(key, "cooling", 5000.0, timestamp=0.0)
+        model.update_duration(key, "idle", 1000.0, timestamp=0.0)
+
+        # After 2 half-lives (24 hours): all x 0.25
+        model.update_duration((("hour", 11),), "on", 50.0, timestamp=86400.0)
+
+        # Decayed totals: heating=2500, cooling=1250, idle=250, total=4000
+        # State threshold: max(4000 x 0.003, 20) = 20
+        # Bucket threshold: 8000 x 0.05 = 400
+        model.prune_adaptive()
+
+        assert key in model._states  # 4000 >= 400
+        assert set(model._states[key].durations.keys()) == {
+            "heating",
+            "cooling",
+            "idle",
+        }
+
+    def test_prune_adaptive_removes_heavily_decayed_bucket(self) -> None:
+        """Prune adaptive removes buckets that decayed below threshold."""
+        model = DiscreteConditionalModel(half_life=86400.0)
+        key = (("hour", 10),)
+
+        model.update_duration(key, "on", 10000.0, timestamp=0.0)
+        model.update_duration(key, "off", 5000.0, timestamp=0.0)
+
+        # Need to trigger decay by updating with a later timestamp
+        # After 7 half-lives: factor = 0.5^7 ≈ 0.0078
+        # But update_duration doesn't auto-decay existing buckets
+        # We need to manually apply decay first
+        model._states[key].apply_decay(current_ts=7 * 86400.0, half_life=86400.0)
+
+        # Now the totals should be decayed: on ≈ 78, off ≈ 39, total ≈ 117
+        model.prune_adaptive()
+
+        # Bucket threshold: 400
+        # hour=10: total ~117 < 400, removed
+        assert key not in model._states
+
+    def test_prune_adaptive_decay_workflow_realistic(self) -> None:
+        """Realistic workflow: build data, decay, adaptive prune."""
+        model = DiscreteConditionalModel(half_life=86400.0)
+        key1 = (("hour", 10),)
+        key2 = (("hour", 11),)
+
+        # Week 1: Build data
+        for day in range(7):
+            ts = day * 86400.0
+            model.update_duration(key1, "on", 5000.0, timestamp=ts)
+            model.update_duration(key1, "off", 3000.0, timestamp=ts)
+            model.update_duration(key2, "heating", 4000.0, timestamp=ts)
+
+        # After 1 week with observations, trigger decay
+        model.update_duration((("hour", 12),), "test", 100.0, timestamp=7 * 86400.0)
+
+        # Adaptive pruning scales to current data volumes
+        model.prune_adaptive()
+
+        # Both buckets should still exist with substantial data
+        assert key1 in model._states
+        assert key2 in model._states
+
+
+class TestPruneAdaptiveDistributionImpact:
+    """Test how prune_adaptive affects distributions and predictions."""
+
+    def test_prune_adaptive_changes_distribution(self) -> None:
+        """Prune adaptive changes distribution by removing states."""
         model = DiscreteConditionalModel()
-        model.update({"x": 1}, "a", duration=10.0)
+        key = (("hour", 10),)
 
-        with pytest.raises(ValueError, match="horizon must be positive"):
-            model.forecast({"x": 1}, horizon=-5, advance_time_features=self._no_advance)
+        model.update_duration(key, "on", 7000.0, timestamp=0.0)
+        model.update_duration(key, "off", 800.0, timestamp=0.0)
+        model.update_duration(key, "idle", 20.0, timestamp=0.0)
 
-    def test_forecast_single_step(self) -> None:
-        """Test forecast with horizon=1 predicts correctly."""
+        dist_before = model.distribution(key)
+        assert "idle" in dist_before
+
+        model.prune_adaptive()
+
+        dist_after = model.distribution(key)
+        assert "idle" not in dist_after
+        assert dist_after["on"] == pytest.approx(7000.0 / 7800.0)
+
+    def test_prune_adaptive_can_change_prediction(self) -> None:
+        """Prune adaptive can change predicted state."""
         model = DiscreteConditionalModel()
+        key = (("hour", 10),)
 
-        model.update({"x": 1}, "a", duration=10.0)
-        model.update({"x": 1}, "b", duration=5.0)
+        model.update_duration(key, "on", 5000.0, timestamp=0.0)
+        model.update_duration(key, "off", 5020.0, timestamp=0.0)
 
-        prediction = model.predict({"x": 1})
-        forecast_predictions = model.forecast({"x": 1}, horizon=1, advance_time_features=self._no_advance)
+        pred_before = model.predict(key)
+        assert pred_before.state == "off"
 
-        assert len(forecast_predictions) == 1
-        assert forecast_predictions[0]["prediction"] == prediction
+        # Aggressive state pruning might remove off if it's borderline
+        # Let's create a scenario where prediction changes
+        model2 = DiscreteConditionalModel()
+        key2 = (("hour", 10),)
+        model2.update_duration(key2, "on", 400.0, timestamp=0.0)
+        model2.update_duration(key2, "off", 50.0, timestamp=0.0)
 
-    def test_forecast_state_isolation(self) -> None:
-        """Test that forecast doesn't modify model state."""
+        # After pruning with high threshold
+        model2.prune_adaptive(
+            state_epsilon=0.1, absolute_state_min=60.0, expected_bucket_time=3000.0
+        )
+
+        # off (50) < 60, removed; only on remains
+        pred_after = model2.predict(key2)
+        assert pred_after.state == "on"
+
+    def test_prune_adaptive_bucket_removed_returns_empty(self) -> None:
+        """After bucket pruned, distribution and prediction return empty/None."""
         model = DiscreteConditionalModel()
+        key = (("hour", 10),)
 
-        # Train model
-        for _ in range(5):
-            model.update({"x": 1}, "a", duration=10.0)
+        model.update_duration(key, "on", 300.0, timestamp=0.0)
 
-        # Get state before forecast
-        t_before = model._t
-        states_before = dict(model._states)
+        model.prune_adaptive()  # 300 < 400
 
-        # Run forecast
-        model.forecast({"x": 1}, horizon=5, advance_time_features=self._no_advance)
+        assert model.distribution(key) == {}
 
-        # State should be unchanged
-        assert model._t == t_before
-        assert len(model._states) == len(states_before)
-        for key in states_before:
-            assert key in model._states
+        pred = model.predict(key)
+        assert pred.state is None
+        assert pred.distribution == {}
 
-    def test_forecast_min_step_confidence_zero(self) -> None:
-        """Test forecast with min_step_confidence=0 goes full horizon."""
-        model = DiscreteConditionalModel(min_step_confidence=0.0)
 
-        # Train model
-        model.update({"x": 1}, "a", duration=10.0)
+class TestPruneAdaptiveEdgeCases:
+    """Test prune_adaptive edge cases and corner scenarios."""
 
-        # Forecast should go full horizon even with low confidence
-        predictions = model.forecast({"x": 1}, horizon=10, advance_time_features=self._no_advance)
-
-        # Should complete all 10 steps (confidence threshold is 0)
-        assert len(predictions) == 10
-
-    def test_forecast_different_features(self) -> None:
-        """Test forecast with changing feature contexts."""
+    def test_prune_adaptive_zero_epsilon_values(self) -> None:
+        """Zero epsilon values result in only absolute thresholds."""
         model = DiscreteConditionalModel()
+        key = (("hour", 10),)
 
-        # Train different patterns
-        for _ in range(5):
-            model.update({"x": 1, "y": "a"}, "state1", duration=10.0)
-            model.update({"x": 2, "y": "b"}, "state2", duration=10.0)
+        model.update_duration(key, "on", 1000.0, timestamp=0.0)
+        model.update_duration(key, "off", 25.0, timestamp=0.0)
+        model.update_duration(key, "idle", 15.0, timestamp=0.0)
 
-        # Forecast for first pattern
-        predictions1 = model.forecast({"x": 1, "y": "a"}, horizon=3, advance_time_features=self._no_advance)
-        # Forecast for second pattern
-        predictions2 = model.forecast({"x": 2, "y": "b"}, horizon=3, advance_time_features=self._no_advance)
+        model.prune_adaptive(bucket_epsilon=0.0, state_epsilon=0.0)
 
-        # Should predict their respective states
-        assert any(p["prediction"] == "state1" for p in predictions1)
-        assert any(p["prediction"] == "state2" for p in predictions2)
+        # State threshold: max(1040 x 0, 20) = 20
+        # Bucket threshold: 8000 x 0 = 0
+        assert "idle" not in model._states[key].durations
+        assert key in model._states  # Any total > 0 kept
 
-    def test_forecast_unseen_features(self) -> None:
-        """Test forecast with features not seen during training."""
+    def test_prune_adaptive_very_high_epsilon_aggressive(self) -> None:
+        """Very high epsilon values result in aggressive pruning."""
         model = DiscreteConditionalModel()
+        key = (("hour", 10),)
 
-        # Train on x=1
-        model.update({"x": 1}, "a", duration=10.0)
+        model.update_duration(key, "on", 5000.0, timestamp=0.0)
+        model.update_duration(key, "off", 2000.0, timestamp=0.0)
 
-        # Forecast on unseen x=99
-        predictions = model.forecast({"x": 99}, horizon=3, advance_time_features=self._no_advance)
+        model.prune_adaptive(bucket_epsilon=0.5, state_epsilon=0.3)
 
-        # Should still make predictions (likely fall back to global/partial state)
-        # Exact behavior depends on implementation, but should not crash
-        assert isinstance(predictions, list)
+        # Bucket threshold: 8000 x 0.5 = 4000
+        # Total: 7000, still >= 4000
+        # State threshold: max(7000 x 0.3, 20) = 2100
+        # off (2000) < 2100, removed
+        assert model._states[key].durations == {"on": 5000.0}
 
-    def test_forecast_with_high_confidence_threshold(self) -> None:
-        """Test forecast with very high min_step_confidence."""
-        model = DiscreteConditionalModel(min_step_confidence=0.99)
-
-        # Train model with moderate confidence
-        model.update({"x": 1}, "a", duration=10.0)
-        model.update({"x": 1}, "b", duration=5.0)
-
-        # Forecast should stop early due to high threshold
-        predictions = model.forecast({"x": 1}, horizon=10, advance_time_features=self._no_advance)
-
-        # Should make at least first prediction but likely stop early
-        assert len(predictions) >= 0
-        assert len(predictions) <= 10
-
-    def test_forecast_advance_time_features(self) -> None:
-        """Test forecast with time-advancing features."""
+    def test_prune_adaptive_all_states_removed_from_bucket(self) -> None:
+        """If all states removed, bucket is also removed."""
         model = DiscreteConditionalModel()
+        key = (("hour", 10),)
 
-        # Train patterns at different time buckets
-        for _ in range(5):
-            model.update({"time": 0}, "morning", duration=10.0)
-            model.update({"time": 1}, "afternoon", duration=10.0)
-            model.update({"time": 2}, "evening", duration=10.0)
+        model.update_duration(key, "on", 15.0, timestamp=0.0)
+        model.update_duration(key, "off", 10.0, timestamp=0.0)
 
-        def advance_time(features: dict, step: int) -> dict:
-            """Advance time bucket with each step."""
-            new_features = features.copy()
-            new_features["time"] = (features["time"] + step) % 3
-            return new_features
+        model.prune_adaptive(absolute_state_min=20.0)
 
-        # Forecast should use advancing time features
-        predictions = model.forecast({"time": 0}, horizon=3, advance_time_features=advance_time)
+        # All states < 20, so total becomes 0 < 400
+        assert key not in model._states
 
-        # Should have predictions for different time periods
-        assert len(predictions) >= 1
-        # Each prediction should include used features
-        for pred in predictions:
-            assert "used_features" in pred
-
-    def test_forecast_result_structure(self) -> None:
-        """Test forecast returns correct result structure."""
+    def test_prune_adaptive_successive_calls(self) -> None:
+        """Multiple prune_adaptive calls progressively remove data."""
         model = DiscreteConditionalModel()
+        key = (("hour", 10),)
 
-        model.update({"x": 1}, "a", duration=10.0)
+        model.update_duration(key, "a", 8000.0, timestamp=0.0)
+        model.update_duration(key, "b", 500.0, timestamp=0.0)
+        model.update_duration(key, "c", 100.0, timestamp=0.0)
+        model.update_duration(key, "d", 50.0, timestamp=0.0)
 
-        predictions = model.forecast({"x": 1}, horizon=3, advance_time_features=self._no_advance)
+        # First prune: total = 8650
+        # State threshold: max(8650 x 0.003, 20) = 25.95
+        # d (50) >= 25.95, all states kept
+        model.prune_adaptive()
+        assert len(model._states[key].durations) == 4  # all kept
 
-        # Check structure of each prediction
-        for i, pred in enumerate(predictions, start=1):
-            assert "step" in pred
-            assert pred["step"] == i
-            assert "prediction" in pred
-            assert "step_confidence" in pred
-            assert "rolling_confidence" in pred
-            assert "used_features" in pred
-            assert 0.0 <= pred["step_confidence"] <= 1.0
-            assert 0.0 <= pred["rolling_confidence"] <= 1.0
+        # Second prune with higher thresholds
+        # State threshold: max(8650 x 0.05, 20) = 432.5
+        # a (8000) kept, b (500) kept, c (100) < 432.5 removed, d (50) < 432.5 removed
+        model.prune_adaptive(state_epsilon=0.05)
+        assert len(model._states[key].durations) == 2  # a, b
+
+    def test_prune_adaptive_preserves_last_update_timestamp(self) -> None:
+        """Prune adaptive doesn't modify last_update_ts."""
+        model = DiscreteConditionalModel(half_life=10.0)
+        key = (("hour", 10),)
+
+        model.update_duration(key, "on", 10000.0, timestamp=12345.0)
+
+        original_ts = model._states[key].last_update_ts
+
+        model.prune_adaptive()
+
+        assert model._states[key].last_update_ts == original_ts
+
+    def test_prune_adaptive_with_complex_time_keys(self) -> None:
+        """Prune adaptive works with complex multi-dimensional keys."""
+        model = DiscreteConditionalModel()
+        key1 = (("hour", 10), ("day", 1), ("month", 3))
+        key2 = (("hour", 11), ("day", 1), ("month", 3))
+
+        model.update_duration(key1, "on", 8000.0, timestamp=0.0)
+        model.update_duration(key2, "off", 300.0, timestamp=0.0)
+
+        model.prune_adaptive()
+
+        assert key1 in model._states
+        assert key2 not in model._states
+
+    def test_prune_adaptive_comparison_with_fixed_prune(self) -> None:
+        """Prune adaptive behaves differently than fixed prune."""
+        # Setup two identical models
+        model1 = DiscreteConditionalModel()
+        model2 = DiscreteConditionalModel()
+        key = (("hour", 10),)
+
+        for m in [model1, model2]:
+            m.update_duration(key, "on", 10000.0, timestamp=0.0)
+            m.update_duration(key, "off", 500.0, timestamp=0.0)
+            m.update_duration(key, "idle", 25.0, timestamp=0.0)
+
+        # Fixed prune
+        model1.prune(min_state_duration=30.0, min_bucket_support=400.0)
+
+        # Adaptive prune
+        # State threshold: max(10525 x 0.003, 20) = 31.575
+        model2.prune_adaptive()
+
+        # Both should have similar results, but adaptive auto-calculated
+        assert set(model1._states[key].durations.keys()) == {"on", "off"}
+        assert set(model2._states[key].durations.keys()) == {"on", "off"}
+
+        # idle removed from both (25 < 30 and 25 < 31.575)
+        assert "idle" not in model1._states[key].durations
+        assert "idle" not in model2._states[key].durations
+
+
+class TestFastDecayInitialization:
+    """Test fast decay initialization and attributes."""
+
+    def test_initialization_creates_fast_decay_attributes(self) -> None:
+        """Model initialization sets up fast decay half-life."""
+        model = DiscreteConditionalModel(half_life=3600.0)
+
+        assert model.half_life == 3600.0
+        assert model.half_life_normal == 3600.0
+        assert model.half_life_fast == 360.0  # half_life / 10
+
+    def test_initialization_fast_decay_zero_half_life(self) -> None:
+        """Fast decay attributes work with zero half-life."""
+        model = DiscreteConditionalModel(half_life=0.0)
+
+        assert model.half_life == 0.0
+        assert model.half_life_normal == 0.0
+        assert model.half_life_fast == 0.0
+
+    def test_initialization_fast_decay_large_half_life(self) -> None:
+        """Fast decay attributes work with large half-life."""
+        model = DiscreteConditionalModel(half_life=604800.0)  # 1 week
+
+        assert model.half_life == 604800.0
+        assert model.half_life_normal == 604800.0
+        assert model.half_life_fast == 60480.0  # 1 week / 10
+
+
+class TestFastDecayDriftDetection:
+    """Test fast decay activation on drift detection."""
+
+    def test_drift_detection_sets_fast_decay_counter(self) -> None:
+        """Detecting drift sets fast_decay_updates to 15."""
+        model = DiscreteConditionalModel(half_life=3600.0)
+        key = (("hour", 10),)
+
+        # Establish baseline pattern (75% on, 25% off)
+        model.update_duration(key, "on", 3000.0, timestamp=1000.0)
+        model.update_duration(key, "off", 1000.0, timestamp=1001.0)
+
+        stats = model._states[key]
+        assert stats.baseline is not None
+        assert stats.fast_decay_updates == 0
+
+        # Significant pattern change (12.5% on, 87.5% off) triggers drift
+        model.update_duration(key, "on", 500.0, timestamp=6000.0)
+        model.update_duration(key, "off", 3500.0, timestamp=6001.0)
+
+        # Drift detected, fast decay activated (set to 15, then decremented to 14)
+        assert stats.fast_decay_updates == 14
+
+    def test_no_drift_no_fast_decay_activation(self) -> None:
+        """Small changes don't trigger fast decay."""
+        model = DiscreteConditionalModel(half_life=3600.0)
+        key = (("hour", 10),)
+
+        # Establish baseline
+        model.update_duration(key, "on", 3000.0, timestamp=1000.0)
+        model.update_duration(key, "off", 1000.0, timestamp=1001.0)
+
+        stats = model._states[key]
+        assert stats.fast_decay_updates == 0
+
+        # Small change (73% vs 75%)
+        model.update_duration(key, "on", 2900.0, timestamp=6000.0)
+        model.update_duration(key, "off", 1100.0, timestamp=6001.0)
+
+        # No drift, no fast decay
+        assert stats.fast_decay_updates == 0
+
+    def test_drift_detection_cooldown_prevents_rapid_activation(self) -> None:
+        """Cooldown period prevents rapid successive fast decay activations."""
+        model = DiscreteConditionalModel(half_life=3600.0)
+        key = (("hour", 10),)
+
+        # Establish baseline
+        model.update_duration(key, "on", 3000.0, timestamp=1000.0)
+        model.update_duration(key, "off", 1000.0, timestamp=1001.0)
+
+        # First drift detection
+        model.update_duration(key, "on", 500.0, timestamp=6000.0)
+        model.update_duration(key, "off", 3500.0, timestamp=6001.0)
+
+        stats = model._states[key]
+        assert stats.fast_decay_updates == 14  # Set to 15, then decremented
+
+        # Try to trigger drift again within cooldown (< 3600s)
+        model.update_duration(key, "on", 3000.0, timestamp=7000.0)
+        model.update_duration(key, "off", 1000.0, timestamp=7001.0)
+
+        # Still in cooldown, counter just decremented from 14
+        assert stats.fast_decay_updates < 14
+
+
+class TestFastDecayCounterBehavior:
+    """Test fast_decay_updates counter behavior."""
+
+    def test_counter_decrements_on_each_update(self) -> None:
+        """Fast decay counter decrements on each update."""
+        model = DiscreteConditionalModel(half_life=3600.0)
+        key = (("hour", 10),)
+
+        # Manually set counter (simulating post-drift state after first decrement)
+        model._states[key] = StateStats(
+            durations={"on": 1000.0},
+            last_update_ts=0.0,
+            fast_decay_updates=14,  # Already decremented once after set to 15
+        )
+
+        # Each update decrements counter
+        for i in range(14, 0, -1):
+            assert model._states[key].fast_decay_updates == i
+            model.update_duration(key, "on", 100.0, timestamp=float(i * 100))
+
+        # After 14 more updates, counter reaches 0
+        assert model._states[key].fast_decay_updates == 0
+
+    def test_counter_stops_at_zero(self) -> None:
+        """Fast decay counter doesn't go below zero."""
+        model = DiscreteConditionalModel(half_life=3600.0)
+        key = (("hour", 10),)
+
+        # Start with counter at 1
+        model._states[key] = StateStats(
+            durations={"on": 1000.0},
+            last_update_ts=0.0,
+            fast_decay_updates=1,
+        )
+
+        # Update twice
+        model.update_duration(key, "on", 100.0, timestamp=100.0)
+        assert model._states[key].fast_decay_updates == 0
+
+        model.update_duration(key, "on", 100.0, timestamp=200.0)
+        assert model._states[key].fast_decay_updates == 0  # Stays at 0
+
+
+class TestFastDecayAppliedDecay:
+    """Test that fast decay actually uses faster half-life."""
+
+    def test_apply_decay_uses_fast_half_life_when_counter_positive(self) -> None:
+        """Apply decay uses fast half-life when fast_decay_updates > 0."""
+        model = DiscreteConditionalModel(half_life=3600.0)
+        key = (("hour", 10),)
+
+        # Create stats with fast decay active
+        stats = StateStats(
+            durations={"on": 1000.0, "off": 500.0},
+            last_update_ts=0.0,
+            fast_decay_updates=10,
+        )
+        model._states[key] = stats
+
+        # Apply decay for 1 fast half-life (360s, not 3600s)
+        model._apply_decay(stats, timestamp=360.0)
+
+        # Should be halved (fast half-life = 360s)
+        assert stats.durations["on"] == pytest.approx(500.0)
+        assert stats.durations["off"] == pytest.approx(250.0)
+
+    def test_apply_decay_uses_normal_half_life_when_counter_zero(self) -> None:
+        """Apply decay uses normal half-life when fast_decay_updates = 0."""
+        model = DiscreteConditionalModel(half_life=3600.0)
+        key = (("hour", 10),)
+
+        # Create stats with no fast decay
+        stats = StateStats(
+            durations={"on": 1000.0, "off": 500.0},
+            last_update_ts=0.0,
+            fast_decay_updates=0,
+        )
+        model._states[key] = stats
+
+        # Apply decay for 1 normal half-life (3600s)
+        model._apply_decay(stats, timestamp=3600.0)
+
+        # Should be halved (normal half-life = 3600s)
+        assert stats.durations["on"] == pytest.approx(500.0)
+        assert stats.durations["off"] == pytest.approx(250.0)
+
+    def test_fast_decay_accelerates_forgetting(self) -> None:
+        """Fast decay causes much faster forgetting than normal decay."""
+        model = DiscreteConditionalModel(half_life=3600.0)
+        key1 = (("hour", 10),)
+        key2 = (("hour", 11),)
+
+        # Create identical stats: one with fast decay, one without
+        stats_fast = StateStats(
+            durations={"on": 1000.0},
+            last_update_ts=0.0,
+            fast_decay_updates=5,
+        )
+        stats_normal = StateStats(
+            durations={"on": 1000.0},
+            last_update_ts=0.0,
+            fast_decay_updates=0,
+        )
+
+        model._states[key1] = stats_fast
+        model._states[key2] = stats_normal
+
+        # Apply decay for same elapsed time (360s)
+        model._apply_decay(stats_fast, timestamp=360.0)
+        model._apply_decay(stats_normal, timestamp=360.0)
+
+        # Fast decay: 360s = 1 fast half-life → halved
+        assert stats_fast.durations["on"] == pytest.approx(500.0)
+
+        # Normal decay: 360s = 0.1 normal half-life → minimal change
+        # decay_factor = 0.5 ^ (360/3600) = 0.5 ^ 0.1 ≈ 0.933
+        assert stats_normal.durations["on"] == pytest.approx(933.0, rel=0.01)
+
+
+class TestFastDecayIntegration:
+    """Test fast decay in realistic scenarios."""
+
+    def test_pattern_shift_with_fast_decay_adaptation(self) -> None:
+        """Fast decay enables quick adaptation after pattern shift."""
+        model = DiscreteConditionalModel(half_life=3600.0)
+        key = (("hour", 10),)
+
+        # Establish old pattern: 75% on, 25% off
+        model.update_duration(key, "on", 3000.0, timestamp=1000.0)
+        model.update_duration(key, "off", 1000.0, timestamp=1001.0)
+
+        # Verify baseline established
+        stats = model._states[key]
+        assert stats.baseline is not None
+
+        # Pattern shifts dramatically: now 12.5% on, 87.5% off
+        model.update_duration(key, "on", 500.0, timestamp=6000.0)
+        model.update_duration(key, "off", 3500.0, timestamp=6001.0)
+
+        # Drift detected, fast decay activated (set to 15, then decremented)
+        assert stats.fast_decay_updates == 14
+
+        # Continue with new pattern for 15 updates
+        for i in range(15):
+            timestamp = 7000.0 + i * 100.0
+            model.update_duration(key, "off", 1000.0, timestamp=timestamp)
+
+        # After 15 updates, back to normal decay
+        assert stats.fast_decay_updates == 0
+
+        # Distribution should now strongly favor "off" state
+        dist = model.distribution(key)
+        assert dist["off"] > 0.8  # Heavily weighted toward new pattern
+
+    def test_multiple_buckets_independent_fast_decay(self) -> None:
+        """Different buckets have independent fast decay counters."""
+        model = DiscreteConditionalModel(half_life=3600.0)
+        key1 = (("hour", 10),)
+        key2 = (("hour", 11),)
+
+        # Establish patterns in both buckets
+        for key in [key1, key2]:
+            model.update_duration(key, "on", 3000.0, timestamp=1000.0)
+            model.update_duration(key, "off", 1000.0, timestamp=1001.0)
+
+        # Trigger drift only in key1
+        model.update_duration(key1, "on", 500.0, timestamp=6000.0)
+        model.update_duration(key1, "off", 3500.0, timestamp=6001.0)
+
+        # key1 has fast decay (14 after set and decrement), key2 doesn't
+        assert model._states[key1].fast_decay_updates == 14
+        assert model._states[key2].fast_decay_updates == 0
+
+    def test_fast_decay_workflow_realistic_scenario(self) -> None:
+        """Complete workflow: normal → drift → fast decay → normal."""
+        model = DiscreteConditionalModel(half_life=86400.0)  # 1 day
+        key = (("hour", 9),)
+
+        # Phase 1: Normal operation - establish strong office pattern (99% office)
+        # Use much larger values for office to create extreme baseline
+        model.update_duration(key, "office", 10000.0, timestamp=1000.0)
+        model.update_duration(key, "home", 100.0, timestamp=1001.0)
+
+        dist1 = model.distribution(key)
+        assert dist1["office"] > dist1["home"]  # Mostly at office
+        assert model._states[key].fast_decay_updates == 0
+
+        # Phase 2: Pattern changes dramatically (99% home) - ensure drift detection
+        # Keep time gap small (1 hour = 3600 seconds) to minimize decay effects
+        model.update_duration(key, "home", 10000.0, timestamp=1000.0 + 3600.0)
+        model.update_duration(key, "office", 100.0, timestamp=1000.0 + 3601.0)
+
+        assert model._states[key].fast_decay_updates > 0
+
+        # Phase 3: Continue new pattern with fast decay (14 more updates to reach 0)
+        for i in range(14):
+            ts = 9000.0 + i * 100.0
+            model.update_duration(key, "home", 100.0, timestamp=ts)
+
+        # Phase 4: Back to normal decay
+        assert model._states[key].fast_decay_updates == 0
+
+        # Distribution adapted to new pattern
+        dist2 = model.distribution(key)
+        assert dist2["home"] > dist2["office"]  # Now mostly at home
+
+
+class TestFastDecayEdgeCases:
+    """Test edge cases for fast decay behavior."""
+
+    def test_fast_decay_with_zero_half_life(self) -> None:
+        """Fast decay doesn't break with zero half-life."""
+        model = DiscreteConditionalModel(half_life=0.0)
+        key = (("hour", 10),)
+
+        # Establish pattern and trigger drift
+        model.update_duration(key, "on", 3000.0, timestamp=1000.0)
+        model.update_duration(key, "off", 1000.0, timestamp=1001.0)
+        model.update_duration(key, "on", 500.0, timestamp=6000.0)
+        model.update_duration(key, "off", 3500.0, timestamp=6001.0)
+
+        # No decay applied (half_life = 0)
+        stats = model._states[key]
+        # Durations should accumulate without decay
+        assert stats.durations["on"] == 3500.0
+        assert stats.durations["off"] == 4500.0
+
+    def test_fast_decay_counter_survives_prune(self) -> None:
+        """Fast decay counter maintained after pruning states."""
+        model = DiscreteConditionalModel(half_life=3600.0)
+        key = (("hour", 10),)
+
+        # Create stats with fast decay and multiple states
+        model._states[key] = StateStats(
+            durations={"on": 1000.0, "off": 500.0, "idle": 10.0},
+            last_update_ts=0.0,
+            fast_decay_updates=10,
+        )
+
+        # Prune low-weight state
+        model.prune(min_state_duration=50.0, min_bucket_support=0.0)
+
+        # Counter preserved after pruning
+        assert model._states[key].fast_decay_updates == 10
+        assert "idle" not in model._states[key].durations
+
+    def test_drift_detection_after_fast_decay_period(self) -> None:
+        """Can detect new drift after fast decay period ends."""
+        model = DiscreteConditionalModel(half_life=3600.0)
+        key = (("hour", 10),)
+
+        # First drift
+        model.update_duration(key, "on", 3000.0, timestamp=1000.0)
+        model.update_duration(key, "off", 1000.0, timestamp=1001.0)
+        model.update_duration(key, "on", 500.0, timestamp=6000.0)
+        model.update_duration(key, "off", 3500.0, timestamp=6001.0)
+
+        stats = model._states[key]
+        assert stats.fast_decay_updates == 14  # Set to 15, then decremented
+
+        # Exhaust fast decay counter (14 more updates)
+        for i in range(14):
+            model.update_duration(key, "off", 100.0, timestamp=7000.0 + i * 100.0)
+
+        assert stats.fast_decay_updates == 0
+
+        # Second drift (after cooldown) - more dramatic change
+        model.update_duration(key, "on", 3500.0, timestamp=20000.0)
+        model.update_duration(key, "off", 100.0, timestamp=20001.0)
+
+        # New drift can be detected, counter reset to 15 then decremented to 14
+        assert stats.fast_decay_updates == 14
+
+

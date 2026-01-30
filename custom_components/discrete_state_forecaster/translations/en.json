@@ -7,6 +7,7 @@
           "stability": "How often the forecasted entity changes behavior over time?",
           "time_bucket_size": "Time bucket size",
           "use_day_of_week_feature": "Use day of the week",
+          "use_month_of_year_feature": "Use month of the year",
           "calendar_features": "Include calendar entities",
           "forecaster_features": "Include other forecasted entities"
         },

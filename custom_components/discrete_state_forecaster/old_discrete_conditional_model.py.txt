@@ -626,12 +626,15 @@ class DiscreteConditionalModel:
         state = self._states.get(key)
         support_time = sum(state.y.values()) if state else 0.0
 
-        # Calculate entropy confidence: normalize entropy to [0, 1] range
-        # max_entropy is the entropy of a uniform distribution
-        # entropy_conf = 1.0 means deterministic (low entropy)
-        # entropy_conf = 0.0 means uniform distribution (high entropy)
-        max_entropy = math.log2(len(dist)) if len(dist) > 1 else 0.0
-        entropy_conf = 1.0 - (entropy / max_entropy if max_entropy > 0 else 1.0)
+        if len(dist) <= 1:
+            entropy_conf = 1.0
+        else:
+            # Calculate entropy confidence: normalize entropy to [0, 1] range
+            # max_entropy is the entropy of a uniform distribution
+            # entropy_conf = 1.0 means deterministic (low entropy)
+            # entropy_conf = 0.0 means uniform distribution (high entropy)
+            max_entropy = math.log2(len(dist)) if len(dist) > 1 else 0.0
+            entropy_conf = 1.0 - (entropy / max_entropy if max_entropy > 0 else 1.0)
 
         if not without_model_update:
             # We update concept drift state based on this confidence evaluation

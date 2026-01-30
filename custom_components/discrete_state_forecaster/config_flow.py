@@ -17,6 +17,7 @@ from .const import (
     CONF_TARGET_ENTITY_ID,
     CONF_TIME_BUCKET_SIZE_IN_MINUTES,
     CONF_USE_DAY_OF_WEEK_FEATURE,
+    CONF_USE_MONTH_OF_YEAR_FEATURE,
     DOMAIN,
     LOGGER,
     SUPPORTED_BUCKET_SIZES,
@@ -49,26 +50,27 @@ class DiscreteStateForecasterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN
                         mode=selector.SelectSelectorMode.DROPDOWN,
                     )
                 ),
-                vol.Required(CONF_STABILITY): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=SUPPORTED_STABILITY_OPTIONS,
-                        translation_key=CONF_STABILITY,
-                        mode=selector.SelectSelectorMode.DROPDOWN,
-                    )
-                ),
+                # vol.Required(CONF_STABILITY): selector.SelectSelector(
+                #     selector.SelectSelectorConfig(
+                #         options=SUPPORTED_STABILITY_OPTIONS,
+                #         translation_key=CONF_STABILITY,
+                #         mode=selector.SelectSelectorMode.DROPDOWN,
+                #     )
+                # ),
                 vol.Required(CONF_USE_DAY_OF_WEEK_FEATURE, default=False): cv.boolean,
-                vol.Optional(CONF_CALENDAR_FEATURES): selector.EntitySelector(
-                    selector.EntitySelectorConfig(
-                        multiple=True,
-                        domain=["calendar"],
-                    )
-                ),
-                vol.Optional(CONF_FORECASTER_FEATURES): selector.EntitySelector(
-                    selector.EntitySelectorConfig(
-                        multiple=True,
-                        integration=DOMAIN,
-                    )
-                ),
+                vol.Required(CONF_USE_MONTH_OF_YEAR_FEATURE, default=False): cv.boolean,
+                # vol.Optional(CONF_CALENDAR_FEATURES): selector.EntitySelector(
+                #     selector.EntitySelectorConfig(
+                #         multiple=True,
+                #         domain=["calendar"],
+                #     )
+                # ),
+                # vol.Optional(CONF_FORECASTER_FEATURES): selector.EntitySelector(
+                #     selector.EntitySelectorConfig(
+                #         multiple=True,
+                #         integration=DOMAIN,
+                #     )
+                # ),
             }
         )
 
@@ -97,15 +99,20 @@ class DiscreteStateForecasterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN
             data = {
                 CONF_NAME: name,
                 CONF_TARGET_ENTITY_ID: user_input[CONF_TARGET_ENTITY_ID],
-                CONF_DECAY_SECONDS: stability_to_decay_seconds(
-                    user_input[CONF_STABILITY]
+                # CONF_DECAY_SECONDS: stability_to_decay_seconds(
+                #     user_input[CONF_STABILITY]
+                # ),
+                CONF_TIME_BUCKET_SIZE_IN_MINUTES: int(
+                    user_input[CONF_TIME_BUCKET_SIZE_IN_MINUTES]
                 ),
-                CONF_TIME_BUCKET_SIZE_IN_MINUTES: int(user_input[CONF_TIME_BUCKET_SIZE_IN_MINUTES]),
                 CONF_USE_DAY_OF_WEEK_FEATURE: user_input.get(
                     CONF_USE_DAY_OF_WEEK_FEATURE, False
                 ),
-                CONF_CALENDAR_FEATURES: user_input.get(CONF_CALENDAR_FEATURES, []),
-                CONF_FORECASTER_FEATURES: user_input.get(CONF_FORECASTER_FEATURES, []),
+                CONF_USE_MONTH_OF_YEAR_FEATURE: user_input.get(
+                    CONF_USE_MONTH_OF_YEAR_FEATURE, False
+                ),
+                # CONF_CALENDAR_FEATURES: user_input.get(CONF_CALENDAR_FEATURES, []),
+                # CONF_FORECASTER_FEATURES: user_input.get(CONF_FORECASTER_FEATURES, []),
             }
 
             LOGGER.info("Creating Discrete State Forecaster with data: %s", data)
