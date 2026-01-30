@@ -22,9 +22,11 @@ Example:
 """
 
 import math
-from datetime import UTC, datetime
 from typing import Final, Self
 
+from custom_components.discrete_state_forecaster.model.aggregated_stats import (
+    AggregatedStats,
+)
 from custom_components.discrete_state_forecaster.model.confidence import Confidence
 from custom_components.discrete_state_forecaster.model.hierarchical_state_stats import (
     HierarchicalStateStats,
@@ -194,37 +196,46 @@ class DiscreteConditionalModel:
         # if stats.fast_decay_updates > 0:
         #     stats.fast_decay_updates -= 1
 
-    def distribution(self: Self, key: TimeKey) -> dict[State, float]:
+    def distribution(self: Self, key: TimeKey, timestamp: float) -> AggregatedStats:
         """
-        Gets the probability distribution for a specific time bucket.
+        Gets the aggregated probability distribution for a specific time bucket.
 
         Returns the learned probability distribution over states for the given
-        time bucket. Each probability represents the fraction of total observed
-        time that the system spent in that state during this time bucket.
+        time bucket, blended hierarchically across all parent temporal contexts.
+        Uses support-weighted blending to combine statistics from specific to
+        general temporal patterns.
 
         Args:
             key: The temporal key identifying the time bucket for which to
                 retrieve the distribution.
 
         Returns:
-            A dictionary mapping state values to their probabilities (values
-            between 0 and 1 that sum to 1). Returns an empty dictionary if
-            no observations have been recorded for this time bucket.
+            AggregatedStats containing:
+            - distribution: Dictionary mapping state values to their probabilities
+              (values between 0 and 1 that sum to 1). Empty dict if no sufficient
+              observations have been recorded.
+            - support_time: Total accumulated support time across all hierarchy
+              levels that contributed to the distribution.
+            - depth: Number of hierarchy levels that had sufficient support to
+              contribute to the blended distribution.
 
         Example:
             ```
             >>> model = DiscreteConditionalModel()
-            >>> model.update_duration((("time_of_day", 600),), "on", 100.0)
-            >>> model.update_duration((("time_of_day", 600),), "off", 200.0)
-            >>> dist = model.distribution((("time_of_day", 600),))
-            >>> print(dist)
+            >>> key = TimeKey((("time_of_day", 600),))
+            >>> model.update_duration(key, "on", 100.0, timestamp=1000.0)
+            >>> model.update_duration(key, "off", 200.0, timestamp=1000.0)
+            >>> agg_stats = model.distribution(key)
+            >>> print(agg_stats.distribution)
             {'on': 0.3333333333333333, 'off': 0.6666666666666666}
+            >>> print(agg_stats.support_time)
+            300.0
             >>> # Unknown time buckets return empty distribution
-            >>> model.distribution((("time_of_day", 700),))
-            {}
+            >>> model.distribution(TimeKey((("time_of_day", 700),)))
+            AggregatedStats(distribution={}, support_time=0.0, depth=0)
             ```
         """
-        return self._stats.distribution(key)
+        return self._stats.distribution(key, timestamp=timestamp)
 
     def predict(self: Self, key: TimeKey, timestamp: float | None = None) -> Prediction:
         """
@@ -322,7 +333,7 @@ class DiscreteConditionalModel:
             or operations will use these decayed values unless new observations
             are added.
         """
-        stats = self._stats.distribution(key)
+        stats = self._stats.distribution(key, timestamp)
 
         state = max(stats.distribution, key=stats.distribution.get)
 

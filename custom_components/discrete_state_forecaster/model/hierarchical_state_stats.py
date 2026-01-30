@@ -29,8 +29,16 @@ class HierarchicalStateStats:
 
     This class maintains a dictionary of StateStats objects indexed by TimeKey, where each
     TimeKey represents a specific temporal context (e.g., "Monday at 10 AM"). It provides
-    hierarchical blending of statistics, exponential decay for temporal relevance, and
-    automatic pruning to manage memory usage.
+    hierarchical blending of statistics, exponential decay for temporal relevance, automatic
+    pruning to manage memory usage, and concept drift detection to adapt to pattern changes.
+
+    Features:
+    - Hierarchical temporal pattern tracking across multiple granularity levels
+    - Support-weighted blending of distributions from specific to general patterns
+    - Exponential decay for temporal relevance with configurable half-life
+    - Automatic pruning of insignificant statistics
+    - Concept drift detection with accelerated adaptation on pattern shifts
+    - Memory management through key limit enforcement
 
     Attributes:
         stats: Dictionary mapping TimeKey objects to StateStats.
@@ -49,7 +57,7 @@ class HierarchicalStateStats:
         self.prune_interval: float = 6 * 3600
         self.max_keys: int = 50_000
 
-    def distribution(self: Self, key: TimeKey) -> AggregatedStats:
+    def distribution(self: Self, key: TimeKey, timestamp: float) -> AggregatedStats:
         """
         Computes state probability distribution using hierarchical blending.
 
@@ -77,6 +85,8 @@ class HierarchicalStateStats:
             stats = self.stats.get(k)
             if not stats:
                 continue
+
+            stats.apply_decay(timestamp, self.half_life)
 
             support = stats.total()
             if support < MIN_SUPPORT:
@@ -170,6 +180,16 @@ class HierarchicalStateStats:
         If a TimeKey doesn't exist, creates a new StateStats entry. Applies decay before
         updating to maintain temporal relevance.
 
+        Concept Drift Detection:
+        At each hierarchy level, checks for concept drift (significant distribution shifts)
+        using the StateStats.check_drift() method. When drift is detected:
+        - Sets fast_decay_updates to 15 for that level
+        - Triggers accelerated adaptation to new patterns
+        - Helps the model quickly adjust to behavioral changes
+
+        The fast_decay_updates counter decrements on each subsequent update, providing
+        a brief period of enhanced learning after pattern shifts are detected.
+
         Args:
             key: The TimeKey representing the temporal context.
             state: The state value that was observed (e.g., "on", "off").
@@ -180,7 +200,18 @@ class HierarchicalStateStats:
             - Creates StateStats entries for key and all parent keys if they don't exist
             - Applies decay to all affected StateStats before updating
             - Updates durations for the state across all hierarchy levels
+            - Checks for concept drift at each level
+            - Sets fast_decay_updates=15 when drift is detected
+            - Decrements fast_decay_updates counter if > 0
             - May trigger key limit enforcement if max_keys threshold is exceeded
+
+        Example:
+            >>> stats = HierarchicalStateStats()
+            >>> key = TimeKey((("hour", 10), ("weekday", 1)))
+            >>> # Normal update
+            >>> stats.update(key, "on", 100.0, ts=1000.0)
+            >>> # If pattern changes significantly, drift is detected automatically
+            >>> # and fast_decay_updates is set for adaptive learning
         """
         for k in key.parents():
             stats = self.stats.get(k)
@@ -190,6 +221,12 @@ class HierarchicalStateStats:
 
             stats.apply_decay(ts, self.half_life)
             stats.update_duration(state, duration)
+
+            if stats.check_drift(ts):
+                stats.fast_decay_updates = 15
+
+            if stats.fast_decay_updates > 0:
+                stats.fast_decay_updates -= 1
 
         if len(self.stats) > self.max_keys * 1.1:
             self.enforce_key_limit()
