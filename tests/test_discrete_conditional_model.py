@@ -12,7 +12,6 @@ Tests cover:
 """
 
 import math
-from typing import Final
 
 import pytest
 
@@ -65,7 +64,7 @@ class TestUpdateDuration:
 
         model.update_duration(key, "on", 100.0, timestamp=1000.0)
 
-        stats = model.distribution(key)
+        stats = model.distribution(key, timestamp=1000.0)
         assert stats.distribution == {"on": 1.0}
         # Support includes both specific key and GLOBAL (hierarchical blending)
         assert stats.support_time == pytest.approx(200.0)  # 100 + 100 from GLOBAL
@@ -78,7 +77,7 @@ class TestUpdateDuration:
         model.update_duration(key, "on", 100.0, timestamp=1000.0)
         model.update_duration(key, "on", 50.0, timestamp=1050.0)
 
-        stats = model.distribution(key)
+        stats = model.distribution(key, timestamp=1000.0)
         assert stats.distribution == {"on": 1.0}
         # Support includes both specific key (150) and GLOBAL (150)
         assert stats.support_time == pytest.approx(300.0)
@@ -91,7 +90,7 @@ class TestUpdateDuration:
         model.update_duration(key, "on", 100.0, timestamp=1000.0)
         model.update_duration(key, "off", 200.0, timestamp=1000.0)
 
-        stats = model.distribution(key)
+        stats = model.distribution(key, timestamp=1000.0)
         assert stats.distribution["on"] == pytest.approx(1 / 3)
         assert stats.distribution["off"] == pytest.approx(2 / 3)
         # Support includes both specific key (300) and GLOBAL (300)
@@ -105,7 +104,7 @@ class TestUpdateDuration:
         # Update with duration below threshold
         model.update_duration(key, "on", MIN_DURATION_THRESHOLD - 0.1, timestamp=1000.0)
 
-        stats = model.distribution(key)
+        stats = model.distribution(key, timestamp=1000.0)
         # Should be empty since duration was filtered
         assert stats.distribution == {}
         assert stats.support_time == 0.0
@@ -118,7 +117,7 @@ class TestUpdateDuration:
         # Need > MIN_SUPPORT (30.0) for hierarchical stats to contribute
         model.update_duration(key, "on", 40.0, timestamp=1000.0)
 
-        stats = model.distribution(key)
+        stats = model.distribution(key, timestamp=1000.0)
         assert stats.distribution == {"on": 1.0}
         assert stats.support_time >= 40.0
 
@@ -132,8 +131,8 @@ class TestUpdateDuration:
         model.update_duration(key1, "on", 300.0, timestamp=1000.0)
         model.update_duration(key2, "off", 400.0, timestamp=1000.0)
 
-        stats1 = model.distribution(key1)
-        stats2 = model.distribution(key2)
+        stats1 = model.distribution(key1, timestamp=1000.0)
+        stats2 = model.distribution(key2, timestamp=1000.0)
 
         # Both keys share GLOBAL parent, so distributions blend
         assert "on" in stats1.distribution
@@ -148,7 +147,7 @@ class TestUpdateDuration:
 
         model.update_duration(TimeKey.GLOBAL, "on", 100.0, timestamp=1000.0)
 
-        stats = model.distribution(TimeKey.GLOBAL)
+        stats = model.distribution(TimeKey.GLOBAL, timestamp=1000.0)
         assert stats.distribution == {"on": 1.0}
 
     def test_update_hierarchical_keys(self) -> None:
@@ -159,7 +158,7 @@ class TestUpdateDuration:
         model.update_duration(key, "on", 100.0, timestamp=1000.0)
 
         # Should update the specific key
-        stats = model.distribution(key)
+        stats = model.distribution(key, timestamp=1000.0)
         assert stats.distribution == {"on": 1.0}
 
 
@@ -171,7 +170,7 @@ class TestDistribution:
         model = DiscreteConditionalModel()
         key = TimeKey((("time_of_day", 600),))
 
-        stats = model.distribution(key)
+        stats = model.distribution(key, timestamp=1000.0)
 
         assert stats.distribution == {}
         assert stats.support_time == 0.0
@@ -184,7 +183,7 @@ class TestDistribution:
 
         model.update_duration(key, "on", 100.0, timestamp=1000.0)
 
-        stats = model.distribution(key)
+        stats = model.distribution(key, timestamp=1000.0)
         assert stats.distribution == {"on": 1.0}
 
     def test_distribution_multiple_states(self) -> None:
@@ -195,7 +194,7 @@ class TestDistribution:
         model.update_duration(key, "on", 75.0, timestamp=1000.0)
         model.update_duration(key, "off", 25.0, timestamp=1000.0)
 
-        stats = model.distribution(key)
+        stats = model.distribution(key, timestamp=1000.0)
         assert stats.distribution["on"] == pytest.approx(0.75)
         assert stats.distribution["off"] == pytest.approx(0.25)
 
@@ -208,7 +207,7 @@ class TestDistribution:
         model.update_duration(key, "b", 200.0, timestamp=1000.0)
         model.update_duration(key, "c", 300.0, timestamp=1000.0)
 
-        stats = model.distribution(key)
+        stats = model.distribution(key, timestamp=1000.0)
         total = sum(stats.distribution.values())
         assert total == pytest.approx(1.0)
 
@@ -219,7 +218,7 @@ class TestDistribution:
 
         model.update_duration(key, "on", 100.0, timestamp=1000.0)
 
-        stats = model.distribution(key)
+        stats = model.distribution(key, timestamp=1000.0)
         assert hasattr(stats, "distribution")
         assert hasattr(stats, "support_time")
         assert hasattr(stats, "depth")
@@ -237,7 +236,7 @@ class TestDistribution:
         model.update_duration(specific_key, "off", 100.0, timestamp=1000.0)
 
         # Distribution should blend both levels
-        stats = model.distribution(specific_key)
+        stats = model.distribution(specific_key, timestamp=1000.0)
         assert "on" in stats.distribution
         assert "off" in stats.distribution
         # Specific key should have higher weight but parent contributes
@@ -277,7 +276,7 @@ class TestPredict:
         key = TimeKey((("time_of_day", 600),))
 
         # Empty distribution causes max() to raise ValueError
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=r"max.*empty"):
             model.predict(key, timestamp=1000.0)
 
     def test_predict_confidence_metrics(self) -> None:
@@ -329,17 +328,6 @@ class TestPredict:
         prediction = model.predict(key, timestamp=1000.0)
         # Support includes both specific key (300) and GLOBAL (300)
         assert prediction.confidence.support_time == pytest.approx(600.0)
-
-    def test_predict_without_timestamp_uses_current_time(self) -> None:
-        """Test prediction without explicit timestamp."""
-        model = DiscreteConditionalModel()
-        key = TimeKey((("time_of_day", 600),))
-
-        model.update_duration(key, "on", 100.0, timestamp=1000.0)
-
-        # Should not raise error
-        prediction = model.predict(key)
-        assert prediction.state == "on"
 
 
 class TestEntropy:
@@ -406,12 +394,10 @@ class TestPrune:
         model.prune(now_ts=1000.0, absolute_min=10.0, min_total=50.0)
 
         # Specific bucket should be removed, but GLOBAL might still have data
-        stats_specific = model.distribution(key)
+        stats = model.distribution(key, timestamp=1000.0)
         # After pruning, distribution may still show GLOBAL data if it has sufficient support
-
-    def test_prune_keeps_sufficient_buckets(self) -> None:
-        """Test that pruning keeps buckets above threshold."""
-        model = DiscreteConditionalModel()
+        # Just verify we can query the distribution
+        assert isinstance(stats.distribution, dict)
         key = TimeKey((("time_of_day", 600),))
 
         model.update_duration(key, "on", 100.0, timestamp=1000.0)
@@ -420,7 +406,7 @@ class TestPrune:
         model.prune(now_ts=1000.0, absolute_min=10.0, min_total=50.0)
 
         # Bucket should remain
-        stats = model.distribution(key)
+        stats = model.distribution(key, timestamp=1000.0)
         assert stats.distribution == {"on": 1.0}
 
     def test_prune_removes_low_weight_states(self) -> None:
@@ -434,7 +420,7 @@ class TestPrune:
         )  # Below MIN_DURATION_THRESHOLD
 
         # 'off' never gets recorded due to MIN_DURATION_THRESHOLD filter
-        stats = model.distribution(key)
+        stats = model.distribution(key, timestamp=1000.0)
         assert "on" in stats.distribution
         # 'off' was filtered before recording
 
@@ -450,15 +436,12 @@ class TestPrune:
         model.prune(now_ts=1000.0, absolute_min=10.0, min_total=50.0)
 
         # key1 should have strong support, key2 weak
-        stats1 = model.distribution(key1)
-        stats2 = model.distribution(key2)
-
+        stats1 = model.distribution(key1, timestamp=1000.0)
+        
         assert "on" in stats1.distribution
-        # key2 may still show GLOBAL data after pruning
-
-    def test_prune_with_epsilon_parameter(self) -> None:
-        """Test pruning with epsilon parameter."""
-        model = DiscreteConditionalModel()
+        # key2 may still show GLOBAL data after pruning even if specific bucket was removed
+        stats2 = model.distribution(key2, timestamp=1000.0)
+        assert isinstance(stats2.distribution, dict)
         key = TimeKey((("time_of_day", 600),))
 
         model.update_duration(key, "on", 100.0, timestamp=1000.0)
@@ -466,7 +449,7 @@ class TestPrune:
         # Should work with epsilon parameter
         model.prune(now_ts=1000.0, epsilon=0.001, absolute_min=10.0, min_total=50.0)
 
-        stats = model.distribution(key)
+        stats = model.distribution(key, timestamp=1000.0)
         assert stats.distribution == {"on": 1.0}
 
 
@@ -480,7 +463,7 @@ class TestEdgeCases:
 
         model.update_duration(key, "on", 1e10, timestamp=1000.0)
 
-        stats = model.distribution(key)
+        stats = model.distribution(key, timestamp=1000.0)
         assert stats.distribution == {"on": 1.0}
 
     def test_very_small_duration_above_threshold(self) -> None:
@@ -491,7 +474,7 @@ class TestEdgeCases:
         # Use duration above MIN_SUPPORT (30.0) to ensure it contributes
         model.update_duration(key, "on", 35.0, timestamp=1000.0)
 
-        stats = model.distribution(key)
+        stats = model.distribution(key, timestamp=1000.0)
         assert "on" in stats.distribution
 
     def test_many_states(self) -> None:
@@ -502,7 +485,7 @@ class TestEdgeCases:
         for i in range(100):
             model.update_duration(key, f"state_{i}", 10.0, timestamp=1000.0)
 
-        stats = model.distribution(key)
+        stats = model.distribution(key, timestamp=1000.0)
         assert len(stats.distribution) == 100
         # All states should have equal probability
         for prob in stats.distribution.values():
@@ -519,7 +502,7 @@ class TestEdgeCases:
         # All buckets should be accessible
         for i in range(1000):
             key = TimeKey((("time_of_day", i),))
-            stats = model.distribution(key)
+            stats = model.distribution(key, timestamp=1000.0)
             assert stats.distribution == {"on": 1.0}
 
     def test_zero_timestamp(self) -> None:
@@ -529,7 +512,7 @@ class TestEdgeCases:
 
         model.update_duration(key, "on", 100.0, timestamp=0.0)
 
-        stats = model.distribution(key)
+        stats = model.distribution(key, timestamp=1000.0)
         assert stats.distribution == {"on": 1.0}
 
     def test_negative_timestamp(self) -> None:
@@ -539,7 +522,7 @@ class TestEdgeCases:
 
         model.update_duration(key, "on", 100.0, timestamp=-1000.0)
 
-        stats = model.distribution(key)
+        stats = model.distribution(key, timestamp=1000.0)
         assert stats.distribution == {"on": 1.0}
 
     def test_empty_time_key_components(self) -> None:
@@ -548,7 +531,7 @@ class TestEdgeCases:
 
         model.update_duration(TimeKey.GLOBAL, "on", 100.0, timestamp=1000.0)
 
-        stats = model.distribution(TimeKey.GLOBAL)
+        stats = model.distribution(TimeKey.GLOBAL, timestamp=1000.0)
         assert stats.distribution == {"on": 1.0}
 
     def test_deeply_nested_time_key(self) -> None:
@@ -567,7 +550,7 @@ class TestEdgeCases:
 
         model.update_duration(key, "on", 100.0, timestamp=1000.0)
 
-        stats = model.distribution(key)
+        stats = model.distribution(key, timestamp=1000.0)
         assert stats.distribution == {"on": 1.0}
 
     def test_state_name_special_characters(self) -> None:
@@ -579,7 +562,7 @@ class TestEdgeCases:
         for state in special_states:
             model.update_duration(key, state, 10.0, timestamp=1000.0)
 
-        stats = model.distribution(key)
+        stats = model.distribution(key, timestamp=1000.0)
         assert len(stats.distribution) == len(special_states)
 
     def test_numeric_state_names(self) -> None:
@@ -591,7 +574,7 @@ class TestEdgeCases:
         model.update_duration(key, "0", 100.0, timestamp=1000.0)
         model.update_duration(key, "1", 200.0, timestamp=1000.0)
 
-        stats = model.distribution(key)
+        stats = model.distribution(key, timestamp=1000.0)
         assert stats.distribution["0"] == pytest.approx(1 / 3)
         assert stats.distribution["1"] == pytest.approx(2 / 3)
 
@@ -609,7 +592,7 @@ class TestIntegration:
         model.update_duration(key, "off", 100.0, timestamp=1000.0)
 
         # Check distribution
-        stats = model.distribution(key)
+        stats = model.distribution(key, timestamp=1000.0)
         assert stats.distribution["on"] == pytest.approx(0.75)
 
         # Make prediction
@@ -621,7 +604,7 @@ class TestIntegration:
         model.prune(now_ts=1000.0, absolute_min=10.0, min_total=50.0)
 
         # Should still be there
-        stats_after = model.distribution(key)
+        stats_after = model.distribution(key, timestamp=1000.0)
         assert stats_after.distribution["on"] == pytest.approx(0.75)
 
     def test_hierarchical_pattern_learning(self) -> None:
@@ -637,7 +620,7 @@ class TestIntegration:
         model.update_duration(specific_key, "meeting", 300.0, timestamp=1000.0)
 
         # Specific key should blend both patterns
-        stats = model.distribution(specific_key)
+        stats = model.distribution(specific_key, timestamp=1000.0)
         assert "working" in stats.distribution
         assert "meeting" in stats.distribution
 
@@ -660,7 +643,7 @@ class TestIntegration:
         model.update_duration(specific_key, "specific", 100.0, timestamp=1000.0)
 
         # Should blend all three levels
-        stats = model.distribution(specific_key)
+        stats = model.distribution(specific_key, timestamp=1000.0)
         assert len(stats.distribution) >= 1
         assert stats.depth >= 1
 
@@ -677,8 +660,8 @@ class TestIntegration:
         model.update_duration(evening, "sleep", 100.0, timestamp=1000.0)
 
         # Patterns should be independent
-        morning_stats = model.distribution(morning)
-        evening_stats = model.distribution(evening)
+        morning_stats = model.distribution(morning, timestamp=1000.0)
+        evening_stats = model.distribution(evening, timestamp=1000.0)
 
         assert "wake_up" in morning_stats.distribution
         assert "sleep" in evening_stats.distribution
@@ -692,12 +675,12 @@ class TestIntegration:
         model.update_duration(key, "off", 900.0, timestamp=1000.0)
         model.update_duration(key, "on", 100.0, timestamp=1000.0)
 
-        initial_stats = model.distribution(key)
+        initial_stats = model.distribution(key, timestamp=1000.0)
         assert initial_stats.distribution["off"] > initial_stats.distribution["on"]
 
         # Shift pattern: add more "on" observations
         model.update_duration(key, "on", 900.0, timestamp=2000.0)
 
-        updated_stats = model.distribution(key)
+        updated_stats = model.distribution(key, timestamp=1000.0)
         # Now probabilities should be closer
         assert updated_stats.distribution["on"] > 0.4

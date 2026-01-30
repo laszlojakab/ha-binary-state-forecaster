@@ -33,9 +33,6 @@ from custom_components.discrete_state_forecaster.model.hierarchical_state_stats 
 )
 from custom_components.discrete_state_forecaster.model.prediction import Prediction
 from custom_components.discrete_state_forecaster.model.state import State
-from custom_components.discrete_state_forecaster.model.state_stats import (
-    StateStats,
-)
 from custom_components.discrete_state_forecaster.model.time_indexers.time_key import (
     TimeKey,
 )
@@ -186,16 +183,6 @@ class DiscreteConditionalModel:
             ts=timestamp,
         )
 
-        # self._apply_decay(stats, timestamp)
-
-        # stats.update_duration(state, duration)
-
-        # if stats.check_drift(timestamp):
-        #     stats.fast_decay_updates = 15
-
-        # if stats.fast_decay_updates > 0:
-        #     stats.fast_decay_updates -= 1
-
     def distribution(self: Self, key: TimeKey, timestamp: float) -> AggregatedStats:
         """
         Gets the aggregated probability distribution for a specific time bucket.
@@ -205,9 +192,17 @@ class DiscreteConditionalModel:
         Uses support-weighted blending to combine statistics from specific to
         general temporal patterns.
 
+        When the model has decay enabled (half_life > 0), this method applies
+        exponential decay to the statistics based on the elapsed time since the
+        last update, ensuring that recent observations are weighted more heavily
+        than older ones.
+
         Args:
             key: The temporal key identifying the time bucket for which to
                 retrieve the distribution.
+            timestamp: Unix timestamp for the distribution calculation. Used to
+                apply exponential decay when half_life > 0. The decay factor is
+                calculated based on the elapsed time since the last update.
 
         Returns:
             AggregatedStats containing:
@@ -225,19 +220,19 @@ class DiscreteConditionalModel:
             >>> key = TimeKey((("time_of_day", 600),))
             >>> model.update_duration(key, "on", 100.0, timestamp=1000.0)
             >>> model.update_duration(key, "off", 200.0, timestamp=1000.0)
-            >>> agg_stats = model.distribution(key)
+            >>> agg_stats = model.distribution(key, timestamp=1000.0)
             >>> print(agg_stats.distribution)
             {'on': 0.3333333333333333, 'off': 0.6666666666666666}
             >>> print(agg_stats.support_time)
             300.0
             >>> # Unknown time buckets return empty distribution
-            >>> model.distribution(TimeKey((("time_of_day", 700),)))
+            >>> model.distribution(TimeKey((("time_of_day", 700),)), timestamp=1000.0)
             AggregatedStats(distribution={}, support_time=0.0, depth=0)
             ```
         """
         return self._stats.distribution(key, timestamp=timestamp)
 
-    def predict(self: Self, key: TimeKey, timestamp: float | None = None) -> Prediction:
+    def predict(self: Self, key: TimeKey, timestamp: float) -> Prediction:
         """
         Predicts the most likely state for a specific time bucket.
 
@@ -253,8 +248,8 @@ class DiscreteConditionalModel:
         Args:
             key: The temporal key identifying the time bucket for which to
                 make a prediction.
-            timestamp: Unix timestamp for the prediction. If None, uses current time.
-                When decay is enabled (half_life > 0), this timestamp is used to
+            timestamp: Unix timestamp for the prediction. Used to apply exponential
+                decay when half_life > 0. When decay is enabled, this timestamp is used to
                 calculate elapsed time since the last update, which determines
                 the decay factor applied to historical observations. For models
                 without decay, this parameter has no effect.
@@ -412,15 +407,17 @@ class DiscreteConditionalModel:
         - Clean up time buckets that are no longer relevant
 
         Args:
-            min_state_duration: Minimum duration threshold in seconds for
+            now_ts: Current timestamp used for decay calculations.
+            epsilon: Relative threshold for pruning states. States with relative
+                support below this fraction are removed.
+            absolute_min: Absolute minimum duration threshold in seconds for
                 individual states within each bucket. States with durations
                 strictly less than this value are removed from their bucket.
                 Typical values: 10-60 seconds.
-            min_bucket_support: Minimum total duration threshold in seconds
-                for time buckets. After state pruning, buckets with total
-                duration less than this value are removed entirely. This ensures
-                predictions are only made for buckets with sufficient data.
-                Typical values: 60-300 seconds.
+            min_total: Minimum total duration threshold in seconds for time buckets.
+                After state pruning, buckets with total duration less than this
+                value are removed entirely. This ensures predictions are only made
+                for buckets with sufficient data. Typical values: 60-300 seconds.
 
         Behavior:
             - First applies state-level pruning to all buckets
