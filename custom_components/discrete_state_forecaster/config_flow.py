@@ -66,7 +66,7 @@ class DiscreteStateForecasterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN
                     user_input[CONF_TIME_BUCKET_SIZE_IN_MINUTES]
                 ),
             }
-            
+
             # Store initial options (indexers and prediction settings)
             options_data = {
                 CONF_USE_DAY_OF_WEEK: user_input.get(
@@ -92,7 +92,9 @@ class DiscreteStateForecasterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN
                 config_data[CONF_TIME_BUCKET_SIZE_IN_MINUTES],
             )
 
-            return self.async_create_entry(title=title, data=config_data, options=options_data)
+            return self.async_create_entry(
+                title=title, data=config_data, options=options_data
+            )
 
         # Show form to select target entity and configuration
         data_schema = vol.Schema(
