@@ -35,7 +35,7 @@ from .const import (
     CONF_USE_MONTH_OF_YEAR_FEATURE,
     STORING_TIME_PATTERN,
 )
-from .model.discrete_conditional_model import DiscreteConditionalModel
+from .model.hierarchical_temporal_state_model import HierarchicalTemporalStateModel
 from .model.state_tracker import StateTracker
 from .model.time_indexers import CompositeIndexer, DayOfWeekIndexer, MonthIndexer, TimeOfDayIndexer
 
@@ -102,7 +102,7 @@ class DiscreteStateForecasterCoordinator(
             )
         )
         self._composite_indexer = CompositeIndexer(self._time_indexers)
-        self._model = DiscreteConditionalModel(3600 * 24 * 7)
+        self._model = HierarchicalTemporalStateModel(3600 * 24 * 7)
         self._forecaster = TimeAwareForecaster(self._composite_indexer)
         self._state_tracker = StateTracker(self._forecaster)
 
@@ -252,7 +252,7 @@ class DiscreteStateForecasterCoordinator(
         #         self._config_entry.data[CONF_TARGET_ENTITY_ID],
         #     )
 
-        # self._model = model or DiscreteConditionalModel()
+        # self._model = model or HierarchicalTemporalStateModel()
         # self._model.decay = self.config_entry.data.get(CONF_DECAY_SECONDS, 3600.0)
         ...
 

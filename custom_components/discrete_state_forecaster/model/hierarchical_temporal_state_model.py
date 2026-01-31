@@ -13,7 +13,7 @@ of temporal features.
 Example:
     ```
     >>> from .time_indexers import CompositeIndexer, TimeOfDayIndexer, DayOfWeekIndexer
-    >>> model = DiscreteConditionalModel()
+    >>> model = HierarchicalTemporalStateModel()
     >>> model.update_duration((("time_of_day", 600),), "on", 150.0)
     >>> model.update_duration((("time_of_day", 600),), "off", 50.0)
     >>> model.distribution((("time_of_day", 600),))
@@ -41,7 +41,7 @@ MIN_DURATION_THRESHOLD: Final = 5.0  # Filter durations below this (seconds)
 
 
 # Name may should be changed to Hierarchical Temporal Bayesian?
-class DiscreteConditionalModel:
+class HierarchicalTemporalStateModel:
     """
     A time-conditioned discrete state prediction model.
 
@@ -60,7 +60,7 @@ class DiscreteConditionalModel:
 
     Example:
         ```
-        >>> model = DiscreteConditionalModel()
+        >>> model = HierarchicalTemporalStateModel()
         >>> # Record that during time bucket 600, the state was "on" for 100 seconds
         >>> model.update_duration((("time_of_day", 600),), "on", 100.0)
         >>> model.update_duration((("time_of_day", 600),), "off", 200.0)
@@ -73,7 +73,7 @@ class DiscreteConditionalModel:
 
     def __init__(self, half_life: float = 0.0):
         """
-        Initializes a new DiscreteConditionalModel.
+        Initializes a new HierarchicalTemporalStateModel.
 
         Creates an empty model with no learned state statistics. Statistics are
         accumulated as durations are updated via the update_duration method.
@@ -102,10 +102,10 @@ class DiscreteConditionalModel:
         Example:
             ```
             >>> # No decay: all observations weighted equally
-            >>> model = DiscreteConditionalModel(half_life=0.0)
+            >>> model = HierarchicalTemporalStateModel(half_life=0.0)
             >>> # 1 day half-life: observations lose 50% weight after 24 hours
             >>> # After drift: 10x faster decay (2.4 hour half-life) for 15 updates
-            >>> model = DiscreteConditionalModel(half_life=86400.0)
+            >>> model = HierarchicalTemporalStateModel(half_life=86400.0)
             ```
         """
         self._stats = HierarchicalStateStats(half_life=half_life)
@@ -163,7 +163,7 @@ class DiscreteConditionalModel:
 
         Example:
             ```
-            >>> model = DiscreteConditionalModel(half_life=86400.0)
+            >>> model = HierarchicalTemporalStateModel(half_life=86400.0)
             >>> # Normal operation: 1-day half-life
             >>> model.update_duration((("time_of_day", 600),), "on", 150.0)
             >>> # Pattern changes significantly (drift detected)
@@ -216,7 +216,7 @@ class DiscreteConditionalModel:
 
         Example:
             ```
-            >>> model = DiscreteConditionalModel()
+            >>> model = HierarchicalTemporalStateModel()
             >>> key = TimeKey((("time_of_day", 600),))
             >>> model.update_duration(key, "on", 100.0, timestamp=1000.0)
             >>> model.update_duration(key, "off", 200.0, timestamp=1000.0)
@@ -275,7 +275,7 @@ class DiscreteConditionalModel:
         Examples:
             ```
             >>> # Basic prediction without decay
-            >>> model = DiscreteConditionalModel()
+            >>> model = HierarchicalTemporalStateModel()
             >>> model.update_duration((('time_of_day', 600),), 'on', 300.0)
             >>> model.update_duration((('time_of_day', 600),), 'off', 100.0)
             >>> prediction = model.predict((('time_of_day', 600),))
@@ -287,7 +287,7 @@ class DiscreteConditionalModel:
             Max probability: 0.75
 
             >>> # Prediction with decay - recent patterns matter more
-            >>> model = DiscreteConditionalModel(half_life=3600.0)  # 1 hour half-life
+            >>> model = HierarchicalTemporalStateModel(half_life=3600.0)  # 1 hour half-life
             >>> key = (('hour', 10),)
             >>> # Old observation: mostly 'off'
             >>> model.update_duration(key, 'off', 1000.0, timestamp=0.0)
@@ -311,7 +311,7 @@ class DiscreteConditionalModel:
             )
 
             >>> # Explicit timestamp for decay calculation
-            >>> model = DiscreteConditionalModel(half_life=86400.0)  # 1 day
+            >>> model = HierarchicalTemporalStateModel(half_life=86400.0)  # 1 day
             >>> key = (('hour', 14),)
             >>> model.update_duration(key, 'heating', 5000.0, timestamp=0.0)
             >>> # Predict 3 days later - heavy decay applied
@@ -435,7 +435,7 @@ class DiscreteConditionalModel:
 
         Examples:
             ```
-            >>> model = DiscreteConditionalModel()
+            >>> model = HierarchicalTemporalStateModel()
             >>> model.update_duration((('hour', 10),), 'on', 100.0)
             >>> model.update_duration((('hour', 10),), 'off', 5.0)
             >>> model.update_duration((('hour', 11),), 'idle', 20.0)
@@ -449,7 +449,7 @@ class DiscreteConditionalModel:
             False
 
             >>> # Typical usage after decay
-            >>> model = DiscreteConditionalModel(half_life=86400.0)  # 1 day
+            >>> model = HierarchicalTemporalStateModel(half_life=86400.0)  # 1 day
             >>> # ... record observations over time ...
             >>> # After 1 week, prune states that decayed below threshold
             >>> model.prune(min_state_duration=10.0, min_bucket_support=60.0)

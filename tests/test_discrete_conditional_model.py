@@ -1,5 +1,5 @@
 """
-Comprehensive tests for DiscreteConditionalModel.
+Comprehensive tests for HierarchicalTemporalStateModel.
 
 Tests cover:
 - Initialization with various configurations
@@ -15,9 +15,9 @@ import math
 
 import pytest
 
-from custom_components.discrete_state_forecaster.model.discrete_conditional_model import (
+from custom_components.discrete_state_forecaster.model.hierarchical_temporal_state_model import (
     MIN_DURATION_THRESHOLD,
-    DiscreteConditionalModel,
+    HierarchicalTemporalStateModel,
 )
 from custom_components.discrete_state_forecaster.model.time_indexers.time_key import (
     TimeKey,
@@ -25,32 +25,32 @@ from custom_components.discrete_state_forecaster.model.time_indexers.time_key im
 
 
 class TestInitialization:
-    """Tests for DiscreteConditionalModel initialization."""
+    """Tests for HierarchicalTemporalStateModel initialization."""
 
     def test_init_default_no_decay(self) -> None:
         """Test initialization with default parameters (no decay)."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         # Should initialize without errors
         assert model is not None
 
     def test_init_with_half_life(self) -> None:
         """Test initialization with custom half-life."""
-        model = DiscreteConditionalModel(half_life=3600.0)
+        model = HierarchicalTemporalStateModel(half_life=3600.0)
         assert model is not None
 
     def test_init_with_zero_half_life(self) -> None:
         """Test initialization with zero half-life (no decay)."""
-        model = DiscreteConditionalModel(half_life=0.0)
+        model = HierarchicalTemporalStateModel(half_life=0.0)
         assert model is not None
 
     def test_init_with_very_small_half_life(self) -> None:
         """Test initialization with very small half-life."""
-        model = DiscreteConditionalModel(half_life=1.0)
+        model = HierarchicalTemporalStateModel(half_life=1.0)
         assert model is not None
 
     def test_init_with_large_half_life(self) -> None:
         """Test initialization with large half-life."""
-        model = DiscreteConditionalModel(half_life=86400.0 * 365)  # 1 year
+        model = HierarchicalTemporalStateModel(half_life=86400.0 * 365)  # 1 year
         assert model is not None
 
 
@@ -59,7 +59,7 @@ class TestUpdateDuration:
 
     def test_update_single_observation(self) -> None:
         """Test updating with a single observation."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         key = TimeKey((("time_of_day", 600),))
 
         model.update_duration(key, "on", 100.0, timestamp=1000.0)
@@ -71,7 +71,7 @@ class TestUpdateDuration:
 
     def test_update_multiple_observations_same_state(self) -> None:
         """Test multiple updates for the same state."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         key = TimeKey((("time_of_day", 600),))
 
         model.update_duration(key, "on", 100.0, timestamp=1000.0)
@@ -84,7 +84,7 @@ class TestUpdateDuration:
 
     def test_update_multiple_states(self) -> None:
         """Test updating with different states."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         key = TimeKey((("time_of_day", 600),))
 
         model.update_duration(key, "on", 100.0, timestamp=1000.0)
@@ -98,7 +98,7 @@ class TestUpdateDuration:
 
     def test_update_filters_short_durations(self) -> None:
         """Test that durations below MIN_DURATION_THRESHOLD are filtered."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         key = TimeKey((("time_of_day", 600),))
 
         # Update with duration below threshold
@@ -111,7 +111,7 @@ class TestUpdateDuration:
 
     def test_update_accepts_duration_at_threshold(self) -> None:
         """Test that durations exactly at MIN_DURATION_THRESHOLD are accepted."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         key = TimeKey((("time_of_day", 600),))
 
         # Need > MIN_SUPPORT (30.0) for hierarchical stats to contribute
@@ -123,7 +123,7 @@ class TestUpdateDuration:
 
     def test_update_different_keys(self) -> None:
         """Test updating different time keys independently."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         key1 = TimeKey((("time_of_day", 600),))
         key2 = TimeKey((("time_of_day", 700),))
 
@@ -143,7 +143,7 @@ class TestUpdateDuration:
 
     def test_update_with_global_key(self) -> None:
         """Test updating with TimeKey.GLOBAL."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
 
         model.update_duration(TimeKey.GLOBAL, "on", 100.0, timestamp=1000.0)
 
@@ -152,7 +152,7 @@ class TestUpdateDuration:
 
     def test_update_hierarchical_keys(self) -> None:
         """Test updating with hierarchical keys."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         key = TimeKey((("day_of_week", 1), ("hour", 10)))
 
         model.update_duration(key, "on", 100.0, timestamp=1000.0)
@@ -167,7 +167,7 @@ class TestDistribution:
 
     def test_distribution_empty_model(self) -> None:
         """Test distribution for a key with no observations."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         key = TimeKey((("time_of_day", 600),))
 
         stats = model.distribution(key, timestamp=1000.0)
@@ -178,7 +178,7 @@ class TestDistribution:
 
     def test_distribution_single_state(self) -> None:
         """Test distribution with single state."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         key = TimeKey((("time_of_day", 600),))
 
         model.update_duration(key, "on", 100.0, timestamp=1000.0)
@@ -188,7 +188,7 @@ class TestDistribution:
 
     def test_distribution_multiple_states(self) -> None:
         """Test distribution with multiple states."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         key = TimeKey((("time_of_day", 600),))
 
         model.update_duration(key, "on", 75.0, timestamp=1000.0)
@@ -200,7 +200,7 @@ class TestDistribution:
 
     def test_distribution_sums_to_one(self) -> None:
         """Test that probabilities sum to 1.0."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         key = TimeKey((("time_of_day", 600),))
 
         model.update_duration(key, "a", 100.0, timestamp=1000.0)
@@ -213,7 +213,7 @@ class TestDistribution:
 
     def test_distribution_returns_aggregated_stats(self) -> None:
         """Test that distribution returns AggregatedStats with all fields."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         key = TimeKey((("time_of_day", 600),))
 
         model.update_duration(key, "on", 100.0, timestamp=1000.0)
@@ -225,7 +225,7 @@ class TestDistribution:
 
     def test_distribution_hierarchical_blending(self) -> None:
         """Test hierarchical blending when specific key has insufficient data."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
 
         # Add data to parent (general) key
         parent_key = TimeKey((("hour", 10),))
@@ -248,7 +248,7 @@ class TestPredict:
 
     def test_predict_single_state(self) -> None:
         """Test prediction with single state."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         key = TimeKey((("time_of_day", 600),))
 
         model.update_duration(key, "on", 100.0, timestamp=1000.0)
@@ -260,7 +260,7 @@ class TestPredict:
 
     def test_predict_multiple_states_chooses_max(self) -> None:
         """Test prediction chooses state with highest probability."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         key = TimeKey((("time_of_day", 600),))
 
         model.update_duration(key, "on", 300.0, timestamp=1000.0)
@@ -272,7 +272,7 @@ class TestPredict:
 
     def test_predict_empty_model_returns_empty_prediction(self) -> None:
         """Test prediction for unknown key returns empty Prediction."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         key = TimeKey((("time_of_day", 600),))
 
         # Empty distribution should return empty Prediction
@@ -286,7 +286,7 @@ class TestPredict:
 
     def test_predict_confidence_metrics(self) -> None:
         """Test that prediction includes all confidence metrics."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         key = TimeKey((("time_of_day", 600),))
 
         model.update_duration(key, "on", 100.0, timestamp=1000.0)
@@ -299,7 +299,7 @@ class TestPredict:
 
     def test_predict_entropy_confidence_certain(self) -> None:
         """Test entropy confidence is high when prediction is certain."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         key = TimeKey((("time_of_day", 600),))
 
         # Single state = certainty
@@ -311,7 +311,7 @@ class TestPredict:
 
     def test_predict_entropy_confidence_uncertain(self) -> None:
         """Test entropy confidence is lower when prediction is uncertain."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         key = TimeKey((("time_of_day", 600),))
 
         # Equal probabilities = maximum uncertainty
@@ -324,7 +324,7 @@ class TestPredict:
 
     def test_predict_support_time(self) -> None:
         """Test that support_time reflects total observations across hierarchy."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         key = TimeKey((("time_of_day", 600),))
 
         model.update_duration(key, "on", 100.0, timestamp=1000.0)
@@ -340,7 +340,7 @@ class TestEntropy:
 
     def test_entropy_single_state(self) -> None:
         """Test entropy of certain distribution (single state)."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         dist = {"on": 1.0}
 
         entropy = model._entropy(dist)
@@ -348,7 +348,7 @@ class TestEntropy:
 
     def test_entropy_equal_probabilities(self) -> None:
         """Test entropy of uniform distribution."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
 
         # Two states, equal probabilities
         dist = {"on": 0.5, "off": 0.5}
@@ -358,7 +358,7 @@ class TestEntropy:
 
     def test_entropy_four_states_uniform(self) -> None:
         """Test entropy of 4-state uniform distribution."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         dist = {"a": 0.25, "b": 0.25, "c": 0.25, "d": 0.25}
 
         entropy = model._entropy(dist)
@@ -367,7 +367,7 @@ class TestEntropy:
 
     def test_entropy_skewed_distribution(self) -> None:
         """Test entropy of skewed distribution."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         dist = {"on": 0.9, "off": 0.1}
 
         entropy = model._entropy(dist)
@@ -376,7 +376,7 @@ class TestEntropy:
 
     def test_entropy_three_states(self) -> None:
         """Test entropy calculation with three states."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         dist = {"a": 0.5, "b": 0.3, "c": 0.2}
 
         entropy = model._entropy(dist)
@@ -389,7 +389,7 @@ class TestPrune:
 
     def test_prune_removes_low_support_buckets(self) -> None:
         """Test that pruning removes buckets below support threshold."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         key = TimeKey((("time_of_day", 600),))
 
         # Add small duration (below min_total=50)
@@ -416,7 +416,7 @@ class TestPrune:
 
     def test_prune_removes_low_weight_states(self) -> None:
         """Test that pruning removes states with low weights."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         key = TimeKey((("time_of_day", 600),))
 
         model.update_duration(key, "on", 100.0, timestamp=1000.0)
@@ -429,7 +429,7 @@ class TestPrune:
 
     def test_prune_multiple_buckets_independently(self) -> None:
         """Test pruning affects different buckets independently."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         key1 = TimeKey((("time_of_day", 600),))
         key2 = TimeKey((("time_of_day", 700),))
 
@@ -461,7 +461,7 @@ class TestEdgeCases:
 
     def test_very_large_duration(self) -> None:
         """Test handling of very large duration values."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         key = TimeKey((("time_of_day", 600),))
 
         model.update_duration(key, "on", 1e10, timestamp=1000.0)
@@ -471,7 +471,7 @@ class TestEdgeCases:
 
     def test_very_small_duration_above_threshold(self) -> None:
         """Test very small duration just above filter threshold."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         key = TimeKey((("time_of_day", 600),))
 
         # Use duration above MIN_SUPPORT (30.0) to ensure it contributes
@@ -482,7 +482,7 @@ class TestEdgeCases:
 
     def test_many_states(self) -> None:
         """Test model with many different states."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         key = TimeKey((("time_of_day", 600),))
 
         for i in range(100):
@@ -496,7 +496,7 @@ class TestEdgeCases:
 
     def test_many_time_buckets(self) -> None:
         """Test model with many different time buckets."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
 
         for i in range(1000):
             key = TimeKey((("time_of_day", i),))
@@ -510,7 +510,7 @@ class TestEdgeCases:
 
     def test_zero_timestamp(self) -> None:
         """Test handling of zero timestamp."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         key = TimeKey((("time_of_day", 600),))
 
         model.update_duration(key, "on", 100.0, timestamp=0.0)
@@ -520,7 +520,7 @@ class TestEdgeCases:
 
     def test_negative_timestamp(self) -> None:
         """Test handling of negative timestamp."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         key = TimeKey((("time_of_day", 600),))
 
         model.update_duration(key, "on", 100.0, timestamp=-1000.0)
@@ -530,7 +530,7 @@ class TestEdgeCases:
 
     def test_empty_time_key_components(self) -> None:
         """Test with GLOBAL time key (empty components)."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
 
         model.update_duration(TimeKey.GLOBAL, "on", 100.0, timestamp=1000.0)
 
@@ -539,7 +539,7 @@ class TestEdgeCases:
 
     def test_deeply_nested_time_key(self) -> None:
         """Test with deeply nested time key."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         key = TimeKey(
             (
                 ("year", 2024),
@@ -558,7 +558,7 @@ class TestEdgeCases:
 
     def test_state_name_special_characters(self) -> None:
         """Test states with special characters."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         key = TimeKey((("time_of_day", 600),))
 
         special_states = ["on/off", "state-1", "state_2", "state.3", "state:4"]
@@ -570,7 +570,7 @@ class TestEdgeCases:
 
     def test_numeric_state_names(self) -> None:
         """Test states with numeric names."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         key = TimeKey((("time_of_day", 600),))
 
         # States can be numbers (as strings)
@@ -587,7 +587,7 @@ class TestIntegration:
 
     def test_complete_workflow(self) -> None:
         """Test complete workflow: update, predict, prune."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         key = TimeKey((("hour", 10),))
 
         # Add observations
@@ -612,7 +612,7 @@ class TestIntegration:
 
     def test_hierarchical_pattern_learning(self) -> None:
         """Test that specific patterns override general when sufficient data exists."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
 
         # Add data to general pattern (hour level)
         hour_key = TimeKey((("hour", 10),))
@@ -633,7 +633,7 @@ class TestIntegration:
 
     def test_multiple_hierarchy_levels(self) -> None:
         """Test blending across multiple hierarchy levels."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
 
         # Global level
         model.update_duration(TimeKey.GLOBAL, "default", 10000.0, timestamp=1000.0)
@@ -653,7 +653,7 @@ class TestIntegration:
 
     def test_temporal_pattern_isolation(self) -> None:
         """Test that different time periods maintain independent patterns."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
 
         # Morning pattern
         morning = TimeKey((("hour", 8),))
@@ -672,7 +672,7 @@ class TestIntegration:
 
     def test_gradual_pattern_shift(self) -> None:
         """Test updating patterns over time."""
-        model = DiscreteConditionalModel()
+        model = HierarchicalTemporalStateModel()
         key = TimeKey((("hour", 10),))
 
         # Initial pattern: mostly off

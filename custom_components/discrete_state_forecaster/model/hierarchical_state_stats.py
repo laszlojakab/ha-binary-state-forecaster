@@ -47,15 +47,38 @@ class HierarchicalStateStats:
         last_prune_ts: Timestamp of the last pruning operation.
         prune_interval: Minimum time in seconds between pruning operations.
                         Default is 21600 (6 hours).
+        prune_every_n_updates: Prune after this many updates (if set). If None (default),
+                               uses only time-based pruning. When set, pruning occurs
+                               after N updates OR when time interval elapses (whichever
+                               comes first).
+        update_count: Counter tracking number of updates since last prune.
         max_keys: Maximum number of TimeKey entries to retain. Default is 50,000.
     """
 
-    def __init__(self: Self, half_life: float = 3600.0) -> None:
-        """Initialize an empty hierarchical state statistics tracker."""
+    def __init__(
+        self: Self,
+        half_life: float = 3600.0,
+        prune_interval: float = 21600.0,
+        prune_every_n_updates: int | None = None,
+    ) -> None:
+        """Initialize an empty hierarchical state statistics tracker.
+
+        Args:
+            half_life: Time in seconds for exponential decay. Default is 3600.0 (1 hour).
+            prune_interval: Minimum time in seconds between pruning operations.
+                           Default is 21600.0 (6 hours).
+            prune_every_n_updates: If set, prune after this many updates in addition to
+                                   time-based pruning. If None (default), uses only
+                                   time-based pruning. When set, pruning occurs when
+                                   either N updates have occurred OR the time interval
+                                   has elapsed (whichever comes first).
+        """
         self.stats: dict[TimeKey, StateStats] = {}
         self.half_life: float = half_life
         self.last_prune_ts: float = 0.0
-        self.prune_interval: float = 6 * 3600
+        self.prune_interval: float = prune_interval
+        self.prune_every_n_updates: int | None = prune_every_n_updates
+        self.update_count: int = 0
         self.max_keys: int = 50_000
 
     def distribution(self: Self, key: TimeKey, timestamp: float | None = None) -> AggregatedStats:
@@ -153,10 +176,14 @@ class HierarchicalStateStats:
         Prunes insignificant statistics and applies decay to manage memory and relevance.
 
         Performs maintenance by:
-        1. Checking if enough time has passed since last pruning
+        1. Checking if enough time has passed since last pruning OR if enough updates have occurred
         2. Applying exponential decay to all statistics
         3. Removing insignificant states within each StateStats
         4. Removing entire TimeKey entries with insufficient total support
+
+        Pruning is triggered when EITHER:
+        - Time interval has elapsed (prune_interval), OR
+        - Update count threshold is reached (prune_every_n_updates, if configured)
 
         Args:
             timestamp: Current timestamp in seconds. If None (default), uses current
@@ -175,10 +202,18 @@ class HierarchicalStateStats:
         if timestamp is None:
             timestamp = time.time()
 
-        if timestamp - self.last_prune_ts < self.prune_interval:
+        # Check both time-based and update-based pruning conditions
+        time_based_prune = timestamp - self.last_prune_ts >= self.prune_interval
+        update_based_prune = (
+            self.prune_every_n_updates is not None
+            and self.update_count >= self.prune_every_n_updates
+        )
+
+        if not (time_based_prune or update_based_prune):
             return
 
         self.last_prune_ts = timestamp
+        self.update_count = 0
 
         keys_to_delete: list[TimeKey] = []
 
@@ -260,6 +295,8 @@ class HierarchicalStateStats:
         """
         if timestamp is None:
             timestamp = time.time()
+
+        self.update_count += 1
 
         for k in key.parents():
             stats = self.stats.get(k)

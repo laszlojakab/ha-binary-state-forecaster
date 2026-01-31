@@ -14,8 +14,8 @@ tracking.
 from datetime import datetime
 from typing import Self
 
-from custom_components.discrete_state_forecaster.model.discrete_conditional_model import (
-    DiscreteConditionalModel,
+from custom_components.discrete_state_forecaster.model.hierarchical_temporal_state_model import (
+    HierarchicalTemporalStateModel,
 )
 from custom_components.discrete_state_forecaster.model.prediction import Prediction
 from custom_components.discrete_state_forecaster.model.state import State
@@ -84,7 +84,9 @@ class TimeAwareForecaster:
             ```
         """
         self.indexer: CompositeIndexer = indexer
-        self.model: DiscreteConditionalModel = DiscreteConditionalModel(half_life=half_life)
+        self.model: HierarchicalTemporalStateModel = HierarchicalTemporalStateModel(
+            half_life=half_life
+        )
 
     def update_interval(
         self: Self,
