@@ -140,9 +140,7 @@ class DiscreteStateForecasterCoordinator(
             Event(
                 event_type=EventType("state_changed"),
                 data={
-                    "new_state": self.hass.states.get(
-                        self.config_entry.data[CONF_TARGET_ENTITY_ID]
-                    )
+                    "new_state": self.hass.states.get(self.config_entry.data[CONF_TARGET_ENTITY_ID])
                 },
                 time_fired_timestamp=now.timestamp(),
             )
@@ -473,11 +471,7 @@ class DiscreteStateForecasterCoordinator(
         if state is None:
             return None
 
-        return (
-            state.state
-            if state.state not in (STATE_UNKNOWN, STATE_UNAVAILABLE)
-            else None
-        )
+        return state.state if state.state not in (STATE_UNKNOWN, STATE_UNAVAILABLE) else None
 
     def _track_next_time_indexer_change(self: Self, now: datetime) -> None:
         next_boundary = self._composite_indexer.next_boundary(now)

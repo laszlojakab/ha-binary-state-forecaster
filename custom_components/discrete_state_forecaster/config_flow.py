@@ -32,9 +32,7 @@ class DiscreteStateForecasterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN
 
     VERSION = 1
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """Handles the step when integration added from the UI."""
         data_schema = vol.Schema(
             {
@@ -76,9 +74,7 @@ class DiscreteStateForecasterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN
 
         if user_input is not None:
             # Get the binary sensor friendly name for the title
-            binary_sensor_entity = self.hass.states.get(
-                user_input[CONF_TARGET_ENTITY_ID]
-            )
+            binary_sensor_entity = self.hass.states.get(user_input[CONF_TARGET_ENTITY_ID])
             binary_sensor_name = (
                 binary_sensor_entity.attributes.get("friendly_name")
                 if binary_sensor_entity
@@ -102,12 +98,8 @@ class DiscreteStateForecasterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN
                 # CONF_DECAY_SECONDS: stability_to_decay_seconds(
                 #     user_input[CONF_STABILITY]
                 # ),
-                CONF_TIME_BUCKET_SIZE_IN_MINUTES: int(
-                    user_input[CONF_TIME_BUCKET_SIZE_IN_MINUTES]
-                ),
-                CONF_USE_DAY_OF_WEEK_FEATURE: user_input.get(
-                    CONF_USE_DAY_OF_WEEK_FEATURE, False
-                ),
+                CONF_TIME_BUCKET_SIZE_IN_MINUTES: int(user_input[CONF_TIME_BUCKET_SIZE_IN_MINUTES]),
+                CONF_USE_DAY_OF_WEEK_FEATURE: user_input.get(CONF_USE_DAY_OF_WEEK_FEATURE, False),
                 CONF_USE_MONTH_OF_YEAR_FEATURE: user_input.get(
                     CONF_USE_MONTH_OF_YEAR_FEATURE, False
                 ),

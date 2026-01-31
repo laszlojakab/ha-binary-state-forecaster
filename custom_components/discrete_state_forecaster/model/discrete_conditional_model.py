@@ -336,10 +336,7 @@ class DiscreteConditionalModel:
                 state=None,
                 distribution={},
                 confidence=Confidence(
-                    max_probability=0.0,
-                    entropy_confidence=0.0,
-                    support_time=0.0,
-                    depth=0
+                    max_probability=0.0, entropy_confidence=0.0, support_time=0.0, depth=0
                 ),
             )
 
@@ -348,9 +345,7 @@ class DiscreteConditionalModel:
         max_p = max(stats.distribution.values())
 
         ent = self._entropy(stats.distribution)
-        max_ent = (
-            math.log2(len(stats.distribution)) if len(stats.distribution) > 1 else 0
-        )
+        max_ent = math.log2(len(stats.distribution)) if len(stats.distribution) > 1 else 0
         entropy_conf = 1 - ent / max_ent if max_ent > 0 else 1.0
 
         return Prediction(
@@ -360,7 +355,7 @@ class DiscreteConditionalModel:
                 max_probability=max_p,
                 entropy_confidence=entropy_conf,
                 support_time=stats.support_time,
-                depth=stats.depth
+                depth=stats.depth,
             ),
         )
 

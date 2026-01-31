@@ -232,16 +232,16 @@ class TestTimeKeyParent:
     def test_parent_chain(self):
         """Test navigating up a parent chain."""
         key = TimeKey((("month", 3), ("weekday", 1), ("hour", 15)))
-        
+
         parent1 = key.parent()
         assert parent1 == TimeKey((("month", 3), ("weekday", 1)))
-        
+
         parent2 = parent1.parent()
         assert parent2 == TimeKey((("month", 3),))
-        
+
         parent3 = parent2.parent()
         assert parent3 == TimeKey.GLOBAL
-        
+
         parent4 = parent3.parent()
         assert parent4 is None
 
@@ -250,7 +250,7 @@ class TestTimeKeyParent:
         original = TimeKey((("weekday", 1), ("hour", 15)))
         original_items = original.items
         parent = original.parent()
-        
+
         assert original.items == original_items  # Original unchanged
         assert len(parent) == len(original) - 1
 
@@ -262,7 +262,7 @@ class TestTimeKeyParents:
         """Test parents iterator for a single dimension key."""
         key = TimeKey((("hour", 15),))
         parents_list = list(key.parents())
-        
+
         assert len(parents_list) == 2
         assert parents_list[0] == key
         assert parents_list[1] == TimeKey.GLOBAL
@@ -271,7 +271,7 @@ class TestTimeKeyParents:
         """Test parents iterator for multiple dimensions."""
         key = TimeKey((("weekday", 1), ("hour", 15)))
         parents_list = list(key.parents())
-        
+
         assert len(parents_list) == 3
         assert parents_list[0] == TimeKey((("weekday", 1), ("hour", 15)))
         assert parents_list[1] == TimeKey((("weekday", 1),))
@@ -280,7 +280,7 @@ class TestTimeKeyParents:
     def test_parents_global(self):
         """Test that parents of GLOBAL only yields GLOBAL itself."""
         parents_list = list(TimeKey.GLOBAL.parents())
-        
+
         assert len(parents_list) == 1
         assert parents_list[0] == TimeKey.GLOBAL
 
@@ -288,7 +288,7 @@ class TestTimeKeyParents:
         """Test parents iterator for a complex hierarchy."""
         key = TimeKey((("year", 2024), ("month", 3), ("weekday", 1), ("hour", 15)))
         parents_list = list(key.parents())
-        
+
         assert len(parents_list) == 5
         assert parents_list[0] == key
         assert parents_list[1] == TimeKey((("year", 2024), ("month", 3), ("weekday", 1)))
@@ -300,14 +300,14 @@ class TestTimeKeyParents:
         """Test that parents() returns an iterator (not a list)."""
         key = TimeKey((("hour", 15),))
         parents_iter = key.parents()
-        
+
         # Should be able to iterate one at a time
         first = next(parents_iter)
         assert first == key
-        
+
         second = next(parents_iter)
         assert second == TimeKey.GLOBAL
-        
+
         # Should raise StopIteration when exhausted
         with pytest.raises(StopIteration):
             next(parents_iter)
@@ -315,10 +315,10 @@ class TestTimeKeyParents:
     def test_parents_can_iterate_multiple_times(self):
         """Test that we can call parents() multiple times."""
         key = TimeKey((("weekday", 1), ("hour", 15)))
-        
+
         first_iteration = list(key.parents())
         second_iteration = list(key.parents())
-        
+
         assert first_iteration == second_iteration
 
 
@@ -330,11 +330,11 @@ class TestTimeKeyEdgeCases:
         # Integer values
         key1 = TimeKey((("hour", 15),))
         assert key1.items[0][1] == 15
-        
+
         # String values
         key2 = TimeKey((("period", "morning"),))
         assert key2.items[0][1] == "morning"
-        
+
         # Tuple values (hashable)
         key3 = TimeKey((("range", (10, 20)),))
         assert key3.items[0][1] == (10, 20)
@@ -343,7 +343,7 @@ class TestTimeKeyEdgeCases:
         """Test keys with the same dimension but different values."""
         key1 = TimeKey((("hour", 15),))
         key2 = TimeKey((("hour", 16),))
-        
+
         assert key1 != key2
         assert hash(key1) != hash(key2)
 
@@ -351,11 +351,11 @@ class TestTimeKeyEdgeCases:
         """Test that TimeKey items tuple is immutable."""
         key = TimeKey((("hour", 15),))
         original_items = key.items
-        
+
         # items is a tuple, so individual elements cannot be modified
         with pytest.raises(TypeError):
             key.items[0] = ("hour", 16)
-        
+
         # Original should be unchanged
         assert key.items == original_items
 
@@ -363,9 +363,9 @@ class TestTimeKeyEdgeCases:
         """Test a very deep hierarchy."""
         dimensions = tuple((f"dim{i}", i) for i in range(10))
         key = TimeKey(dimensions)
-        
+
         assert len(key) == 10
-        
+
         parents_list = list(key.parents())
         assert len(parents_list) == 11  # 10 levels + GLOBAL
 
@@ -384,11 +384,11 @@ class TestTimeKeyUsagePatterns:
         key1 = TimeKey((("hour", 15),))
         key2 = TimeKey((("hour", 16),))
         key3 = TimeKey((("hour", 15),))  # Same as key1
-        
+
         data = {}
         data[key1] = "value1"
         data[key2] = "value2"
-        
+
         assert data[key1] == "value1"
         assert data[key3] == "value1"  # key3 equals key1
         assert data[key2] == "value2"
@@ -400,37 +400,34 @@ class TestTimeKeyUsagePatterns:
         data = {
             TimeKey.GLOBAL: "global_default",
             TimeKey((("hour", 15),)): "hour_specific",
-            TimeKey((("hour", 15), ("weekday", 1))): "very_specific"
+            TimeKey((("hour", 15), ("weekday", 1))): "very_specific",
         }
-        
+
         # Look up specific key
         specific_key = TimeKey((("hour", 15), ("weekday", 1)))
         assert data[specific_key] == "very_specific"
-        
+
         # Look up parent
         parent_key = specific_key.parent()
         assert data[parent_key] == "hour_specific"
-        
+
         # Look up global
         assert data[TimeKey.GLOBAL] == "global_default"
 
     def test_fallback_lookup_pattern(self):
         """Test a fallback lookup pattern using parents()."""
         # Create partial data
-        data = {
-            TimeKey.GLOBAL: "default",
-            TimeKey((("hour", 15),)): "hour_value"
-        }
-        
+        data = {TimeKey.GLOBAL: "default", TimeKey((("hour", 15),)): "hour_value"}
+
         # Try to find value for a specific key, falling back to parents
         search_key = TimeKey((("hour", 15), ("weekday", 1)))
-        
+
         result = None
         for parent in search_key.parents():
             if parent in data:
                 result = data[parent]
                 break
-        
+
         assert result == "hour_value"  # Found in parent
 
     def test_collect_all_parent_values(self):
@@ -438,10 +435,10 @@ class TestTimeKeyUsagePatterns:
         data = {
             TimeKey.GLOBAL: 1,
             TimeKey((("hour", 15),)): 10,
-            TimeKey((("hour", 15), ("weekday", 1))): 100
+            TimeKey((("hour", 15), ("weekday", 1))): 100,
         }
-        
+
         key = TimeKey((("hour", 15), ("weekday", 1)))
         values = [data.get(parent, 0) for parent in key.parents()]
-        
+
         assert values == [100, 10, 1]

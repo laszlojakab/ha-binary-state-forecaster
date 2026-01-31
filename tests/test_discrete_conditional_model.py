@@ -277,7 +277,7 @@ class TestPredict:
 
         # Empty distribution should return empty Prediction
         prediction = model.predict(key, timestamp=1000.0)
-        
+
         assert prediction.state is None
         assert prediction.distribution == {}
         assert prediction.confidence.max_probability == 0.0
@@ -420,9 +420,7 @@ class TestPrune:
         key = TimeKey((("time_of_day", 600),))
 
         model.update_duration(key, "on", 100.0, timestamp=1000.0)
-        model.update_duration(
-            key, "off", 3.0, timestamp=1000.0
-        )  # Below MIN_DURATION_THRESHOLD
+        model.update_duration(key, "off", 3.0, timestamp=1000.0)  # Below MIN_DURATION_THRESHOLD
 
         # 'off' never gets recorded due to MIN_DURATION_THRESHOLD filter
         stats = model.distribution(key, timestamp=1000.0)
@@ -442,7 +440,7 @@ class TestPrune:
 
         # key1 should have strong support, key2 weak
         stats1 = model.distribution(key1, timestamp=1000.0)
-        
+
         assert "on" in stats1.distribution
         # key2 may still show GLOBAL data after pruning even if specific bucket was removed
         stats2 = model.distribution(key2, timestamp=1000.0)

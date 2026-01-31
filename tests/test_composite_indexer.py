@@ -29,9 +29,7 @@ class TestCompositeIndexerInitialization:
 
     def test_initialization_with_multiple_indexers(self) -> None:
         """Test composite indexer with multiple indexers."""
-        indexer = CompositeIndexer(
-            [DayOfWeekIndexer(), TimeOfDayIndexer(bucket_minutes=30)]
-        )
+        indexer = CompositeIndexer([DayOfWeekIndexer(), TimeOfDayIndexer(bucket_minutes=30)])
         assert len(indexer.indexers) == 2
         assert isinstance(indexer.indexers[0], DayOfWeekIndexer)
         assert isinstance(indexer.indexers[1], TimeOfDayIndexer)
@@ -70,9 +68,7 @@ class TestCompositeIndexerKey:
 
     def test_key_two_indexers(self) -> None:
         """Test composite key with two indexers."""
-        indexer = CompositeIndexer(
-            [DayOfWeekIndexer(), TimeOfDayIndexer(bucket_minutes=60)]
-        )
+        indexer = CompositeIndexer([DayOfWeekIndexer(), TimeOfDayIndexer(bucket_minutes=60)])
 
         # Monday at 14:30
         ts = datetime(2026, 1, 26, 14, 30)
@@ -85,9 +81,7 @@ class TestCompositeIndexerKey:
 
     def test_key_structure(self) -> None:
         """Test that key structure is (name, value) pairs."""
-        indexer = CompositeIndexer(
-            [DayOfWeekIndexer(), TimeOfDayIndexer(bucket_minutes=30)]
-        )
+        indexer = CompositeIndexer([DayOfWeekIndexer(), TimeOfDayIndexer(bucket_minutes=30)])
         ts = datetime(2026, 1, 30, 18, 45)  # Friday at 18:45
         key = indexer.key(ts)
 
@@ -120,9 +114,7 @@ class TestCompositeIndexerKey:
 
     def test_key_different_times_same_day(self) -> None:
         """Test keys for different times on the same day."""
-        indexer = CompositeIndexer(
-            [DayOfWeekIndexer(), TimeOfDayIndexer(bucket_minutes=60)]
-        )
+        indexer = CompositeIndexer([DayOfWeekIndexer(), TimeOfDayIndexer(bucket_minutes=60)])
 
         ts1 = datetime(2026, 1, 26, 10, 0)  # Monday 10:00
         ts2 = datetime(2026, 1, 26, 14, 0)  # Monday 14:00
@@ -136,9 +128,7 @@ class TestCompositeIndexerKey:
 
     def test_key_different_days_same_time(self) -> None:
         """Test keys for different days at the same time."""
-        indexer = CompositeIndexer(
-            [DayOfWeekIndexer(), TimeOfDayIndexer(bucket_minutes=60)]
-        )
+        indexer = CompositeIndexer([DayOfWeekIndexer(), TimeOfDayIndexer(bucket_minutes=60)])
 
         ts1 = datetime(2026, 1, 26, 14, 0)  # Monday 14:00
         ts2 = datetime(2026, 1, 27, 14, 0)  # Tuesday 14:00
@@ -152,9 +142,7 @@ class TestCompositeIndexerKey:
 
     def test_key_completely_different_timestamps(self) -> None:
         """Test keys for completely different timestamps."""
-        indexer = CompositeIndexer(
-            [DayOfWeekIndexer(), TimeOfDayIndexer(bucket_minutes=30)]
-        )
+        indexer = CompositeIndexer([DayOfWeekIndexer(), TimeOfDayIndexer(bucket_minutes=30)])
 
         ts1 = datetime(2026, 1, 26, 10, 15)  # Monday 10:15
         ts2 = datetime(2026, 1, 30, 18, 45)  # Friday 18:45
@@ -169,9 +157,7 @@ class TestCompositeIndexerKey:
 
     def test_key_same_composite_bucket(self) -> None:
         """Test that same composite bucket produces same key."""
-        indexer = CompositeIndexer(
-            [DayOfWeekIndexer(), TimeOfDayIndexer(bucket_minutes=60)]
-        )
+        indexer = CompositeIndexer([DayOfWeekIndexer(), TimeOfDayIndexer(bucket_minutes=60)])
 
         # Both are Monday at hour 14
         ts1 = datetime(2026, 1, 26, 14, 15)
@@ -207,9 +193,7 @@ class TestCompositeIndexerNextBoundary:
     def test_next_boundary_takes_minimum(self) -> None:
         """Test that next_boundary returns the earliest boundary."""
         # Day boundary at midnight, time boundary at next hour
-        indexer = CompositeIndexer(
-            [DayOfWeekIndexer(), TimeOfDayIndexer(bucket_minutes=60)]
-        )
+        indexer = CompositeIndexer([DayOfWeekIndexer(), TimeOfDayIndexer(bucket_minutes=60)])
 
         # 14:30 - next hour (15:00) comes before next day (midnight)
         ts = datetime(2026, 1, 26, 14, 30)
@@ -220,9 +204,7 @@ class TestCompositeIndexerNextBoundary:
     def test_next_boundary_day_comes_first(self) -> None:
         """Test next boundary when day boundary comes first."""
         # Day boundary at midnight, time boundary every 12 hours
-        indexer = CompositeIndexer(
-            [DayOfWeekIndexer(), TimeOfDayIndexer(bucket_minutes=12 * 60)]
-        )
+        indexer = CompositeIndexer([DayOfWeekIndexer(), TimeOfDayIndexer(bucket_minutes=12 * 60)])
 
         # 23:30 - next day (00:00) comes before next 12-hour mark (12:00)
         ts = datetime(2026, 1, 26, 23, 30)
@@ -233,9 +215,7 @@ class TestCompositeIndexerNextBoundary:
     def test_next_boundary_multiple_indexers_same_time(self) -> None:
         """Test when multiple indexers have the same next boundary."""
         # Both change at midnight
-        indexer = CompositeIndexer(
-            [DayOfWeekIndexer(), TimeOfDayIndexer(bucket_minutes=24 * 60)]
-        )
+        indexer = CompositeIndexer([DayOfWeekIndexer(), TimeOfDayIndexer(bucket_minutes=24 * 60)])
 
         ts = datetime(2026, 1, 26, 12, 0)
         next_bound = indexer.next_boundary(ts)
@@ -261,9 +241,7 @@ class TestCompositeIndexerNextBoundary:
 
     def test_next_boundary_sequence(self) -> None:
         """Test a sequence of next_boundary calls."""
-        indexer = CompositeIndexer(
-            [DayOfWeekIndexer(), TimeOfDayIndexer(bucket_minutes=60)]
-        )
+        indexer = CompositeIndexer([DayOfWeekIndexer(), TimeOfDayIndexer(bucket_minutes=60)])
 
         ts = datetime(2026, 1, 26, 22, 30)
 
@@ -309,9 +287,7 @@ class TestCompositeIndexerEdgeCases:
 
     def test_key_boundary_consistency(self) -> None:
         """Test that keys change at boundaries."""
-        indexer = CompositeIndexer(
-            [DayOfWeekIndexer(), TimeOfDayIndexer(bucket_minutes=60)]
-        )
+        indexer = CompositeIndexer([DayOfWeekIndexer(), TimeOfDayIndexer(bucket_minutes=60)])
 
         # Just before boundary
         ts1 = datetime(2026, 1, 26, 14, 59, 59)
@@ -346,9 +322,7 @@ class TestCompositeIndexerEdgeCases:
 
     def test_boundary_at_day_and_time_transition(self) -> None:
         """Test boundary when both day and time change simultaneously."""
-        indexer = CompositeIndexer(
-            [DayOfWeekIndexer(), TimeOfDayIndexer(bucket_minutes=60)]
-        )
+        indexer = CompositeIndexer([DayOfWeekIndexer(), TimeOfDayIndexer(bucket_minutes=60)])
 
         # 23:30 on Monday
         ts = datetime(2026, 1, 26, 23, 30)

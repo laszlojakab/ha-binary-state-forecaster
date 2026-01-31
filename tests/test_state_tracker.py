@@ -49,9 +49,7 @@ class TestInitialization:
 
     def test_init_with_composite_indexer(self) -> None:
         """Test initialization with multi-dimensional forecaster."""
-        indexer = CompositeIndexer(
-            [DayOfWeekIndexer(), TimeOfDayIndexer(60)]
-        )
+        indexer = CompositeIndexer([DayOfWeekIndexer(), TimeOfDayIndexer(60)])
         forecaster = TimeAwareForecaster(indexer)
         tracker = StateTracker(forecaster)
 
@@ -448,9 +446,7 @@ class TestForecasterIntegration:
 
     def test_with_hierarchical_indexer(self) -> None:
         """Test StateTracker with multi-level hierarchical indexer."""
-        indexer = CompositeIndexer(
-            [MonthIndexer(), DayOfWeekIndexer(), TimeOfDayIndexer(60)]
-        )
+        indexer = CompositeIndexer([MonthIndexer(), DayOfWeekIndexer(), TimeOfDayIndexer(60)])
         forecaster = TimeAwareForecaster(indexer)
         tracker = StateTracker(forecaster)
 

@@ -208,7 +208,7 @@ class StateStats:
             50.0
             >>> stats.durations["off"]
             100.0
-            
+
             >>> # Using default current time
             >>> stats2 = StateStats(durations={"heating": 500.0})
             >>> stats2.apply_decay(half_life=3600.0)  # Uses time.time()
@@ -217,7 +217,7 @@ class StateStats:
         """
         if timestamp is None:
             timestamp = time.time()
-            
+
         if self.last_update_ts is None:
             self.last_update_ts = timestamp
             return
@@ -281,9 +281,7 @@ class StateStats:
             {}
             ```
         """
-        self.durations = {
-            s: d for s, d in self.durations.items() if d >= min_state_duration
-        }
+        self.durations = {s: d for s, d in self.durations.items() if d >= min_state_duration}
 
     def prune_adaptive(
         self,

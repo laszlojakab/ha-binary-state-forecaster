@@ -84,9 +84,7 @@ class TimeAwareForecaster:
             ```
         """
         self.indexer: CompositeIndexer = indexer
-        self.model: DiscreteConditionalModel = DiscreteConditionalModel(
-            half_life=half_life
-        )
+        self.model: DiscreteConditionalModel = DiscreteConditionalModel(half_life=half_life)
 
     def update_interval(
         self: Self,

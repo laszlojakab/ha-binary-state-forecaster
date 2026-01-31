@@ -100,13 +100,13 @@ class HierarchicalStateStats:
         if specific_stats:
             specific_stats.apply_decay(timestamp, self.half_life)
             specific_support = specific_stats.total()
-            
+
             # If specific key has enough support, use ONLY it (no blending)
             if specific_support >= MIN_SUPPORT:
                 return AggregatedStats(
                     distribution=specific_stats.distribution(),
                     support_time=specific_support,
-                    depth=1
+                    depth=1,
                 )
 
         # Specific key lacks sufficient data, blend across hierarchy
@@ -140,9 +140,7 @@ class HierarchicalStateStats:
         # normalize
         norm_dist = {state: w / total_support for state, w in weighted.items()}
 
-        return AggregatedStats(
-            distribution=norm_dist, support_time=total_support, depth=depth
-        )
+        return AggregatedStats(distribution=norm_dist, support_time=total_support, depth=depth)
 
     def prune(
         self: Self,
@@ -185,7 +183,6 @@ class HierarchicalStateStats:
         keys_to_delete: list[TimeKey] = []
 
         for key, stats in self.stats.items():
-
             # Decay all stats first
             stats.apply_decay(timestamp, self.half_life)
 

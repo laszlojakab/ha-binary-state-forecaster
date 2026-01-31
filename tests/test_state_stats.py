@@ -84,9 +84,7 @@ class TestStateStatsTotal:
 
     def test_total_with_string_states(self) -> None:
         """Test total with string state names."""
-        stats = StateStats(
-            durations={"heating": 150.0, "cooling": 250.0, "idle": 100.0}
-        )
+        stats = StateStats(durations={"heating": 150.0, "cooling": 250.0, "idle": 100.0})
         assert stats.total() == 500.0
 
     def test_total_with_numeric_states(self) -> None:
@@ -589,10 +587,10 @@ class TestApplyDecayOptionalTimestamp:
     def test_default_timestamp_uses_current_time(self) -> None:
         """When timestamp is None, uses current system time."""
         stats = StateStats(durations={"on": 100.0, "off": 200.0})
-        
+
         # Call without timestamp - should use time.time()
         stats.apply_decay(half_life=3600.0)
-        
+
         # Should have set last_update_ts to something
         assert stats.last_update_ts is not None
         assert stats.last_update_ts > 0
@@ -603,21 +601,21 @@ class TestApplyDecayOptionalTimestamp:
     def test_default_timestamp_on_second_call_applies_decay(self) -> None:
         """Second call without timestamp applies decay based on elapsed time."""
         stats = StateStats(durations={"on": 100.0, "off": 200.0})
-        
+
         # First call sets timestamp
         stats.apply_decay(half_life=1.0)
         first_ts = stats.last_update_ts
-        
+
         # Wait a tiny bit
         time.sleep(0.01)
-        
+
         # Second call should apply decay
         stats.apply_decay(half_life=1.0)
-        
+
         # Timestamp should be updated
         assert stats.last_update_ts is not None
         assert stats.last_update_ts > first_ts
-        
+
         # Durations should have decayed (very small amount due to short wait)
         assert stats.durations["on"] < 100.0
         assert stats.durations["off"] < 200.0
@@ -626,26 +624,26 @@ class TestApplyDecayOptionalTimestamp:
         """Explicit timestamp parameter overrides default time.time()."""
         stats = StateStats(durations={"on": 100.0})
         stats.last_update_ts = 0.0
-        
+
         # Use explicit timestamp
         stats.apply_decay(timestamp=10.0, half_life=10.0)
-        
+
         assert stats.last_update_ts == 10.0
         assert stats.durations["on"] == pytest.approx(50.0)
 
     def test_mixing_explicit_and_default_timestamps(self) -> None:
         """Can mix explicit and default timestamps across calls."""
         stats = StateStats(durations={"on": 100.0})
-        
+
         # First call with explicit timestamp
         stats.apply_decay(timestamp=0.0, half_life=100.0)
         assert stats.last_update_ts == 0.0
-        
+
         # Second call with explicit timestamp
         stats.apply_decay(timestamp=100.0, half_life=100.0)
         assert stats.last_update_ts == 100.0
         assert stats.durations["on"] == pytest.approx(50.0)
-        
+
         # Third call with default (should use current time)
         stats.apply_decay(half_life=100.0)
         # Should update to current time (which is >> 100.0)
@@ -654,9 +652,9 @@ class TestApplyDecayOptionalTimestamp:
     def test_default_timestamp_with_zero_half_life(self) -> None:
         """Default timestamp with zero half-life updates timestamp only."""
         stats = StateStats(durations={"on": 100.0})
-        
+
         stats.apply_decay(half_life=0.0)
-        
+
         assert stats.last_update_ts is not None
         assert stats.last_update_ts > 0
         # No decay applied
@@ -665,9 +663,9 @@ class TestApplyDecayOptionalTimestamp:
     def test_default_timestamp_empty_durations(self) -> None:
         """Default timestamp works with empty durations."""
         stats = StateStats()
-        
+
         stats.apply_decay(half_life=100.0)
-        
+
         assert stats.last_update_ts is not None
         assert stats.last_update_ts > 0
         assert stats.durations == {}
@@ -676,11 +674,11 @@ class TestApplyDecayOptionalTimestamp:
         """Explicitly passing None is same as omitting parameter."""
         stats1 = StateStats(durations={"on": 100.0})
         stats2 = StateStats(durations={"on": 100.0})
-        
+
         # Both should behave identically
         stats1.apply_decay(timestamp=None, half_life=3600.0)
         stats2.apply_decay(half_life=3600.0)
-        
+
         # Both should have timestamps set
         assert stats1.last_update_ts is not None
         assert stats2.last_update_ts is not None
@@ -779,9 +777,7 @@ class TestPruneWithDecay:
 
     def test_prune_workflow_decay_then_prune(self) -> None:
         """Realistic workflow: decay old data, then prune insignificant states."""
-        stats = StateStats(
-            durations={"heating": 1000.0, "cooling": 500.0, "idle": 100.0}
-        )
+        stats = StateStats(durations={"heating": 1000.0, "cooling": 500.0, "idle": 100.0})
         stats.last_update_ts = 0.0
 
         # Simulate 1 week passing with 1 day half-life
@@ -1055,9 +1051,7 @@ class TestPruneAdaptiveWithDecay:
 
     def test_prune_adaptive_decay_workflow_realistic(self) -> None:
         """Realistic workflow: decay old data, then adaptive prune."""
-        stats = StateStats(
-            durations={"on": 10000.0, "off": 5000.0, "idle": 1000.0, "error": 200.0}
-        )
+        stats = StateStats(durations={"on": 10000.0, "off": 5000.0, "idle": 1000.0, "error": 200.0})
         stats.last_update_ts = 0.0
 
         # After 1 week with 1-day half-life: 7 half-lives

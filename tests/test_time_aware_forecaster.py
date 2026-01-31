@@ -41,9 +41,7 @@ class TestInitialization:
 
     def test_init_with_composite_indexer(self) -> None:
         """Test initialization with multiple indexers."""
-        indexer = CompositeIndexer(
-            [DayOfWeekIndexer(), TimeOfDayIndexer(30)]
-        )
+        indexer = CompositeIndexer([DayOfWeekIndexer(), TimeOfDayIndexer(30)])
         forecaster = TimeAwareForecaster(indexer)
         assert forecaster is not None
         assert forecaster.indexer == indexer
@@ -334,9 +332,7 @@ class TestPredict:
 
     def test_predict_with_hierarchical_indexer(self) -> None:
         """Test prediction with hierarchical time indexer."""
-        indexer = CompositeIndexer(
-            [DayOfWeekIndexer(), TimeOfDayIndexer(60)]
-        )
+        indexer = CompositeIndexer([DayOfWeekIndexer(), TimeOfDayIndexer(60)])
         forecaster = TimeAwareForecaster(indexer)
 
         # Weekday morning pattern
@@ -414,9 +410,7 @@ class TestEdgeCases:
 
         forecaster.update_interval(start, end, "on")
 
-        prediction = forecaster.predict(
-            datetime(2024, 1, 1, 10, 15, 0, 999999)
-        )
+        prediction = forecaster.predict(datetime(2024, 1, 1, 10, 15, 0, 999999))
         assert prediction.state == "on"
 
     def test_very_fine_grained_indexer(self) -> None:

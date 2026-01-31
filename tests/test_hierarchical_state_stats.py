@@ -496,7 +496,7 @@ class TestHierarchicalStateStatsDistribution:
         # Add more to parent to make it sufficient
         stats.stats[parent_key].update_duration("off", MIN_SUPPORT + 100)
 
-        result = stats.distribution(specific_key, timestamp = 1000.0)
+        result = stats.distribution(specific_key, timestamp=1000.0)
 
         # Specific level should be skipped (< MIN_SUPPORT)
         # Parent level should be used
@@ -577,9 +577,7 @@ class TestHierarchicalStateStatsDistribution:
         # Global has: 100 "on", 100 "off" (total 200)
 
         # Add more data to parent manually
-        stats.stats[parent].update_duration(
-            "on", 300.0
-        )  # Parent now has 400 "on", 100 "off"
+        stats.stats[parent].update_duration("on", 300.0)  # Parent now has 400 "on", 100 "off"
         stats.stats[parent].update_duration(
             "idle", 100.0
         )  # Parent now has 400 "on", 100 "off", 100 "idle"
@@ -615,7 +613,7 @@ class TestHierarchicalStateStatsDistribution:
         # Update populates specific, parent1, parent2, and GLOBAL
         stats.update(specific, "on", 200.0, timestamp=1000.0)
 
-        result = stats.distribution(specific, timestamp = 1000.0)
+        result = stats.distribution(specific, timestamp=1000.0)
 
         # With sufficient data, uses only specific key
         assert result.depth == 1
@@ -633,7 +631,7 @@ class TestHierarchicalStateStatsDistribution:
         # Add sufficient data to parent manually
         stats.stats[parent].update_duration("off", 200.0)
 
-        result = stats.distribution(specific, timestamp = 1000.0)
+        result = stats.distribution(specific, timestamp=1000.0)
 
         # Only parent and GLOBAL have sufficient support
         # (specific has MIN_SUPPORT-1 which is < MIN_SUPPORT)
@@ -670,7 +668,7 @@ class TestHierarchicalStateStatsDistribution:
         stats.stats[parent].update_duration("idle", 100.0)
         # Now parent has 200 total
 
-        result = stats.distribution(specific, timestamp = 1000.0)
+        result = stats.distribution(specific, timestamp=1000.0)
 
         # With sufficient data, uses only specific key
         assert result.support_time == pytest.approx(100.0)
@@ -951,9 +949,11 @@ class TestHierarchicalStateStatsIntegration:
         stats.update(parent, "off", 400.0, timestamp=1000.0)
 
         # Get distribution
-        dist = stats.distribution(specific, timestamp = 1000.0)
+        dist = stats.distribution(specific, timestamp=1000.0)
         assert "on" in dist.distribution
-        assert "off" not in dist.distribution  # Parent data not blended when specific has sufficient data
+        assert (
+            "off" not in dist.distribution
+        )  # Parent data not blended when specific has sufficient data
         assert dist.support_time > 0
         assert dist.depth >= 1
 
@@ -1010,13 +1010,9 @@ class TestHierarchicalStateStatsIntegration:
                 key = TimeKey((("hour", hour), ("weekday", day)))
                 # Different patterns for day vs night
                 if 8 <= hour <= 20:
-                    stats.update(
-                        key, "on", 3600.0, timestamp=1000.0 + day * 86400 + hour * 3600
-                    )
+                    stats.update(key, "on", 3600.0, timestamp=1000.0 + day * 86400 + hour * 3600)
                 else:
-                    stats.update(
-                        key, "off", 3600.0, timestamp=1000.0 + day * 86400 + hour * 3600
-                    )
+                    stats.update(key, "off", 3600.0, timestamp=1000.0 + day * 86400 + hour * 3600)
 
         # Check daytime pattern - now includes parent levels in blending
         day_key = TimeKey((("hour", 14), ("weekday", 3)))
@@ -1041,7 +1037,7 @@ class TestHierarchicalStateStatsIntegration:
         # Only add data to parent level
         stats.update(parent, "on", 500.0, timestamp=1000.0)
 
-        dist = stats.distribution(specific, timestamp = 1000.0)
+        dist = stats.distribution(specific, timestamp=1000.0)
 
         # Should fall back to parent
         assert dist.distribution == {"on": pytest.approx(1.0)}
@@ -1164,6 +1160,7 @@ class TestMinSupportConstant:
         """Test MIN_SUPPORT is a float."""
         assert isinstance(MIN_SUPPORT, float)
 
+
 class TestOptionalTimestampInUpdate:
     """Test optional timestamp parameter in update() method."""
 
@@ -1252,6 +1249,7 @@ class TestOptionalTimestampInDistribution:
 
         # Use recent timestamps so data doesn't completely decay
         import time
+
         recent_time = time.time() - 100  # 100 seconds ago
 
         stats.update(key, "on", 100.0, timestamp=recent_time)
