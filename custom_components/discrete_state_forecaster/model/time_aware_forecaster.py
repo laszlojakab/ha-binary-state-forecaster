@@ -13,7 +13,7 @@ tracking.
 
 import math
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Self
 
 from custom_components.discrete_state_forecaster.model.hierarchical_temporal_state_model import (
@@ -93,6 +93,49 @@ class StatePersistenceTracker:
 
         # Blend with default for stability (80% learned, 20% default)
         return 0.8 * rate + 0.2 * default
+
+
+@dataclass
+class HorizonPrediction:
+    """
+    Prediction at a specific point in a horizon forecast.
+
+    Represents a single prediction within a multi-step horizon forecast,
+    including temporal context (timestamp, duration), the prediction itself,
+    transition information, and a decay factor indicating reduced confidence
+    for predictions further in the future.
+
+    Attributes:
+        timestamp: The time point for this prediction.
+        prediction: The Prediction object containing state, distribution, and
+            confidence metrics.
+        state_duration: Predicted duration of the state so far (seconds).
+            Accumulates as the state persists across prediction steps.
+        is_transition: True if this prediction differs from the previous state.
+            Indicates a predicted state change at this time point.
+        decay_factor: Confidence decay multiplier (0.0 to 1.0) based on distance
+            from present time. Predictions further in the future have lower
+            decay factors (e.g., 1.0 for present, 0.5 for distant future).
+
+    Example:
+        ```
+        >>> horizon_pred = HorizonPrediction(
+        ...     timestamp=datetime(2024, 1, 1, 10, 30),
+        ...     prediction=Prediction(state="on", distribution={"on": 0.8}, confidence=...),
+        ...     state_duration=1800.0,  # 30 minutes
+        ...     is_transition=False,
+        ...     decay_factor=0.91  # Slightly reduced confidence for future prediction
+        ... )
+        >>> if horizon_pred.is_transition:
+        ...     print(f"Predicted transition to {horizon_pred.prediction.state}")
+        ```
+    """
+
+    timestamp: datetime
+    prediction: Prediction
+    state_duration: float
+    is_transition: bool
+    decay_factor: float
 
 
 class TimeAwareForecaster:
@@ -502,3 +545,308 @@ class TimeAwareForecaster:
                 s, self.state_persistence_factor
             )
         return result
+
+    def predict_horizon(
+        self: Self,
+        start_time: datetime,
+        horizon_minutes: int,
+        interval_minutes: int | None = None,
+        current_state: State | None = None,
+        state_duration: float | None = None,
+    ) -> list[HorizonPrediction]:
+        """
+        Predict states at multiple future time points (prediction horizon).
+
+        Uses sequential chaining where each prediction informs the next,
+        modeling state persistence and transitions over time. This creates
+        realistic trajectories where states evolve naturally rather than
+        making independent predictions at each time point.
+
+        Confidence decay is applied to predictions further in the future,
+        reflecting increasing uncertainty. The decay factor is calculated
+        logarithmically: predictions near the present have high confidence
+        (decay_factor ≈ 1.0), while distant predictions have lower confidence
+        (decay_factor < 1.0).
+
+        Args:
+            start_time: Starting point for predictions (typically current time).
+            horizon_minutes: How far ahead to predict (in minutes). For home
+                automation, typical values are 30-120 minutes. Longer horizons
+                have more uncertainty due to compounding prediction errors.
+            interval_minutes: Time step between predictions (in minutes). If None,
+                defaults to the smallest bucket size from the indexer for optimal
+                granularity. Smaller intervals provide smoother trajectories but
+                increase computation.
+            current_state: Current state for initialization. When provided, the
+                first prediction uses state persistence adjustment. Subsequent
+                predictions continue chaining from predicted states.
+            state_duration: How long current_state has been active (seconds).
+                Used for duration-based persistence adjustment in first prediction.
+
+        Returns:
+            List of HorizonPrediction objects, one per time step. Each contains:
+            - timestamp: When this prediction applies
+            - prediction: Full Prediction object (state, distribution, confidence)
+            - state_duration: How long predicted state has been active
+            - is_transition: Whether state changed from previous prediction
+            - decay_factor: Confidence multiplier for this future time point
+
+        Example:
+            ```
+            >>> # Predict next hour in 5-minute steps for heating optimization
+            >>> predictions = forecaster.predict_horizon(
+            ...     datetime.now(),
+            ...     horizon_minutes=60,
+            ...     interval_minutes=5,
+            ...     current_state="heating",
+            ...     state_duration=600  # Been heating for 10 minutes
+            ... )
+            >>>
+            >>> # Find when heating is predicted to turn off
+            >>> for pred in predictions:
+            ...     if pred.is_transition and pred.prediction.state == "off":
+            ...         print(f"Predicted off at {pred.timestamp}")
+            ...         break
+            >>>
+            >>> # Check confidence decay over horizon
+            >>> print(f"Near future: {predictions[0].decay_factor:.2f}")
+            >>> print(f"Distant future: {predictions[-1].decay_factor:.2f}")
+            ```
+
+        Note:
+            - Predictions compound errors over time (early mistakes affect later ones)
+            - Longer horizons should be interpreted with caution
+            - Decay factors help quantify increasing uncertainty
+            - For accurate long-term forecasts, retrain model frequently
+        """
+        # Determine interval if not specified
+        if interval_minutes is None:
+            # Use smallest bucket size from indexer
+            interval_minutes = self.indexer.smallest_bucket_size_minutes()
+
+        # Validate inputs
+        if horizon_minutes <= 0:
+            return []
+        if interval_minutes <= 0:
+            interval_minutes = 1  # Minimum 1 minute
+
+        predictions: list[HorizonPrediction] = []
+        current_ts = start_time
+        predicted_state = current_state
+        predicted_duration = state_duration or 0.0
+
+        # Calculate number of steps
+        num_steps = max(1, horizon_minutes // interval_minutes)
+
+        for step in range(num_steps):
+            # Determine context for this prediction
+            if step == 0:
+                # First prediction uses provided current state
+                context_state = current_state
+                context_duration = state_duration
+            else:
+                # Subsequent predictions use previous predicted state
+                context_state = predicted_state
+                context_duration = predicted_duration
+
+            # Make prediction at this time point
+            pred = self.predict(current_ts, context_state, context_duration)
+
+            # Calculate confidence decay based on distance from present
+            # Logarithmic decay: near future has high confidence, distant has lower
+            # Formula: 1.0 / (1.0 + 0.1 * step) gives gradual decay
+            # step=0 -> 1.0, step=5 -> 0.67, step=10 -> 0.50, step=20 -> 0.33
+            decay_factor = 1.0 / (1.0 + 0.1 * step)
+
+            # Check if this is a transition
+            is_transition = predicted_state is not None and pred.state != predicted_state
+
+            # Create horizon prediction
+            horizon_pred = HorizonPrediction(
+                timestamp=current_ts,
+                prediction=pred,
+                state_duration=predicted_duration,
+                is_transition=is_transition,
+                decay_factor=decay_factor,
+            )
+            predictions.append(horizon_pred)
+
+            # Update state tracking for next iteration
+            if pred.state == predicted_state:
+                # State persists - accumulate duration
+                predicted_duration += interval_minutes * 60
+            else:
+                # State changed - reset duration
+                predicted_state = pred.state
+                predicted_duration = interval_minutes * 60
+
+            # Advance to next time step
+            current_ts = current_ts + timedelta(minutes=interval_minutes)
+
+        return predictions
+
+    def find_next_transition(
+        self: Self,
+        start_time: datetime,
+        max_horizon_minutes: int = 120,
+        interval_minutes: int | None = None,
+        current_state: State | None = None,
+        state_duration: float | None = None,
+    ) -> datetime | None:
+        """
+        Find when the next state transition is predicted to occur.
+
+        Scans the prediction horizon to identify the first time point where
+        the predicted state differs from the current or previously predicted
+        state. This is useful for automation triggers that should activate
+        before an expected state change.
+
+        Args:
+            start_time: Starting point for the search (typically current time).
+            max_horizon_minutes: How far ahead to search (default: 120 minutes).
+                Longer horizons have more uncertainty but may find transitions
+                that occur less frequently.
+            interval_minutes: Time step between predictions. If None, uses
+                smallest bucket size from indexer for optimal granularity.
+            current_state: Current state to detect transitions from. If None,
+                detects transitions between any predicted states.
+            state_duration: How long current_state has been active (seconds).
+
+        Returns:
+            Timestamp of the first predicted state transition, or None if no
+            transition is predicted within the horizon.
+
+        Example:
+            ```
+            >>> # Find when heating is predicted to turn off
+            >>> transition_time = forecaster.find_next_transition(
+            ...     datetime.now(),
+            ...     max_horizon_minutes=180,
+            ...     current_state="heating"
+            ... )
+            >>> if transition_time:
+            ...     minutes_until_off = (transition_time - datetime.now()).seconds // 60
+            ...     print(f"Heating will turn off in {minutes_until_off} minutes")
+            ... else:
+            ...     print("No state change predicted in next 3 hours")
+            ```
+
+        Note:
+            - Returns the timestamp where transition OCCURS, not the last moment
+              of the current state
+            - If current_state is None, returns first transition between any states
+            - Transitions with low confidence (high decay_factor) should be
+              interpreted cautiously
+        """
+        predictions = self.predict_horizon(
+            start_time,
+            max_horizon_minutes,
+            interval_minutes,
+            current_state,
+            state_duration,
+        )
+
+        for pred in predictions:
+            if pred.is_transition:
+                return pred.timestamp
+
+        return None
+
+    def get_state_timeline(
+        self: Self,
+        start_time: datetime,
+        horizon_minutes: int,
+        interval_minutes: int | None = None,
+        current_state: State | None = None,
+        state_duration: float | None = None,
+    ) -> list[tuple[datetime, datetime, State]]:
+        """
+        Get predicted state timeline as continuous intervals.
+
+        Converts a series of horizon predictions into a timeline of continuous
+        state intervals. This is useful for visualization (Gantt charts, timeline
+        displays) and for calculating total predicted duration in each state.
+
+        Args:
+            start_time: Starting point for the timeline.
+            horizon_minutes: How far ahead to generate the timeline.
+            interval_minutes: Time step between predictions. If None, uses
+                smallest bucket size from indexer.
+            current_state: Current state for initialization.
+            state_duration: How long current_state has been active (seconds).
+
+        Returns:
+            List of (start, end, state) tuples representing predicted state
+            intervals. Intervals are continuous and non-overlapping, covering
+            the entire horizon period. Empty list if horizon is invalid or
+            no predictions can be made.
+
+        Example:
+            ```
+            >>> # Get predicted state timeline for next 2 hours
+            >>> timeline = forecaster.get_state_timeline(
+            ...     datetime.now(),
+            ...     horizon_minutes=120,
+            ...     interval_minutes=10,
+            ...     current_state="off"
+            ... )
+            >>>
+            >>> # Display timeline
+            >>> for start, end, state in timeline:
+            ...     duration_min = (end - start).seconds // 60
+            ...     print(f"{state}: {start:%H:%M} to {end:%H:%M} ({duration_min} min)")
+            # Output example:
+            # off: 10:00 to 10:30 (30 min)
+            # on: 10:30 to 11:20 (50 min)
+            # off: 11:20 to 12:00 (40 min)
+            >>>
+            >>> # Calculate total predicted "on" time
+            >>> total_on_minutes = sum(
+            ...     (end - start).seconds // 60
+            ...     for start, end, state in timeline
+            ...     if state == "on"
+            ... )
+            >>> print(f"Predicted 'on' time: {total_on_minutes} minutes")
+            ```
+
+        Note:
+            - Intervals are half-open: [start, end)
+            - The last interval extends to the end of the horizon
+            - States with None are included (representing no prediction data)
+            - For energy optimization, calculate duration * power for each interval
+        """
+        predictions = self.predict_horizon(
+            start_time,
+            horizon_minutes,
+            interval_minutes,
+            current_state,
+            state_duration,
+        )
+
+        if not predictions:
+            return []
+
+        # Determine actual interval size used
+        if interval_minutes is None:
+            interval_minutes = self.indexer.smallest_bucket_size_minutes()
+
+        timeline: list[tuple[datetime, datetime, State]] = []
+        current_interval_state = predictions[0].prediction.state
+        interval_start = predictions[0].timestamp
+
+        # Process all predictions to find state transitions
+        for pred in predictions[1:]:
+            if pred.prediction.state != current_interval_state:
+                # State transition - close current interval
+                timeline.append(
+                    (interval_start, pred.timestamp, current_interval_state)
+                )
+                interval_start = pred.timestamp
+                current_interval_state = pred.prediction.state
+
+        # Close final interval - extends to end of horizon
+        final_end = predictions[-1].timestamp + timedelta(minutes=interval_minutes)
+        timeline.append((interval_start, final_end, current_interval_state))
+
+        return timeline
+
