@@ -1,5 +1,7 @@
 """Tests for HierarchicalStateStats class."""
 
+import time
+
 import pytest
 
 from custom_components.discrete_state_forecaster.model.hierarchical_state_stats import (
@@ -57,7 +59,7 @@ class TestHierarchicalStateStatsUpdate:
         stats = HierarchicalStateStats()
         key = TimeKey((("hour", 10),))
 
-        stats.update(key, "on", 100.0, ts=1000.0)
+        stats.update(key, "on", 100.0, timestamp=1000.0)
 
         assert key in stats.stats
         assert isinstance(stats.stats[key], StateStats)
@@ -67,7 +69,7 @@ class TestHierarchicalStateStatsUpdate:
         stats = HierarchicalStateStats()
         key = TimeKey((("hour", 10),))
 
-        stats.update(key, "on", 100.0, ts=1000.0)
+        stats.update(key, "on", 100.0, timestamp=1000.0)
 
         assert stats.stats[key].durations["on"] == pytest.approx(100.0)
 
@@ -76,8 +78,8 @@ class TestHierarchicalStateStatsUpdate:
         stats = HierarchicalStateStats()
         key = TimeKey((("hour", 10),))
 
-        stats.update(key, "on", 100.0, ts=1000.0)
-        stats.update(key, "off", 200.0, ts=1000.0)
+        stats.update(key, "on", 100.0, timestamp=1000.0)
+        stats.update(key, "off", 200.0, timestamp=1000.0)
 
         assert stats.stats[key].durations["on"] == pytest.approx(100.0)
         assert stats.stats[key].durations["off"] == pytest.approx(200.0)
@@ -87,8 +89,8 @@ class TestHierarchicalStateStatsUpdate:
         stats = HierarchicalStateStats()
         key = TimeKey((("hour", 10),))
 
-        stats.update(key, "on", 100.0, ts=1000.0)
-        stats.update(key, "on", 50.0, ts=1000.0)
+        stats.update(key, "on", 100.0, timestamp=1000.0)
+        stats.update(key, "on", 50.0, timestamp=1000.0)
 
         assert stats.stats[key].durations["on"] == pytest.approx(150.0)
 
@@ -98,8 +100,8 @@ class TestHierarchicalStateStatsUpdate:
         key1 = TimeKey((("hour", 10),))
         key2 = TimeKey((("hour", 11),))
 
-        stats.update(key1, "on", 100.0, ts=1000.0)
-        stats.update(key2, "on", 200.0, ts=1000.0)
+        stats.update(key1, "on", 100.0, timestamp=1000.0)
+        stats.update(key2, "on", 200.0, timestamp=1000.0)
 
         # Should have 3 entries: key1, key2, and GLOBAL (parent of both)
         assert len(stats.stats) == 3
@@ -115,11 +117,11 @@ class TestHierarchicalStateStatsUpdate:
         key = TimeKey((("hour", 10),))
 
         # First update
-        stats.update(key, "on", 100.0, ts=1000.0)
+        stats.update(key, "on", 100.0, timestamp=1000.0)
         initial_duration = stats.stats[key].durations["on"]
 
         # Second update after one half-life
-        stats.update(key, "on", 0.0, ts=1100.0)
+        stats.update(key, "on", 0.0, timestamp=1100.0)
         decayed_duration = stats.stats[key].durations["on"]
 
         # Should have decayed by ~50%
@@ -131,7 +133,7 @@ class TestHierarchicalStateStatsUpdate:
         stats = HierarchicalStateStats()
         key = TimeKey((("hour", 10), ("weekday", 2), ("month", 1)))
 
-        stats.update(key, "on", 100.0, ts=1000.0)
+        stats.update(key, "on", 100.0, timestamp=1000.0)
 
         # Should create 4 levels: specific + 3 parents
         assert len(stats.stats) == 4
@@ -157,7 +159,7 @@ class TestHierarchicalStateStatsUpdate:
         # Create a 3-level key
         key = TimeKey((("hour", 14), ("weekday", 2), ("month", 6)))
 
-        stats.update(key, "on", 100.0, ts=1000.0)
+        stats.update(key, "on", 100.0, timestamp=1000.0)
 
         # Should create 4 entries: specific + 3 parents
         assert len(stats.stats) == 4
@@ -179,8 +181,8 @@ class TestHierarchicalStateStatsUpdate:
         key1 = TimeKey((("hour", 10), ("weekday", 1)))
         key2 = TimeKey((("hour", 10), ("weekday", 2)))
 
-        stats.update(key1, "on", 100.0, ts=1000.0)
-        stats.update(key2, "on", 200.0, ts=1000.0)
+        stats.update(key1, "on", 100.0, timestamp=1000.0)
+        stats.update(key2, "on", 200.0, timestamp=1000.0)
 
         # Specific keys should have their own durations
         assert stats.stats[key1].durations["on"] == pytest.approx(100.0)
@@ -197,7 +199,7 @@ class TestHierarchicalStateStatsUpdate:
         """Test update with GLOBAL (empty) TimeKey."""
         stats = HierarchicalStateStats()
 
-        stats.update(TimeKey(), "on", 100.0, ts=1000.0)
+        stats.update(TimeKey(), "on", 100.0, timestamp=1000.0)
 
         # Should only create GLOBAL entry (no parents above it)
         assert len(stats.stats) == 1
@@ -213,7 +215,7 @@ class TestHierarchicalStateStatsUpdate:
         # But GLOBAL is shared, so we get 11 specific keys + 1 GLOBAL = 12 total
         for i in range(11):
             key = TimeKey((("id", i),))
-            stats.update(key, "on", 100.0, ts=1000.0)
+            stats.update(key, "on", 100.0, timestamp=1000.0)
 
         # With hierarchical updates, we have 11 specific keys + 1 GLOBAL = 12
         # This exceeds 1.1 * 10 = 11, so enforcement should have happened
@@ -222,7 +224,7 @@ class TestHierarchicalStateStatsUpdate:
 
         # Add one more to exceed threshold again
         key = TimeKey((("id", 11),))
-        stats.update(key, "on", 100.0, ts=1000.0)
+        stats.update(key, "on", 100.0, timestamp=1000.0)
 
         # Should have enforced limit again, keeping around 10-11 keys
         assert len(stats.stats) <= 11
@@ -239,7 +241,7 @@ class TestHierarchicalStateStatsConceptDrift:
         # Build up sufficient data for drift detection (>= 3600s)
         # Start with mostly "on" state
         for _ in range(40):
-            stats.update(key, "on", 100.0, ts=1000.0)
+            stats.update(key, "on", 100.0, timestamp=1000.0)
 
         # Verify all levels have stats
         assert key in stats.stats
@@ -258,9 +260,9 @@ class TestHierarchicalStateStatsConceptDrift:
 
         # Build baseline with mostly "on" (75%)
         for _ in range(30):
-            stats.update(key, "on", 100.0, ts=1000.0)
+            stats.update(key, "on", 100.0, timestamp=1000.0)
         for _ in range(10):
-            stats.update(key, "off", 100.0, ts=1000.0)
+            stats.update(key, "off", 100.0, timestamp=1000.0)
 
         # Wait for cooldown period to pass
         ts_after_cooldown = 1000.0 + 3700.0  # > 3600s cooldown
@@ -270,7 +272,7 @@ class TestHierarchicalStateStatsConceptDrift:
 
         # Dramatically shift pattern to mostly "off" (should trigger drift)
         for _ in range(30):
-            stats.update(key, "off", 100.0, ts=ts_after_cooldown)
+            stats.update(key, "off", 100.0, timestamp=ts_after_cooldown)
 
         # After significant pattern shift, fast_decay_updates should be set
         # (may be less than 15 due to decrements during the loop)
@@ -286,13 +288,13 @@ class TestHierarchicalStateStatsConceptDrift:
         stats.stats[key].fast_decay_updates = 5
 
         # Do updates
-        stats.update(key, "on", 100.0, ts=1000.0)
+        stats.update(key, "on", 100.0, timestamp=1000.0)
         assert stats.stats[key].fast_decay_updates == 4
 
-        stats.update(key, "on", 100.0, ts=1000.0)
+        stats.update(key, "on", 100.0, timestamp=1000.0)
         assert stats.stats[key].fast_decay_updates == 3
 
-        stats.update(key, "on", 100.0, ts=1000.0)
+        stats.update(key, "on", 100.0, timestamp=1000.0)
         assert stats.stats[key].fast_decay_updates == 2
 
     def test_fast_decay_counter_reaches_zero(self) -> None:
@@ -303,14 +305,14 @@ class TestHierarchicalStateStatsConceptDrift:
         stats.stats[key] = StateStats()
         stats.stats[key].fast_decay_updates = 2
 
-        stats.update(key, "on", 100.0, ts=1000.0)
+        stats.update(key, "on", 100.0, timestamp=1000.0)
         assert stats.stats[key].fast_decay_updates == 1
 
-        stats.update(key, "on", 100.0, ts=1000.0)
+        stats.update(key, "on", 100.0, timestamp=1000.0)
         assert stats.stats[key].fast_decay_updates == 0
 
         # Should stay at 0
-        stats.update(key, "on", 100.0, ts=1000.0)
+        stats.update(key, "on", 100.0, timestamp=1000.0)
         assert stats.stats[key].fast_decay_updates == 0
 
     def test_drift_detection_independent_per_level(self) -> None:
@@ -321,7 +323,7 @@ class TestHierarchicalStateStatsConceptDrift:
 
         # Build baseline for all levels
         for _ in range(40):
-            stats.update(specific_key, "on", 100.0, ts=1000.0)
+            stats.update(specific_key, "on", 100.0, timestamp=1000.0)
 
         # Manually modify only parent level to trigger drift there
         # Add significant "off" data to parent (but not to specific)
@@ -343,8 +345,8 @@ class TestHierarchicalStateStatsConceptDrift:
         key = TimeKey((("hour", 10),))
 
         # Add only small amount of data (< min_support of 3600s)
-        stats.update(key, "on", 500.0, ts=1000.0)
-        stats.update(key, "off", 500.0, ts=1000.0)
+        stats.update(key, "on", 500.0, timestamp=1000.0)
+        stats.update(key, "off", 500.0, timestamp=1000.0)
 
         # Total is 1000s across all levels, which is < 3600s min_support
         # So drift detection should not trigger
@@ -358,13 +360,13 @@ class TestHierarchicalStateStatsConceptDrift:
 
         # Build sufficient baseline
         for _ in range(40):
-            stats.update(key, "on", 100.0, ts=1000.0)
+            stats.update(key, "on", 100.0, timestamp=1000.0)
 
         baseline_set_ts = 1000.0
 
         # Try to trigger drift immediately (within cooldown)
         for _ in range(40):
-            stats.update(key, "off", 100.0, ts=baseline_set_ts + 100.0)
+            stats.update(key, "off", 100.0, timestamp=baseline_set_ts + 100.0)
 
         # Should not have triggered drift (within cooldown)
         # check_drift uses default cooldown of 3600s
@@ -373,7 +375,7 @@ class TestHierarchicalStateStatsConceptDrift:
         # Now wait past cooldown and trigger drift
         ts_past_cooldown = baseline_set_ts + 3700.0
         for _ in range(40):
-            stats.update(key, "on", 100.0, ts=ts_past_cooldown)
+            stats.update(key, "on", 100.0, timestamp=ts_past_cooldown)
 
         # Drift might now be detected
         # (depends on whether the distribution changed enough)
@@ -385,7 +387,7 @@ class TestHierarchicalStateStatsConceptDrift:
 
         # Build baseline
         for _ in range(40):
-            stats.update(specific_key, "on", 100.0, ts=1000.0)
+            stats.update(specific_key, "on", 100.0, timestamp=1000.0)
 
         # All levels should have baselines
         assert stats.stats[specific_key].baseline is not None
@@ -403,7 +405,7 @@ class TestHierarchicalStateStatsDistribution:
         stats = HierarchicalStateStats()
         key = TimeKey((("hour", 10),))
 
-        result = stats.distribution(key)
+        result = stats.distribution(key, timestamp=1000.0)
 
         assert result.distribution == {}
         assert result.support_time == 0.0
@@ -415,9 +417,9 @@ class TestHierarchicalStateStatsDistribution:
         key = TimeKey((("hour", 10),))
 
         # Add data but less than MIN_SUPPORT (30 seconds)
-        stats.update(key, "on", MIN_SUPPORT - 1, ts=1000.0)
+        stats.update(key, "on", MIN_SUPPORT - 1, timestamp=1000.0)
 
-        result = stats.distribution(key)
+        result = stats.distribution(key, timestamp=1000.0)
 
         assert result.distribution == {}
         assert result.support_time == 0.0
@@ -429,9 +431,9 @@ class TestHierarchicalStateStatsDistribution:
         stats = HierarchicalStateStats()
         key = TimeKey((("hour", 10),))
 
-        stats.update(key, "on", MIN_SUPPORT + 1, ts=1000.0)
+        stats.update(key, "on", MIN_SUPPORT + 1, timestamp=1000.0)
 
-        result = stats.distribution(key)
+        result = stats.distribution(key, timestamp=1000.0)
 
         assert result.distribution == {"on": pytest.approx(1.0)}
         # With hierarchical update: specific (31) + GLOBAL (31) = 62 total support
@@ -443,10 +445,10 @@ class TestHierarchicalStateStatsDistribution:
         stats = HierarchicalStateStats()
         key = TimeKey((("hour", 10),))
 
-        stats.update(key, "on", 200.0, ts=1000.0)
-        stats.update(key, "off", 200.0, ts=1000.0)
+        stats.update(key, "on", 200.0, timestamp=1000.0)
+        stats.update(key, "off", 200.0, timestamp=1000.0)
 
-        result = stats.distribution(key)
+        result = stats.distribution(key, timestamp=1000.0)
 
         assert result.distribution["on"] == pytest.approx(0.5)
         assert result.distribution["off"] == pytest.approx(0.5)
@@ -465,13 +467,13 @@ class TestHierarchicalStateStatsDistribution:
         parent_key = specific_key.parent()  # (("hour", 10),))
 
         # First update: adds to specific (200) and parent (200) and GLOBAL (200)
-        stats.update(specific_key, "on", 200.0, ts=1000.0)
+        stats.update(specific_key, "on", 200.0, timestamp=1000.0)
 
         # Add more data directly to parent level only (not to specific)
         # We do this by manually updating the parent StateStats
         stats.stats[parent_key].update_duration("off", 400.0)
 
-        result = stats.distribution(specific_key)
+        result = stats.distribution(specific_key, timestamp = 1000.0)
 
         # Now we have 3 levels:
         # Specific: 200 "on" (total 200)
@@ -497,13 +499,13 @@ class TestHierarchicalStateStatsDistribution:
         parent_key = specific_key.parent()  # TimeKey((("hour", 10),))
 
         # Specific level has insufficient support
-        stats.update(specific_key, "on", MIN_SUPPORT - 1, ts=1000.0)
+        stats.update(specific_key, "on", MIN_SUPPORT - 1, timestamp=1000.0)
 
         # Note: update also added to parent, but still insufficient
         # Add more to parent to make it sufficient
         stats.stats[parent_key].update_duration("off", MIN_SUPPORT + 100)
 
-        result = stats.distribution(specific_key)
+        result = stats.distribution(specific_key, timestamp = 1000.0)
 
         # Specific level should be skipped (< MIN_SUPPORT)
         # Parent level should be used
@@ -521,9 +523,9 @@ class TestHierarchicalStateStatsDistribution:
         stats = HierarchicalStateStats()
         global_key = TimeKey()
 
-        stats.update(global_key, "on", 300.0, ts=1000.0)
+        stats.update(global_key, "on", 300.0, timestamp=1000.0)
 
-        result = stats.distribution(global_key)
+        result = stats.distribution(global_key, timestamp=1000.0)
 
         assert result.distribution == {"on": pytest.approx(1.0)}
         assert result.support_time == pytest.approx(300.0)
@@ -534,11 +536,11 @@ class TestHierarchicalStateStatsDistribution:
         stats = HierarchicalStateStats()
         key = TimeKey((("hour", 10),))
 
-        stats.update(key, "on", 150.0, ts=1000.0)
-        stats.update(key, "off", 250.0, ts=1000.0)
-        stats.update(key, "idle", 100.0, ts=1000.0)
+        stats.update(key, "on", 150.0, timestamp=1000.0)
+        stats.update(key, "off", 250.0, timestamp=1000.0)
+        stats.update(key, "idle", 100.0, timestamp=1000.0)
 
-        result = stats.distribution(key)
+        result = stats.distribution(key, timestamp=1000.0)
 
         assert sum(result.distribution.values()) == pytest.approx(1.0)
         assert result.support_time > 0
@@ -554,13 +556,13 @@ class TestHierarchicalStateStatsDistribution:
         general = medium.parent()  # (("hour", 10),)
 
         # Update specific - this will add to specific, medium, general, and GLOBAL
-        stats.update(specific, "on", 200.0, ts=1000.0)
+        stats.update(specific, "on", 200.0, timestamp=1000.0)
 
         # Add different states to medium and general manually to create blend
         stats.stats[medium].update_duration("off", 200.0)
         stats.stats[general].update_duration("idle", 200.0)
 
-        result = stats.distribution(specific)
+        result = stats.distribution(specific, timestamp = 1000.0)
 
         # After updates:
         # Specific: 200 "on" (total 200)
@@ -589,8 +591,8 @@ class TestHierarchicalStateStatsDistribution:
         parent = specific.parent()  # (("hour", 10),)
 
         # Update specific with "on" and "off"
-        stats.update(specific, "on", 100.0, ts=1000.0)
-        stats.update(specific, "off", 100.0, ts=1000.0)
+        stats.update(specific, "on", 100.0, timestamp=1000.0)
+        stats.update(specific, "off", 100.0, timestamp=1000.0)
         # Now specific has: 100 "on", 100 "off" (total 200)
         # Parent has: 100 "on", 100 "off" (total 200) - from hierarchical updates
         # Global has: 100 "on", 100 "off" (total 200)
@@ -603,7 +605,7 @@ class TestHierarchicalStateStatsDistribution:
             "idle", 100.0
         )  # Parent now has 400 "on", 100 "off", 100 "idle"
 
-        result = stats.distribution(specific)
+        result = stats.distribution(specific, timestamp = 1000.0)
 
         # Specific: 100 "on", 100 "off" (total 200)
         # Parent: 400 "on", 100 "off", 100 "idle" (total 600)
@@ -625,9 +627,9 @@ class TestHierarchicalStateStatsDistribution:
         stats = HierarchicalStateStats()
         key = TimeKey((("hour", 10),))
 
-        stats.update(key, "on", 200.0, ts=1000.0)
+        stats.update(key, "on", 200.0, timestamp=1000.0)
 
-        result = stats.distribution(key)
+        result = stats.distribution(key, timestamp=1000.0)
 
         # Should use specific level + GLOBAL
         assert result.depth == 2
@@ -638,11 +640,11 @@ class TestHierarchicalStateStatsDistribution:
 
         # Create 4-level hierarchy
         specific = TimeKey((("hour", 10), ("weekday", 1), ("month", 6)))
-        
-        # Update populates specific, parent1, parent2, and GLOBAL
-        stats.update(specific, "on", 200.0, ts=1000.0)
 
-        result = stats.distribution(specific)
+        # Update populates specific, parent1, parent2, and GLOBAL
+        stats.update(specific, "on", 200.0, timestamp=1000.0)
+
+        result = stats.distribution(specific, timestamp = 1000.0)
 
         # All 4 levels should have sufficient support (200 each, MIN_SUPPORT=30)
         assert result.depth == 4
@@ -655,12 +657,12 @@ class TestHierarchicalStateStatsDistribution:
         parent = specific.parent()
 
         # Add insufficient data to specific (less than MIN_SUPPORT)
-        stats.update(specific, "on", MIN_SUPPORT - 1, ts=1000.0)
+        stats.update(specific, "on", MIN_SUPPORT - 1, timestamp=1000.0)
 
         # Add sufficient data to parent manually
         stats.stats[parent].update_duration("off", 200.0)
 
-        result = stats.distribution(specific)
+        result = stats.distribution(specific, timestamp = 1000.0)
 
         # Only parent and GLOBAL have sufficient support
         # (specific has MIN_SUPPORT-1 which is < MIN_SUPPORT)
@@ -674,9 +676,9 @@ class TestHierarchicalStateStatsDistribution:
         key = TimeKey((("hour", 10), ("weekday", 1)))
 
         # Add 100 seconds at specific level (also adds to parent and GLOBAL)
-        stats.update(key, "on", 100.0, ts=1000.0)
+        stats.update(key, "on", 100.0, timestamp=1000.0)
 
-        result = stats.distribution(key)
+        result = stats.distribution(key, timestamp=1000.0)
 
         # Specific: 100, Parent: 100, GLOBAL: 100 = 300 total
         assert result.support_time == pytest.approx(300.0)
@@ -689,15 +691,15 @@ class TestHierarchicalStateStatsDistribution:
         parent = specific.parent()
 
         # Add data to specific (also populates parent and GLOBAL)
-        stats.update(specific, "on", 50.0, ts=1000.0)
-        stats.update(specific, "off", 50.0, ts=1000.0)
+        stats.update(specific, "on", 50.0, timestamp=1000.0)
+        stats.update(specific, "off", 50.0, timestamp=1000.0)
         # Now specific has 100 total, parent has 100, GLOBAL has 100
 
         # Add more to parent manually
         stats.stats[parent].update_duration("idle", 100.0)
         # Now parent has 200 total
 
-        result = stats.distribution(specific)
+        result = stats.distribution(specific, timestamp = 1000.0)
 
         # Specific: 100, Parent: 200, GLOBAL: 100 = 400 total
         assert result.support_time == pytest.approx(400.0)
@@ -707,7 +709,7 @@ class TestHierarchicalStateStatsDistribution:
         stats = HierarchicalStateStats()
         key = TimeKey((("hour", 10),))
 
-        result = stats.distribution(key)
+        result = stats.distribution(key, timestamp=1000.0)
 
         assert result.depth == 0
         assert result.support_time == 0.0
@@ -723,19 +725,19 @@ class TestHierarchicalStateStatsPrune:
         stats.prune_interval = 1000.0
         key = TimeKey((("hour", 10),))
 
-        stats.update(key, "on", 10.0, ts=1000.0)
+        stats.update(key, "on", 10.0, timestamp=1000.0)
 
-        # First prune at ts=1000
-        stats.prune(now_ts=1000.0)
+        # First prune at timestamp=1000
+        stats.prune(timestamp=1000.0)
         assert stats.last_prune_ts == 1000.0
 
         # Try to prune before interval elapsed
-        stats.prune(now_ts=1500.0)
+        stats.prune(timestamp=1500.0)
         # Should not have updated (1500 - 1000 < 1000)
         assert stats.last_prune_ts == 1000.0
 
         # Prune after interval
-        stats.prune(now_ts=2000.0)
+        stats.prune(timestamp=2000.0)
         assert stats.last_prune_ts == 2000.0
 
     def test_prune_removes_low_support_keys(self) -> None:
@@ -746,10 +748,10 @@ class TestHierarchicalStateStatsPrune:
         key_low = TimeKey((("hour", 10),))
         key_high = TimeKey((("hour", 11),))
 
-        stats.update(key_low, "on", 50.0, ts=1000.0)  # Below default min_total=60
-        stats.update(key_high, "on", 200.0, ts=1000.0)  # Above min_total
+        stats.update(key_low, "on", 50.0, timestamp=1000.0)  # Below default min_total=60
+        stats.update(key_high, "on", 200.0, timestamp=1000.0)  # Above min_total
 
-        stats.prune(now_ts=1000.0, min_total=60.0)
+        stats.prune(timestamp=1000.0, min_total=60.0)
 
         assert key_low not in stats.stats
         assert key_high in stats.stats
@@ -761,12 +763,12 @@ class TestHierarchicalStateStatsPrune:
         stats.prune_interval = 0
 
         key = TimeKey((("hour", 10),))
-        stats.update(key, "on", 200.0, ts=1000.0)
+        stats.update(key, "on", 200.0, timestamp=1000.0)
 
         initial_total = stats.stats[key].total()
 
         # Prune after one half-life
-        stats.prune(now_ts=1100.0)
+        stats.prune(timestamp=1100.0)
 
         decayed_total = stats.stats[key].total()
 
@@ -782,11 +784,11 @@ class TestHierarchicalStateStatsPrune:
         key = TimeKey((("hour", 10),))
 
         # Add a dominant state and a tiny state
-        stats.update(key, "on", 10000.0, ts=1000.0)
-        stats.update(key, "off", 10.0, ts=1000.0)  # Only 0.1%
+        stats.update(key, "on", 10000.0, timestamp=1000.0)
+        stats.update(key, "off", 10.0, timestamp=1000.0)  # Only 0.1%
 
         # Prune with epsilon=0.005 (0.5%)
-        stats.prune(now_ts=1000.0, epsilon=0.005)
+        stats.prune(timestamp=1000.0, epsilon=0.005)
 
         # "off" should be removed (0.1% < 0.5%)
         assert "on" in stats.stats[key].durations
@@ -799,11 +801,11 @@ class TestHierarchicalStateStatsPrune:
 
         key = TimeKey((("hour", 10),))
 
-        stats.update(key, "on", 1000.0, ts=1000.0)
-        stats.update(key, "off", 15.0, ts=1000.0)
+        stats.update(key, "on", 1000.0, timestamp=1000.0)
+        stats.update(key, "off", 15.0, timestamp=1000.0)
 
         # Prune with absolute_min=20
-        stats.prune(now_ts=1000.0, absolute_min=20.0)
+        stats.prune(timestamp=1000.0, absolute_min=20.0)
 
         # "off" should be removed (15 < 20)
         assert "on" in stats.stats[key].durations
@@ -817,11 +819,11 @@ class TestHierarchicalStateStatsPrune:
         key = TimeKey((("hour", 10),))
 
         # Add only small states that will be pruned
-        stats.update(key, "on", 5.0, ts=1000.0)
-        stats.update(key, "off", 5.0, ts=1000.0)
+        stats.update(key, "on", 5.0, timestamp=1000.0)
+        stats.update(key, "off", 5.0, timestamp=1000.0)
 
         # Prune with absolute_min that removes all states
-        stats.prune(now_ts=1000.0, absolute_min=10.0, min_total=20.0)
+        stats.prune(timestamp=1000.0, absolute_min=10.0, min_total=20.0)
 
         # Key should be completely removed
         assert key not in stats.stats
@@ -833,12 +835,12 @@ class TestHierarchicalStateStatsPrune:
 
         key = TimeKey((("hour", 10),))
 
-        stats.update(key, "on", 500.0, ts=1000.0)
-        stats.update(key, "off", 500.0, ts=1000.0)
+        stats.update(key, "on", 500.0, timestamp=1000.0)
+        stats.update(key, "off", 500.0, timestamp=1000.0)
 
         initial_count = len(stats.stats)
 
-        stats.prune(now_ts=1000.0)
+        stats.prune(timestamp=1000.0)
 
         # Should not have removed anything
         assert len(stats.stats) == initial_count
@@ -854,12 +856,12 @@ class TestHierarchicalStateStatsPrune:
         key_remove1 = TimeKey((("hour", 12),))
         key_remove2 = TimeKey((("hour", 13),))
 
-        stats.update(key_keep1, "on", 200.0, ts=1000.0)
-        stats.update(key_keep2, "on", 300.0, ts=1000.0)
-        stats.update(key_remove1, "on", 30.0, ts=1000.0)
-        stats.update(key_remove2, "on", 40.0, ts=1000.0)
+        stats.update(key_keep1, "on", 200.0, timestamp=1000.0)
+        stats.update(key_keep2, "on", 300.0, timestamp=1000.0)
+        stats.update(key_remove1, "on", 30.0, timestamp=1000.0)
+        stats.update(key_remove2, "on", 40.0, timestamp=1000.0)
 
-        stats.prune(now_ts=1000.0, min_total=60.0)
+        stats.prune(timestamp=1000.0, min_total=60.0)
 
         assert key_keep1 in stats.stats
         assert key_keep2 in stats.stats
@@ -879,7 +881,7 @@ class TestHierarchicalStateStatsEnforceKeyLimit:
         # So we get 50 specific keys + 1 GLOBAL = 51 total
         for i in range(50):
             key = TimeKey((("id", i),))
-            stats.update(key, "on", 100.0, ts=1000.0)
+            stats.update(key, "on", 100.0, timestamp=1000.0)
 
         stats.enforce_key_limit()
 
@@ -893,7 +895,7 @@ class TestHierarchicalStateStatsEnforceKeyLimit:
         # Add 15 keys
         for i in range(15):
             key = TimeKey((("id", i),))
-            stats.update(key, "on", 100.0, ts=1000.0)
+            stats.update(key, "on", 100.0, timestamp=1000.0)
 
         stats.enforce_key_limit()
 
@@ -912,12 +914,12 @@ class TestHierarchicalStateStatsEnforceKeyLimit:
         key_low2 = TimeKey((("id", 4),))
         key_low3 = TimeKey((("id", 5),))
 
-        stats.update(key_high1, "on", 1000.0, ts=1000.0)
-        stats.update(key_high2, "on", 900.0, ts=1000.0)
-        stats.update(key_high3, "on", 800.0, ts=1000.0)
-        stats.update(key_low1, "on", 100.0, ts=1000.0)
-        stats.update(key_low2, "on", 50.0, ts=1000.0)
-        stats.update(key_low3, "on", 25.0, ts=1000.0)
+        stats.update(key_high1, "on", 1000.0, timestamp=1000.0)
+        stats.update(key_high2, "on", 900.0, timestamp=1000.0)
+        stats.update(key_high3, "on", 800.0, timestamp=1000.0)
+        stats.update(key_low1, "on", 100.0, timestamp=1000.0)
+        stats.update(key_low2, "on", 50.0, timestamp=1000.0)
+        stats.update(key_low3, "on", 25.0, timestamp=1000.0)
 
         stats.enforce_key_limit()
 
@@ -937,7 +939,7 @@ class TestHierarchicalStateStatsEnforceKeyLimit:
         # Add exactly max_keys entries
         for i in range(10):
             key = TimeKey((("id", i),))
-            stats.update(key, "on", 100.0, ts=1000.0)
+            stats.update(key, "on", 100.0, timestamp=1000.0)
 
         stats.enforce_key_limit()
 
@@ -951,7 +953,7 @@ class TestHierarchicalStateStatsEnforceKeyLimit:
         # Add 100 keys (each creates itself + shares GLOBAL)
         for i in range(100):
             key = TimeKey((("id", i),))
-            stats.update(key, "on", float(i), ts=1000.0)
+            stats.update(key, "on", float(i), timestamp=1000.0)
 
         stats.enforce_key_limit()
 
@@ -974,18 +976,18 @@ class TestHierarchicalStateStatsIntegration:
         parent = specific.parent()  # (("hour", 14),)
 
         # Add data
-        stats.update(specific, "on", 200.0, ts=1000.0)
-        stats.update(parent, "off", 400.0, ts=1000.0)
+        stats.update(specific, "on", 200.0, timestamp=1000.0)
+        stats.update(parent, "off", 400.0, timestamp=1000.0)
 
         # Get distribution
-        dist = stats.distribution(specific)
+        dist = stats.distribution(specific, timestamp = 1000.0)
         assert "on" in dist.distribution
         assert "off" in dist.distribution
         assert dist.support_time > 0
         assert dist.depth >= 1
 
         # Prune
-        stats.prune(now_ts=1000.0)
+        stats.prune(timestamp=1000.0)
 
         # Should still have data
         assert len(stats.stats) > 0
@@ -997,15 +999,15 @@ class TestHierarchicalStateStatsIntegration:
         key = TimeKey((("hour", 10),))
 
         # Initial observation
-        stats.update(key, "on", 1000.0, ts=1000.0)
+        stats.update(key, "on", 1000.0, timestamp=1000.0)
         initial = stats.stats[key].total()
 
         # After one half-life, add nothing (just decay)
-        stats.update(key, "on", 0.0, ts=1100.0)
+        stats.update(key, "on", 0.0, timestamp=1100.0)
         after_one = stats.stats[key].total()
 
         # After two half-lives
-        stats.update(key, "on", 0.0, ts=1200.0)
+        stats.update(key, "on", 0.0, timestamp=1200.0)
         after_two = stats.stats[key].total()
 
         assert after_one < initial
@@ -1021,7 +1023,7 @@ class TestHierarchicalStateStatsIntegration:
         # Add many keys
         for i in range(200):
             key = TimeKey((("id", i),))
-            stats.update(key, "on", float(i), ts=1000.0)
+            stats.update(key, "on", float(i), timestamp=1000.0)
 
         # Enforcement happens at 1.1x max_keys, then reduces to max_keys
         # So after 200 updates, should be at or near max_keys (not unbounded)
@@ -1038,22 +1040,22 @@ class TestHierarchicalStateStatsIntegration:
                 # Different patterns for day vs night
                 if 8 <= hour <= 20:
                     stats.update(
-                        key, "on", 3600.0, ts=1000.0 + day * 86400 + hour * 3600
+                        key, "on", 3600.0, timestamp=1000.0 + day * 86400 + hour * 3600
                     )
                 else:
                     stats.update(
-                        key, "off", 3600.0, ts=1000.0 + day * 86400 + hour * 3600
+                        key, "off", 3600.0, timestamp=1000.0 + day * 86400 + hour * 3600
                     )
 
         # Check daytime pattern - now includes parent levels in blending
         day_key = TimeKey((("hour", 14), ("weekday", 3)))
-        dist = stats.distribution(day_key)
+        dist = stats.distribution(day_key, timestamp=1000.0)
         # Should be heavily weighted toward "on" but may have some "off" from parents
         assert dist.distribution.get("on", 0.0) > 0.5  # Mostly "on"
 
         # Check nighttime pattern
         night_key = TimeKey((("hour", 2), ("weekday", 3)))
-        dist = stats.distribution(night_key)
+        dist = stats.distribution(night_key, timestamp=1001.0)
         # Should be heavily weighted toward "off"
         assert dist.distribution.get("off", 0.0) > 0.5  # Mostly "off"
 
@@ -1066,9 +1068,9 @@ class TestHierarchicalStateStatsIntegration:
         parent = specific.parent()  # (("hour", 10),)
 
         # Only add data to parent level
-        stats.update(parent, "on", 500.0, ts=1000.0)
+        stats.update(parent, "on", 500.0, timestamp=1000.0)
 
-        dist = stats.distribution(specific)
+        dist = stats.distribution(specific, timestamp = 1000.0)
 
         # Should fall back to parent
         assert dist.distribution == {"on": pytest.approx(1.0)}
@@ -1084,10 +1086,10 @@ class TestHierarchicalStateStatsIntegration:
         # Add data over time
         for i in range(100):
             key = TimeKey((("hour", i % 24),))
-            stats.update(key, "on", 10.0, ts=float(i * 100))
+            stats.update(key, "on", 10.0, timestamp=float(i * 100))
 
         # Prune
-        stats.prune(now_ts=10000.0, min_total=50.0)
+        stats.prune(timestamp=10000.0, min_total=50.0)
 
         # Should have removed some low-support keys
         assert len(stats.stats) < 24
@@ -1099,7 +1101,7 @@ class TestHierarchicalStateStatsIntegration:
 
         # Establish baseline pattern: mostly "on"
         for _ in range(40):
-            stats.update(key, "on", 100.0, ts=1000.0)
+            stats.update(key, "on", 100.0, timestamp=1000.0)
 
         # Check baseline is established
         assert stats.stats[key].baseline is not None
@@ -1110,7 +1112,7 @@ class TestHierarchicalStateStatsIntegration:
 
         # Trigger pattern shift: now mostly "off"
         for _ in range(40):
-            stats.update(key, "off", 100.0, ts=ts_after_cooldown)
+            stats.update(key, "off", 100.0, timestamp=ts_after_cooldown)
 
         # After significant shift, drift should have been detected
         # and fast_decay_updates should have been set at some point
@@ -1133,7 +1135,7 @@ class TestHierarchicalStateStatsIntegration:
 
         # Build baseline for all levels
         for _ in range(40):
-            stats.update(specific_key, "on", 100.0, ts=1000.0)
+            stats.update(specific_key, "on", 100.0, timestamp=1000.0)
 
         # All levels should have baselines
         assert stats.stats[specific_key].baseline is not None
@@ -1163,20 +1165,20 @@ class TestHierarchicalStateStatsIntegration:
 
         # Do a series of updates
         for i in range(5):
-            stats.update(key, "off", 100.0, ts=1000.0 + i)
+            stats.update(key, "off", 100.0, timestamp=1000.0 + i)
 
         # Counter should have decremented
         assert stats.stats[key].fast_decay_updates == 5
 
         # Continue until it reaches zero
         for i in range(5, 10):
-            stats.update(key, "off", 100.0, ts=1000.0 + i)
+            stats.update(key, "off", 100.0, timestamp=1000.0 + i)
 
         # Should be at 0 now
         assert stats.stats[key].fast_decay_updates == 0
 
         # Further updates should keep it at 0
-        stats.update(key, "off", 100.0, ts=1000.0 + 10)
+        stats.update(key, "off", 100.0, timestamp=1000.0 + 10)
         assert stats.stats[key].fast_decay_updates == 0
 
 
@@ -1190,3 +1192,240 @@ class TestMinSupportConstant:
     def test_min_support_is_float(self) -> None:
         """Test MIN_SUPPORT is a float."""
         assert isinstance(MIN_SUPPORT, float)
+
+class TestOptionalTimestampInUpdate:
+    """Test optional timestamp parameter in update() method."""
+
+    def test_update_with_explicit_timestamp(self) -> None:
+        """Test update works with explicit timestamp."""
+        stats = HierarchicalStateStats()
+        key = TimeKey((("hour", 10),))
+
+        stats.update(key, "on", 100.0, timestamp=1000.0)
+
+        assert stats.stats[key].durations["on"] == pytest.approx(100.0)
+
+    def test_update_with_default_timestamp(self) -> None:
+        """Test update works with default (None) timestamp using current time."""
+        stats = HierarchicalStateStats()
+        key = TimeKey((("hour", 10),))
+
+        # Use default timestamp (current time)
+        stats.update(key, "on", 100.0)
+
+        assert stats.stats[key].durations["on"] == pytest.approx(100.0)
+
+    def test_update_default_timestamp_applies_decay(self) -> None:
+        """Test that default timestamp applies decay correctly."""
+        stats = HierarchicalStateStats()
+        stats.half_life = 0.1  # Very short half-life
+        key = TimeKey((("hour", 10),))
+
+        # First update with explicit timestamp
+        stats.update(key, "on", 100.0, timestamp=1000.0)
+        initial_duration = stats.stats[key].durations["on"]
+
+        # Wait a bit
+        time.sleep(0.15)
+
+        # Second update with default timestamp (should apply decay)
+        stats.update(key, "on", 0.0)  # Add 0 duration to just trigger decay
+        decayed_duration = stats.stats[key].durations["on"]
+
+        # Should have decayed significantly
+        assert decayed_duration < initial_duration
+        assert decayed_duration < 60.0  # Should be less than half
+
+    def test_update_mixing_explicit_and_default_timestamps(self) -> None:
+        """Test mixing explicit and default timestamps in sequential updates."""
+        stats = HierarchicalStateStats()
+        key = TimeKey((("hour", 10),))
+
+        # Use explicit timestamp
+        stats.update(key, "on", 100.0, timestamp=1000.0)
+        assert stats.stats[key].durations["on"] == pytest.approx(100.0)
+
+        # Use later explicit timestamp
+        stats.update(key, "off", 50.0, timestamp=1100.0)
+        assert stats.stats[key].durations["off"] == pytest.approx(50.0)
+
+        # Use even later timestamp
+        stats.update(key, "on", 25.0, timestamp=1200.0)
+        # Both states should have values (decay may have been applied)
+        assert stats.stats[key].durations["on"] > 0.0
+        assert stats.stats[key].durations["off"] > 0.0
+
+
+class TestOptionalTimestampInDistribution:
+    """Test optional timestamp parameter in distribution() method."""
+
+    def test_distribution_with_explicit_timestamp(self) -> None:
+        """Test distribution works with explicit timestamp."""
+        stats = HierarchicalStateStats()
+        key = TimeKey((("hour", 10),))
+
+        stats.update(key, "on", 100.0, timestamp=1000.0)
+        stats.update(key, "off", 100.0, timestamp=1000.0)
+
+        result = stats.distribution(key, timestamp=1000.0)
+
+        assert "on" in result.distribution
+        assert "off" in result.distribution
+        assert result.distribution["on"] == pytest.approx(0.5)
+        assert result.distribution["off"] == pytest.approx(0.5)
+
+    def test_distribution_with_default_timestamp(self) -> None:
+        """Test distribution works with default (None) timestamp using current time."""
+        stats = HierarchicalStateStats()
+        key = TimeKey((("hour", 10),))
+
+        # Use recent timestamps so data doesn't completely decay
+        import time
+        recent_time = time.time() - 100  # 100 seconds ago
+
+        stats.update(key, "on", 100.0, timestamp=recent_time)
+        stats.update(key, "off", 100.0, timestamp=recent_time)
+
+        # Use default timestamp (current time)
+        result = stats.distribution(key)
+
+        # Should still have data since it's recent
+        assert "on" in result.distribution
+        assert "off" in result.distribution
+        # Distribution should still be roughly equal (minimal decay in 100s with 1h half-life)
+        assert result.distribution["on"] == pytest.approx(0.5, rel=0.1)
+        assert result.distribution["off"] == pytest.approx(0.5, rel=0.1)
+
+    def test_distribution_default_timestamp_applies_decay(self) -> None:
+        """Test that default timestamp in distribution applies decay."""
+        stats = HierarchicalStateStats()
+        stats.half_life = 0.1  # Very short half-life
+        key = TimeKey((("hour", 10),))
+
+        # Add data with old timestamp
+        stats.update(key, "on", 100.0, timestamp=1000.0)
+
+        # Check distribution with explicit old timestamp (no decay)
+        result1 = stats.distribution(key, timestamp=1000.0)
+        support1 = result1.support_time
+
+        # Wait a bit
+        time.sleep(0.15)
+
+        # Check distribution with default current timestamp (should decay)
+        result2 = stats.distribution(key)
+        support2 = result2.support_time
+
+        # Support should have decreased due to decay
+        assert support2 < support1
+
+
+class TestOptionalTimestampInPrune:
+    """Test optional timestamp parameter in prune() method."""
+
+    def test_prune_with_explicit_timestamp(self) -> None:
+        """Test prune works with explicit timestamp."""
+        stats = HierarchicalStateStats()
+        stats.prune_interval = 100.0
+        key = TimeKey((("hour", 10),))
+
+        stats.update(key, "on", 10.0, timestamp=1000.0)  # Below min_total
+
+        # Prune with explicit timestamp after interval
+        stats.prune(timestamp=1200.0)
+
+        # Should have pruned the key (insufficient support)
+        assert key not in stats.stats
+
+    def test_prune_with_default_timestamp(self) -> None:
+        """Test prune works with default (None) timestamp using current time."""
+        stats = HierarchicalStateStats()
+        stats.prune_interval = 0.1  # Short interval
+        key = TimeKey((("hour", 10),))
+
+        stats.update(key, "on", 10.0, timestamp=1000.0)
+
+        # Wait for prune interval
+        time.sleep(0.15)
+
+        # Prune with default timestamp
+        stats.prune()
+
+        # Should have pruned the key
+        assert key not in stats.stats
+
+    def test_prune_default_timestamp_respects_interval(self) -> None:
+        """Test that default timestamp respects prune interval."""
+        stats = HierarchicalStateStats()
+        stats.prune_interval = 3600.0  # 1 hour
+        key = TimeKey((("hour", 10),))
+
+        stats.update(key, "on", 10.0)
+
+        # First prune should set last_prune_ts
+        stats.prune()
+        first_prune_ts = stats.last_prune_ts
+
+        # Immediate second prune should not execute (within interval)
+        stats.prune()
+        second_prune_ts = stats.last_prune_ts
+
+        # Should be same (no prune happened)
+        assert first_prune_ts == second_prune_ts
+
+    def test_prune_mixing_explicit_and_default_timestamps(self) -> None:
+        """Test mixing explicit and default timestamps in prune."""
+        stats = HierarchicalStateStats()
+        stats.prune_interval = 100.0
+        key = TimeKey((("hour", 10),))
+
+        stats.update(key, "on", 10.0, timestamp=1000.0)
+
+        # Prune with explicit timestamp
+        stats.prune(timestamp=1200.0)
+        assert stats.last_prune_ts == 1200.0
+
+        # Prune with default (current time) should work
+        stats.prune()
+        # last_prune_ts should be updated to current time
+        assert stats.last_prune_ts > 1200.0
+
+
+class TestOptionalTimestampConsistency:
+    """Test consistency across methods when using optional timestamps."""
+
+    def test_all_methods_accept_none_timestamp(self) -> None:
+        """Test that all methods accept None as timestamp."""
+        stats = HierarchicalStateStats()
+        key = TimeKey((("hour", 10),))
+
+        # All should work with default None timestamp
+        stats.update(key, "on", 100.0)
+        result = stats.distribution(key)
+        stats.prune()
+
+        # Should have valid results
+        assert key in stats.stats
+        assert result.distribution is not None
+
+    def test_explicit_timestamps_provide_determinism(self) -> None:
+        """Test that explicit timestamps provide deterministic behavior."""
+        stats1 = HierarchicalStateStats()
+        stats2 = HierarchicalStateStats()
+        key = TimeKey((("hour", 10),))
+
+        # Same operations with same explicit timestamps
+        timestamp = 1000.0
+        stats1.update(key, "on", 100.0, timestamp=timestamp)
+        stats1.update(key, "off", 50.0, timestamp=timestamp)
+
+        stats2.update(key, "on", 100.0, timestamp=timestamp)
+        stats2.update(key, "off", 50.0, timestamp=timestamp)
+
+        # Should have identical distributions
+        dist1 = stats1.distribution(key, timestamp=timestamp)
+        dist2 = stats2.distribution(key, timestamp=timestamp)
+
+        assert dist1.distribution == dist2.distribution
+        assert dist1.support_time == dist2.support_time
+        assert dist1.depth == dist2.depth

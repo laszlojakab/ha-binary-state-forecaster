@@ -1,5 +1,7 @@
 """Tests for `StateStats` class and decay behavior."""
 
+import time
+
 import pytest
 
 from custom_components.discrete_state_forecaster.model.state_stats import StateStats
@@ -244,7 +246,7 @@ class TestStateStatsUpdateDuration:
     def test_update_duration_alternating_states(self) -> None:
         """Test alternating updates between states."""
         stats = StateStats()
-        for i in range(10):
+        for _ in range(10):
             stats.update_duration("on", 10.0)
             stats.update_duration("off", 5.0)
         assert stats.durations == {"on": 100.0, "off": 50.0}
@@ -485,7 +487,7 @@ class TestApplyDecayInitialization:
         stats = StateStats(durations={"on": 100.0, "off": 200.0})
         assert stats.last_update_ts is None
 
-        stats.apply_decay(current_ts=10.0, half_life=100.0)
+        stats.apply_decay(timestamp=10.0, half_life=100.0)
         assert stats.last_update_ts == 10.0
         # No decay applied on first call
         assert stats.durations["on"] == 100.0
@@ -500,7 +502,7 @@ class TestApplyDecayBasic:
         stats = StateStats(durations={"on": 50.0})
         stats.last_update_ts = 10.0
 
-        stats.apply_decay(current_ts=10.0, half_life=100.0)
+        stats.apply_decay(timestamp=10.0, half_life=100.0)
         assert stats.last_update_ts == 10.0
         assert stats.durations["on"] == 50.0
 
@@ -509,7 +511,7 @@ class TestApplyDecayBasic:
         stats = StateStats(durations={"on": 50.0})
         stats.last_update_ts = 10.0
 
-        stats.apply_decay(current_ts=9.0, half_life=100.0)
+        stats.apply_decay(timestamp=9.0, half_life=100.0)
         assert stats.last_update_ts == 10.0
         assert stats.durations["on"] == 50.0
 
@@ -518,7 +520,7 @@ class TestApplyDecayBasic:
         stats = StateStats(durations={"on": 100.0, "off": 200.0})
         stats.last_update_ts = 0.0
 
-        stats.apply_decay(current_ts=10.0, half_life=0.0)
+        stats.apply_decay(timestamp=10.0, half_life=0.0)
         assert stats.last_update_ts == 10.0
         assert stats.durations["on"] == 100.0
         assert stats.durations["off"] == 200.0
@@ -529,7 +531,7 @@ class TestApplyDecayBasic:
         stats.last_update_ts = 0.0
 
         # After 1 half-life, durations should be 50%
-        stats.apply_decay(current_ts=10.0, half_life=10.0)
+        stats.apply_decay(timestamp=10.0, half_life=10.0)
         assert stats.durations["on"] == pytest.approx(50.0)
         assert stats.durations["off"] == pytest.approx(100.0)
         assert stats.last_update_ts == 10.0
@@ -544,13 +546,13 @@ class TestApplyDecayCumulative:
         stats.last_update_ts = 0.0
 
         # First decay: elapsed=5, half_life=10 -> factor=0.5^0.5
-        stats.apply_decay(current_ts=5.0, half_life=10.0)
+        stats.apply_decay(timestamp=5.0, half_life=10.0)
         factor1 = 0.5 ** (5.0 / 10.0)
         assert stats.durations["a"] == pytest.approx(10.0 * factor1)
         assert stats.durations["b"] == pytest.approx(20.0 * factor1)
 
         # Second decay: elapsed=3, half_life=10 -> factor=0.5^0.3
-        stats.apply_decay(current_ts=8.0, half_life=10.0)
+        stats.apply_decay(timestamp=8.0, half_life=10.0)
         factor2 = 0.5 ** (3.0 / 10.0)
         # Overall factor multiplies
         assert stats.durations["a"] == pytest.approx(10.0 * factor1 * factor2)
@@ -564,7 +566,7 @@ class TestApplyDecayEdgeCases:
     def test_empty_durations_safe(self) -> None:
         """Safe when durations are empty; only timestamp is set."""
         stats = StateStats()
-        stats.apply_decay(current_ts=10.0, half_life=100.0)
+        stats.apply_decay(timestamp=10.0, half_life=100.0)
         # No exception and last_update_ts set
         assert stats.last_update_ts == 10.0
         assert stats.durations == {}
@@ -575,10 +577,115 @@ class TestApplyDecayEdgeCases:
         stats.last_update_ts = 0.0
 
         # Decay should preserve ratios
-        stats.apply_decay(current_ts=10.0, half_life=100.0)
+        stats.apply_decay(timestamp=10.0, half_life=100.0)
         dist = stats.distribution()
         assert dist["x"] == pytest.approx(0.25)
         assert dist["y"] == pytest.approx(0.75)
+
+
+class TestApplyDecayOptionalTimestamp:
+    """Test apply_decay with optional timestamp parameter."""
+
+    def test_default_timestamp_uses_current_time(self) -> None:
+        """When timestamp is None, uses current system time."""
+        stats = StateStats(durations={"on": 100.0, "off": 200.0})
+        
+        # Call without timestamp - should use time.time()
+        stats.apply_decay(half_life=3600.0)
+        
+        # Should have set last_update_ts to something
+        assert stats.last_update_ts is not None
+        assert stats.last_update_ts > 0
+        # Durations should be unchanged on first call
+        assert stats.durations["on"] == 100.0
+        assert stats.durations["off"] == 200.0
+
+    def test_default_timestamp_on_second_call_applies_decay(self) -> None:
+        """Second call without timestamp applies decay based on elapsed time."""
+        stats = StateStats(durations={"on": 100.0, "off": 200.0})
+        
+        # First call sets timestamp
+        stats.apply_decay(half_life=1.0)
+        first_ts = stats.last_update_ts
+        
+        # Wait a tiny bit
+        time.sleep(0.01)
+        
+        # Second call should apply decay
+        stats.apply_decay(half_life=1.0)
+        
+        # Timestamp should be updated
+        assert stats.last_update_ts is not None
+        assert stats.last_update_ts > first_ts
+        
+        # Durations should have decayed (very small amount due to short wait)
+        assert stats.durations["on"] < 100.0
+        assert stats.durations["off"] < 200.0
+
+    def test_explicit_timestamp_overrides_default(self) -> None:
+        """Explicit timestamp parameter overrides default time.time()."""
+        stats = StateStats(durations={"on": 100.0})
+        stats.last_update_ts = 0.0
+        
+        # Use explicit timestamp
+        stats.apply_decay(timestamp=10.0, half_life=10.0)
+        
+        assert stats.last_update_ts == 10.0
+        assert stats.durations["on"] == pytest.approx(50.0)
+
+    def test_mixing_explicit_and_default_timestamps(self) -> None:
+        """Can mix explicit and default timestamps across calls."""
+        stats = StateStats(durations={"on": 100.0})
+        
+        # First call with explicit timestamp
+        stats.apply_decay(timestamp=0.0, half_life=100.0)
+        assert stats.last_update_ts == 0.0
+        
+        # Second call with explicit timestamp
+        stats.apply_decay(timestamp=100.0, half_life=100.0)
+        assert stats.last_update_ts == 100.0
+        assert stats.durations["on"] == pytest.approx(50.0)
+        
+        # Third call with default (should use current time)
+        stats.apply_decay(half_life=100.0)
+        # Should update to current time (which is >> 100.0)
+        assert stats.last_update_ts > 100.0
+
+    def test_default_timestamp_with_zero_half_life(self) -> None:
+        """Default timestamp with zero half-life updates timestamp only."""
+        stats = StateStats(durations={"on": 100.0})
+        
+        stats.apply_decay(half_life=0.0)
+        
+        assert stats.last_update_ts is not None
+        assert stats.last_update_ts > 0
+        # No decay applied
+        assert stats.durations["on"] == 100.0
+
+    def test_default_timestamp_empty_durations(self) -> None:
+        """Default timestamp works with empty durations."""
+        stats = StateStats()
+        
+        stats.apply_decay(half_life=100.0)
+        
+        assert stats.last_update_ts is not None
+        assert stats.last_update_ts > 0
+        assert stats.durations == {}
+
+    def test_explicit_none_timestamp_same_as_default(self) -> None:
+        """Explicitly passing None is same as omitting parameter."""
+        stats1 = StateStats(durations={"on": 100.0})
+        stats2 = StateStats(durations={"on": 100.0})
+        
+        # Both should behave identically
+        stats1.apply_decay(timestamp=None, half_life=3600.0)
+        stats2.apply_decay(half_life=3600.0)
+        
+        # Both should have timestamps set
+        assert stats1.last_update_ts is not None
+        assert stats2.last_update_ts is not None
+        # Should be very close (within milliseconds)
+        assert abs(stats1.last_update_ts - stats2.last_update_ts) < 0.1
 
 
 class TestPruneBasicBehavior:
@@ -661,7 +768,7 @@ class TestPruneWithDecay:
         stats.last_update_ts = 0.0
 
         # After 3 half-lives, durations reduced to 12.5%
-        stats.apply_decay(current_ts=3 * 3600.0, half_life=3600.0)
+        stats.apply_decay(timestamp=3 * 3600.0, half_life=3600.0)
 
         # on: 12.5, off: 25.0, idle: 6.25
         stats.prune(min_state_duration=10.0)
@@ -678,7 +785,7 @@ class TestPruneWithDecay:
         stats.last_update_ts = 0.0
 
         # Simulate 1 week passing with 1 day half-life
-        stats.apply_decay(current_ts=7 * 86400.0, half_life=86400.0)
+        stats.apply_decay(timestamp=7 * 86400.0, half_life=86400.0)
 
         # After 7 half-lives: factor = 0.5^7 ≈ 0.0078125
         # heating: ~7.8, cooling: ~3.9, idle: ~0.78
@@ -936,7 +1043,7 @@ class TestPruneAdaptiveWithDecay:
         stats.last_update_ts = 0.0
 
         # After 2 half-lives: all x 0.25
-        stats.apply_decay(current_ts=86400.0, half_life=43200.0)
+        stats.apply_decay(timestamp=86400.0, half_life=43200.0)
 
         # New totals: heating=125, cooling=75, idle=12.5, total=212.5
         # threshold = max(212.5 * 0.01, 15) = max(2.125, 15) = 15
@@ -954,7 +1061,7 @@ class TestPruneAdaptiveWithDecay:
         stats.last_update_ts = 0.0
 
         # After 1 week with 1-day half-life: 7 half-lives
-        stats.apply_decay(current_ts=7 * 86400.0, half_life=86400.0)
+        stats.apply_decay(timestamp=7 * 86400.0, half_life=86400.0)
 
         # Factor = 0.5^7 ≈ 0.0078125
         # on: ~78, off: ~39, idle: ~7.8, error: ~1.56

@@ -1,6 +1,7 @@
 """Discrete conditional probability model for state prediction."""
 
 import math
+import time
 from dataclasses import dataclass, field
 from typing import Final, Self
 
@@ -161,7 +162,7 @@ class StateStats:
 
         return {k: v / total for k, v in self.durations.items()}
 
-    def apply_decay(self: Self, current_ts: float, half_life: float) -> None:
+    def apply_decay(self: Self, timestamp: float | None = None, half_life: float = 0.0) -> None:
         """
         Applies exponential decay to all state durations.
 
@@ -175,46 +176,58 @@ class StateStats:
             decay_factor = exp(-ln(2) * elapsed / half_life)
                         = 0.5 ^ (elapsed / half_life)
 
-        where ``elapsed`` is ``current_ts - last_update_ts``. When ``last_update_ts``
+        where ``elapsed`` is ``timestamp - last_update_ts``. When ``last_update_ts``
         is ``None`` (i.e., this is the first update), the method initializes
-        ``last_update_ts`` to ``current_ts`` and returns without modifying durations.
+        ``last_update_ts`` to ``timestamp`` and returns without modifying durations.
 
         Args:
-            current_ts: The current timestamp as a float (e.g., seconds since epoch).
+            timestamp: The current timestamp as a float (e.g., seconds since epoch).
+                If None, uses the current system time (time.time()). This allows
+                for deterministic behavior in tests while providing convenience in
+                production use.
             half_life: The half-life in seconds. After this duration, observations
                 retain 50% of their original weight. A value of 0 or negative
                 disables decay (durations unchanged). Larger values mean slower
-                forgetting (e.g., 86400 = 1 day half-life).
+                forgetting (e.g., 86400 = 1 day half-life). Defaults to 0.0.
 
         Behavior:
-            - If ``last_update_ts`` is ``None``: set it to ``current_ts`` and return.
-            - If ``current_ts`` is less than or equal to ``last_update_ts``: do nothing.
+            - If ``timestamp`` is ``None``: uses current system time (``time.time()``).
+            - If ``last_update_ts`` is ``None``: set it to ``timestamp`` and return.
+            - If ``timestamp`` is less than or equal to ``last_update_ts``: do nothing.
             - If ``half_life`` is 0 or negative: update timestamp but skip decay.
             - Otherwise: apply decay to all entries in ``durations`` and update
-              ``last_update_ts`` to ``current_ts``.
+              ``last_update_ts`` to ``timestamp``.
 
         Examples:
             ```
             >>> stats = StateStats(durations={"on": 100.0, "off": 200.0})
             >>> stats.last_update_ts = 0.0
             >>> # After one half-life, durations reduced to 50%
-            >>> stats.apply_decay(current_ts=3600.0, half_life=3600.0)
+            >>> stats.apply_decay(timestamp=3600.0, half_life=3600.0)
             >>> stats.durations["on"]
             50.0
             >>> stats.durations["off"]
             100.0
+            
+            >>> # Using default current time
+            >>> stats2 = StateStats(durations={"heating": 500.0})
+            >>> stats2.apply_decay(half_life=3600.0)  # Uses time.time()
+            >>> # Durations decay based on current system time
             ```
         """
+        if timestamp is None:
+            timestamp = time.time()
+            
         if self.last_update_ts is None:
-            self.last_update_ts = current_ts
+            self.last_update_ts = timestamp
             return
 
-        elapsed = current_ts - self.last_update_ts
+        elapsed = timestamp - self.last_update_ts
         if elapsed <= 0:
             return
 
         if half_life <= 0:
-            self.last_update_ts = current_ts
+            self.last_update_ts = timestamp
             return
 
         decay_factor = 0.5 ** (elapsed / half_life)
@@ -222,7 +235,7 @@ class StateStats:
         for state in self.durations:
             self.durations[state] *= decay_factor
 
-        self.last_update_ts = current_ts
+        self.last_update_ts = timestamp
 
     def prune(
         self,

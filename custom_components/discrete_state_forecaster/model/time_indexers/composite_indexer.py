@@ -95,7 +95,7 @@ class CompositeIndexer(TimeIndexer):
             >>> composite.key(datetime(2026, 1, 31, 14, 30))  # Saturday
             (('weekday', 5), ('time_bucket', 14))
         """
-        return tuple((idx.name, idx.key(ts)) for idx in self.indexers)
+        return TimeKey(tuple((idx.name, idx.key(ts)) for idx in self.indexers))
 
     def next_boundary(self: Self, ts: datetime) -> datetime:
         """

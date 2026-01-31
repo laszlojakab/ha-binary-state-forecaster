@@ -180,7 +180,7 @@ class DiscreteConditionalModel:
             key=key,
             state=state,
             duration=duration,
-            ts=timestamp,
+            timestamp=timestamp,
         )
 
     def distribution(self: Self, key: TimeKey, timestamp: float) -> AggregatedStats:
@@ -329,6 +329,19 @@ class DiscreteConditionalModel:
             are added.
         """
         stats = self._stats.distribution(key, timestamp)
+
+        # Handle empty distribution (no data for this bucket)
+        if not stats.distribution:
+            return Prediction(
+                state=None,
+                distribution={},
+                confidence=Confidence(
+                    max_probability=0.0,
+                    entropy_confidence=0.0,
+                    support_time=0.0,
+                    depth=0
+                ),
+            )
 
         state = max(stats.distribution, key=stats.distribution.get)
 

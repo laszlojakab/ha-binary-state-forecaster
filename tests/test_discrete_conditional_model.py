@@ -270,14 +270,19 @@ class TestPredict:
         assert prediction.state == "on"
         assert prediction.confidence.max_probability == pytest.approx(0.75)
 
-    def test_predict_empty_model_handles_error(self) -> None:
-        """Test prediction for unknown key raises ValueError."""
+    def test_predict_empty_model_returns_empty_prediction(self) -> None:
+        """Test prediction for unknown key returns empty Prediction."""
         model = DiscreteConditionalModel()
         key = TimeKey((("time_of_day", 600),))
 
-        # Empty distribution causes max() to raise ValueError
-        with pytest.raises(ValueError, match=r"max.*empty"):
-            model.predict(key, timestamp=1000.0)
+        # Empty distribution should return empty Prediction
+        prediction = model.predict(key, timestamp=1000.0)
+        
+        assert prediction.state is None
+        assert prediction.distribution == {}
+        assert prediction.confidence.max_probability == 0.0
+        assert prediction.confidence.entropy_confidence == 0.0
+        assert prediction.confidence.support_time == 0.0
 
     def test_predict_confidence_metrics(self) -> None:
         """Test that prediction includes all confidence metrics."""

@@ -7,6 +7,7 @@ It enables sophisticated state prediction by combining fine-grained and coarse-g
 patterns with support-weighted blending, automatic pruning, and exponential decay.
 """
 
+import time
 from typing import Final, Self
 
 from custom_components.discrete_state_forecaster.model.aggregated_stats import (
@@ -57,16 +58,22 @@ class HierarchicalStateStats:
         self.prune_interval: float = 6 * 3600
         self.max_keys: int = 50_000
 
-    def distribution(self: Self, key: TimeKey, timestamp: float) -> AggregatedStats:
+    def distribution(self: Self, key: TimeKey, timestamp: float | None = None) -> AggregatedStats:
         """
         Computes state probability distribution using hierarchical blending.
 
-        Traverses from the specific TimeKey through its parent hierarchy,
-        collecting statistics at each level that has sufficient support.
-        Blends these distributions weighted by their total support.
+        First checks if the specific TimeKey has sufficient data (>= MIN_SUPPORT).
+        If yes, returns ONLY that level's distribution without blending parents.
+        If no, traverses through parent hierarchy and blends distributions weighted
+        by their total support.
+
+        This approach prioritizes specific temporal patterns when they are well-established,
+        and only falls back to more general patterns when specific data is insufficient.
 
         Args:
             key: The TimeKey representing the temporal context.
+            timestamp: The timestamp in seconds for applying decay before computing
+                distribution. If None (default), uses current time from time.time().
 
         Returns:
             AggregatedStats with three fields:
@@ -75,7 +82,34 @@ class HierarchicalStateStats:
             - depth: Number of hierarchy levels that contributed (had >= MIN_SUPPORT)
             Returns empty distribution with 0.0 support and depth count if no level
             has sufficient support (>= MIN_SUPPORT).
+
+        Example:
+            >>> stats = HierarchicalStateStats()
+            >>> key = TimeKey((("hour", 10),))
+            >>> stats.update(key, "on", 100.0, timestamp=1000.0)
+            >>> # Use current time
+            >>> result = stats.distribution(key)
+            >>> # Or specify explicit timestamp for determinism
+            >>> result = stats.distribution(key, timestamp=1500.0)
         """
+        if timestamp is None:
+            timestamp = time.time()
+
+        # Check if the specific key has sufficient data
+        specific_stats = self.stats.get(key)
+        if specific_stats:
+            specific_stats.apply_decay(timestamp, self.half_life)
+            specific_support = specific_stats.total()
+            
+            # If specific key has enough support, use ONLY it (no blending)
+            if specific_support >= MIN_SUPPORT:
+                return AggregatedStats(
+                    distribution=specific_stats.distribution(),
+                    support_time=specific_support,
+                    depth=1
+                )
+
+        # Specific key lacks sufficient data, blend across hierarchy
         weighted: dict[State, float] = {}
         total_support = 0.0
         depth = 0
@@ -112,7 +146,7 @@ class HierarchicalStateStats:
 
     def prune(
         self: Self,
-        now_ts: float,
+        timestamp: float | None = None,
         epsilon: float = 0.003,
         absolute_min: float = 20.0,
         min_total: float = 60.0,
@@ -127,22 +161,33 @@ class HierarchicalStateStats:
         4. Removing entire TimeKey entries with insufficient total support
 
         Args:
-            now_ts: Current timestamp in seconds.
+            timestamp: Current timestamp in seconds. If None (default), uses current
+                time from time.time().
             epsilon: Relative threshold for pruning states. Default is 0.003 (0.3%).
             absolute_min: Absolute minimum duration (seconds) for state retention. Default is 20.0.
             min_total: Minimum total duration (seconds) for TimeKey retention. Default is 60.0.
+
+        Example:
+            >>> stats = HierarchicalStateStats()
+            >>> # Use current time for pruning
+            >>> stats.prune()
+            >>> # Or specify explicit timestamp
+            >>> stats.prune(timestamp=1000.0)
         """
-        if now_ts - self.last_prune_ts < self.prune_interval:
+        if timestamp is None:
+            timestamp = time.time()
+
+        if timestamp - self.last_prune_ts < self.prune_interval:
             return
 
-        self.last_prune_ts = now_ts
+        self.last_prune_ts = timestamp
 
         keys_to_delete: list[TimeKey] = []
 
         for key, stats in self.stats.items():
 
             # Decay all stats first
-            stats.apply_decay(now_ts, self.half_life)
+            stats.apply_decay(timestamp, self.half_life)
 
             # prune states inside the stat
             stats.prune_adaptive(
@@ -163,7 +208,7 @@ class HierarchicalStateStats:
         key: TimeKey,
         state: State,
         duration: float,
-        ts: float,
+        timestamp: float | None = None,
     ) -> None:
         """
         Records a state observation at a specific temporal context and all parent levels.
@@ -194,7 +239,8 @@ class HierarchicalStateStats:
             key: The TimeKey representing the temporal context.
             state: The state value that was observed (e.g., "on", "off").
             duration: The time in seconds spent in this state.
-            ts: The timestamp in seconds when this observation occurred.
+            timestamp: The timestamp in seconds when this observation occurred. If None
+                (default), uses current time from time.time().
 
         Side Effects:
             - Creates StateStats entries for key and all parent keys if they don't exist
@@ -208,21 +254,26 @@ class HierarchicalStateStats:
         Example:
             >>> stats = HierarchicalStateStats()
             >>> key = TimeKey((("hour", 10), ("weekday", 1)))
-            >>> # Normal update
-            >>> stats.update(key, "on", 100.0, ts=1000.0)
+            >>> # Use current time
+            >>> stats.update(key, "on", 100.0)
+            >>> # Or specify explicit timestamp for determinism
+            >>> stats.update(key, "on", 100.0, timestamp=1000.0)
             >>> # If pattern changes significantly, drift is detected automatically
             >>> # and fast_decay_updates is set for adaptive learning
         """
+        if timestamp is None:
+            timestamp = time.time()
+
         for k in key.parents():
             stats = self.stats.get(k)
             if stats is None:
                 stats = StateStats()
                 self.stats[k] = stats
 
-            stats.apply_decay(ts, self.half_life)
+            stats.apply_decay(timestamp, self.half_life)
             stats.update_duration(state, duration)
 
-            if stats.check_drift(ts):
+            if stats.check_drift(timestamp):
                 stats.fast_decay_updates = 15
 
             if stats.fast_decay_updates > 0:

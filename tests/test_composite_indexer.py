@@ -10,6 +10,9 @@ from custom_components.discrete_state_forecaster.model.time_indexers.composite_i
 from custom_components.discrete_state_forecaster.model.time_indexers.day_of_week_indexer import (
     DayOfWeekIndexer,
 )
+from custom_components.discrete_state_forecaster.model.time_indexers.time_key import (
+    TimeKey,
+)
 from custom_components.discrete_state_forecaster.model.time_indexers.time_of_day_indexer import (
     TimeOfDayIndexer,
 )
@@ -61,9 +64,9 @@ class TestCompositeIndexerKey:
         ts = datetime(2026, 1, 26, 14, 30)
         key = indexer.key(ts)
 
-        assert isinstance(key, tuple)
+        assert isinstance(key, TimeKey)
         assert len(key) == 1
-        assert key[0] == ("time_bucket", 29)  # 14:30 -> bucket 29
+        assert key.items[0] == ("time_bucket", 29)  # 14:30 -> bucket 29
 
     def test_key_two_indexers(self) -> None:
         """Test composite key with two indexers."""
@@ -75,10 +78,10 @@ class TestCompositeIndexerKey:
         ts = datetime(2026, 1, 26, 14, 30)
         key = indexer.key(ts)
 
-        assert isinstance(key, tuple)
+        assert isinstance(key, TimeKey)
         assert len(key) == 2
-        assert key[0] == ("weekday", 0)  # Monday
-        assert key[1] == ("time_bucket", 14)  # Hour 14
+        assert key.items[0] == ("weekday", 0)  # Monday
+        assert key.items[1] == ("time_bucket", 14)  # Hour 14
 
     def test_key_structure(self) -> None:
         """Test that key structure is (name, value) pairs."""
@@ -89,12 +92,12 @@ class TestCompositeIndexerKey:
         key = indexer.key(ts)
 
         # Each element should be (name, value) tuple
-        for element in key:
+        for element in key.items:
             assert isinstance(element, tuple)
             assert len(element) == 2
             assert isinstance(element[0], str)  # name is string
 
-        assert key == (("weekday", 4), ("time_bucket", 37))
+        assert key == TimeKey((("weekday", 4), ("time_bucket", 37)))
 
     def test_key_preserves_indexer_order(self) -> None:
         """Test that key preserves the order of indexers."""
@@ -110,10 +113,10 @@ class TestCompositeIndexerKey:
         key2 = indexer2.key(ts)
 
         # Keys should have same elements but different order
-        assert key1[0][0] == "time_bucket"
-        assert key1[1][0] == "weekday"
-        assert key2[0][0] == "weekday"
-        assert key2[1][0] == "time_bucket"
+        assert key1.items[0][0] == "time_bucket"
+        assert key1.items[1][0] == "weekday"
+        assert key2.items[0][0] == "weekday"
+        assert key2.items[1][0] == "time_bucket"
 
     def test_key_different_times_same_day(self) -> None:
         """Test keys for different times on the same day."""
@@ -128,8 +131,8 @@ class TestCompositeIndexerKey:
         key2 = indexer.key(ts2)
 
         # Same day, different time
-        assert key1[0] == key2[0]  # Same weekday
-        assert key1[1] != key2[1]  # Different time bucket
+        assert key1.items[0] == key2.items[0]  # Same weekday
+        assert key1.items[1] != key2.items[1]  # Different time bucket
 
     def test_key_different_days_same_time(self) -> None:
         """Test keys for different days at the same time."""
@@ -144,8 +147,8 @@ class TestCompositeIndexerKey:
         key2 = indexer.key(ts2)
 
         # Different day, same time
-        assert key1[0] != key2[0]  # Different weekday
-        assert key1[1] == key2[1]  # Same time bucket
+        assert key1.items[0] != key2.items[0]  # Different weekday
+        assert key1.items[1] == key2.items[1]  # Same time bucket
 
     def test_key_completely_different_timestamps(self) -> None:
         """Test keys for completely different timestamps."""
@@ -160,8 +163,8 @@ class TestCompositeIndexerKey:
         key2 = indexer.key(ts2)
 
         # Both dimensions should differ
-        assert key1[0] != key2[0]  # Different weekday
-        assert key1[1] != key2[1]  # Different time bucket
+        assert key1.items[0] != key2.items[0]  # Different weekday
+        assert key1.items[1] != key2.items[1]  # Different time bucket
         assert key1 != key2
 
     def test_key_same_composite_bucket(self) -> None:
@@ -178,7 +181,7 @@ class TestCompositeIndexerKey:
         key2 = indexer.key(ts2)
 
         assert key1 == key2
-        assert key1 == (("weekday", 0), ("time_bucket", 14))
+        assert key1 == TimeKey((("weekday", 0), ("time_bucket", 14)))
 
     def test_key_empty_indexers(self) -> None:
         """Test key generation with no indexers."""
@@ -186,7 +189,7 @@ class TestCompositeIndexerKey:
         ts = datetime(2026, 1, 26, 14, 30)
         key = indexer.key(ts)
 
-        assert key == ()
+        assert key == TimeKey.GLOBAL
         assert len(key) == 0
 
 
@@ -301,8 +304,8 @@ class TestCompositeIndexerEdgeCases:
 
         # Should have two time_bucket entries
         assert len(key) == 2
-        assert key[0] == ("time_bucket", 14)  # Hourly
-        assert key[1] == ("time_bucket", 58)  # 15-minute (14*4 + 2)
+        assert key.items[0] == ("time_bucket", 14)  # Hourly
+        assert key.items[1] == ("time_bucket", 58)  # 15-minute (14*4 + 2)
 
     def test_key_boundary_consistency(self) -> None:
         """Test that keys change at boundaries."""
@@ -321,7 +324,7 @@ class TestCompositeIndexerEdgeCases:
         # At least one dimension should change
         assert key1 != key2
         # Time bucket should change
-        assert key1[1] != key2[1]
+        assert key1.items[1] != key2.items[1]
 
     def test_complex_three_way_composite(self) -> None:
         """Test a complex composite with three different indexers."""
@@ -337,9 +340,9 @@ class TestCompositeIndexerEdgeCases:
         key = indexer.key(ts)
 
         assert len(key) == 3
-        assert key[0] == ("weekday", 4)  # Friday
-        assert key[1] == ("time_bucket", 18)  # Hour 18
-        assert key[2] == ("time_bucket", 37)  # 30-min bucket (18*2 + 1)
+        assert key.items[0] == ("weekday", 4)  # Friday
+        assert key.items[1] == ("time_bucket", 18)  # Hour 18
+        assert key.items[2] == ("time_bucket", 37)  # 30-min bucket (18*2 + 1)
 
     def test_boundary_at_day_and_time_transition(self) -> None:
         """Test boundary when both day and time change simultaneously."""
@@ -358,5 +361,5 @@ class TestCompositeIndexerEdgeCases:
         key_after = indexer.key(next_ts)
 
         # Both dimensions should change
-        assert key_before[0] != key_after[0]  # Monday -> Tuesday
-        assert key_before[1] != key_after[1]  # Hour 23 -> Hour 0
+        assert key_before.items[0] != key_after.items[0]  # Monday -> Tuesday
+        assert key_before.items[1] != key_after.items[1]  # Hour 23 -> Hour 0

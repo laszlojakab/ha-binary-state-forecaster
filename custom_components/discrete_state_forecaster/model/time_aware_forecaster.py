@@ -59,7 +59,7 @@ class TimeAwareForecaster:
         ```
     """
 
-    def __init__(self: Self, indexer: CompositeIndexer) -> None:
+    def __init__(self: Self, indexer: CompositeIndexer, half_life: float = 0.0) -> None:
         """
         Initialize a TimeAwareForecaster with a time indexer.
 
@@ -68,6 +68,9 @@ class TimeAwareForecaster:
                 This determines the temporal granularity of pattern learning.
                 For example, CompositeIndexer([TimeOfDayIndexer(60)]) creates
                 hourly buckets.
+            half_life: Half-life for exponential decay in seconds. If 0.0 (default),
+                no decay is applied. Positive values enable temporal decay where
+                older observations have less influence on predictions.
 
         Example:
             ```
@@ -81,7 +84,9 @@ class TimeAwareForecaster:
             ```
         """
         self.indexer: CompositeIndexer = indexer
-        self.model: DiscreteConditionalModel = DiscreteConditionalModel()
+        self.model: DiscreteConditionalModel = DiscreteConditionalModel(
+            half_life=half_life
+        )
 
     def update_interval(
         self: Self,
@@ -148,7 +153,7 @@ class TimeAwareForecaster:
 
             cursor = next_ts
 
-    def predict(self: Self, ts: datetime) -> Prediction:
+    def predict(self: Self, timestamp: datetime) -> Prediction:
         """
         Predicts the most likely state at a specific time.
 
@@ -157,7 +162,7 @@ class TimeAwareForecaster:
         along with confidence metrics.
 
         Args:
-            ts: The timestamp for which to make a prediction. The forecaster
+            timestamp: The timestamp for which to make a prediction. The forecaster
                 will determine which temporal bucket contains this time and
                 use the learned patterns for that bucket.
 
@@ -188,4 +193,5 @@ class TimeAwareForecaster:
             >>> print(f"Confidence: {prediction.confidence.max_probability:.2f}")
             ```
         """
-        return self.model.predict(self.indexer.key(ts))
+        key = self.indexer.key(timestamp)
+        return self.model.predict(key, timestamp.timestamp())
