@@ -9,12 +9,14 @@
           "use_day_of_week": "Hét napjainak mintázatának tanulása",
           "use_month_of_year": "Szezonális (havi) mintázatok tanulása",
           "state_persistence_factor": "Állapot-kitartási tényező",
-          "adaptive_persistence": "Adaptív állapot-kitartás"
+          "adaptive_persistence": "Adaptív állapot-kitartás",
+          "half_life_hours": "Mintázat-lecsengési felezési idő (óra)"
         },
         "data_description": {
           "time_bucket_size_in_minutes": "Az időfelbontás a mintázatok tanulásához. Kisebb értékek (15-30 perc) a gyors változásokat rögzítik, nagyobb értékek (120-240 perc) az általánosabb mintázatokra fókuszálnak.",
           "state_persistence_factor": "Milyen erősen hajlamosak az állapotok megmaradni (0.0 = szabadon változnak, 1.0 = ritkán változnak). Tipikusan: 0.1-0.5. Állítsa be az eszköz viselkedése alapján.",
-          "adaptive_persistence": "Állapot-specifikus kitartás tanulása (pl. a BE állapot stabilabb lehet mint a KI). Ajánlott a legtöbb eszközhöz."
+          "adaptive_persistence": "Állapot-specifikus kitartás tanulása (pl. a BE állapot stabilabb lehet mint a KI). Ajánlott a legtöbb eszközhöz.",
+          "half_life_hours": "Milyen gyorsan fakulnak a régi mintázatok (0 = soha, 168 = 1 hét felezési idő, 720 = 30 nap). Használjon 0-t stabil mintázatokhoz, magasabb értékeket változó szokásokhoz vagy szezonális változásokhoz. Max: 8760 óra (1 év)."
         },
         "description": "Előrejelzési beállítások konfigurálása"
       }
@@ -33,13 +35,15 @@
           "use_day_of_week": "Hét napjainak mintázatának tanulása",
           "use_month_of_year": "Szezonális (havi) mintázatok tanulása",
           "state_persistence_factor": "Állapot-kitartási tényező",
-          "adaptive_persistence": "Adaptív állapot-kitartás"
+          "adaptive_persistence": "Adaptív állapot-kitartás",
+          "half_life_hours": "Mintázat-lecsengési felezési idő (óra)"
         },
         "data_description": {
           "use_day_of_week": "Engedélyezze a hétköznapok és hétvégék közötti különböző mintázatok tanulását (pl. munkaidő, irodai berendezések)",
           "use_month_of_year": "Engedélyezze a havonta ismétlődő szezonális mintázatok tanulását (pl. fűtés/hűtés, öntözés, kültéri világítás)",
           "state_persistence_factor": "Milyen erősen hajlamosak az állapotok megmaradni (0.0 = szabadon változnak, 1.0 = ritkán változnak). Tipikusan: 0.1-0.5. A megtanult mintázatok törlése nélkül módosítható.",
-          "adaptive_persistence": "Állapot-specifikus kitartás tanulása (pl. a BE állapot stabilabb lehet mint a KI). A megtanult mintázatok törlése nélkül módosítható."
+          "adaptive_persistence": "Állapot-specifikus kitartás tanulása (pl. a BE állapot stabilabb lehet mint a KI). A megtanult mintázatok törlése nélkül módosítható.",
+          "half_life_hours": "Milyen gyorsan fakulnak a régi mintázatok (0 = soha, 168 = 1 hét, 720 = 30 nap). Hasznos változó szokásokhoz vagy szezonális változásokhoz. A megtanult mintázatok törlése nélkül módosítható."
         }
       },
       "confirm_reset": {

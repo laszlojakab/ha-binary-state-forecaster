@@ -31,6 +31,7 @@ from .const import (
     CONF_CALENDAR_FEATURES,
     CONF_DECAY_SECONDS,
     CONF_FORECASTER_FEATURES,
+    CONF_HALF_LIFE_HOURS,
     CONF_STATE_PERSISTENCE_FACTOR,
     CONF_TARGET_ENTITY_ID,
     CONF_TIME_BUCKET_SIZE_IN_MINUTES,
@@ -39,6 +40,7 @@ from .const import (
     CONF_USE_MONTH_OF_YEAR,
     CONF_USE_MONTH_OF_YEAR_FEATURE,
     DEFAULT_ADAPTIVE_PERSISTENCE,
+    DEFAULT_HALF_LIFE_HOURS,
     DEFAULT_STATE_PERSISTENCE_FACTOR,
     DEFAULT_TIME_BUCKET_SIZE_IN_MINUTES,
     DEFAULT_USE_DAY_OF_WEEK,
@@ -103,10 +105,13 @@ class DiscreteStateForecasterCoordinator(
         adaptive_persistence = config_entry.options.get(
             CONF_ADAPTIVE_PERSISTENCE, DEFAULT_ADAPTIVE_PERSISTENCE
         )
+        half_life_hours = config_entry.options.get(
+            CONF_HALF_LIFE_HOURS, DEFAULT_HALF_LIFE_HOURS
+        )
         
         self._forecaster = TimeAwareForecaster(
             self._composite_indexer,
-            half_life=0.0,  # No temporal decay for now
+            half_life=half_life_hours * 3600,  # Convert hours to seconds
             state_persistence_factor=state_persistence_factor,
             adaptive_persistence=adaptive_persistence,
         )
@@ -402,11 +407,14 @@ class DiscreteStateForecasterCoordinator(
             adaptive_persistence = config_entry.options.get(
                 CONF_ADAPTIVE_PERSISTENCE, DEFAULT_ADAPTIVE_PERSISTENCE
             )
+            half_life_hours = config_entry.options.get(
+                CONF_HALF_LIFE_HOURS, DEFAULT_HALF_LIFE_HOURS
+            )
 
             # Create new forecaster (resets the model)
             self._forecaster = TimeAwareForecaster(
                 self._composite_indexer,
-                half_life=0.0,
+                half_life=half_life_hours * 3600,  # Convert hours to seconds
                 state_persistence_factor=state_persistence_factor,
                 adaptive_persistence=adaptive_persistence,
             )
