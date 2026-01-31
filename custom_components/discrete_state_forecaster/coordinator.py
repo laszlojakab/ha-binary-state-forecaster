@@ -21,6 +21,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 from homeassistant.util.event_type import EventType
 
+from custom_components.discrete_state_forecaster.model.prediction import Prediction
 from custom_components.discrete_state_forecaster.model.time_aware_forecaster import (
     TimeAwareForecaster,
 )
@@ -31,44 +32,34 @@ from .const import (
     CONF_FORECASTER_FEATURES,
     CONF_TARGET_ENTITY_ID,
     CONF_TIME_BUCKET_SIZE_IN_MINUTES,
+    CONF_USE_DAY_OF_WEEK,
     CONF_USE_DAY_OF_WEEK_FEATURE,
+    CONF_USE_MONTH_OF_YEAR,
     CONF_USE_MONTH_OF_YEAR_FEATURE,
+    DEFAULT_TIME_BUCKET_SIZE_IN_MINUTES,
+    DEFAULT_USE_DAY_OF_WEEK,
+    DEFAULT_USE_MONTH_OF_YEAR,
     STORING_TIME_PATTERN,
 )
-from .model.hierarchical_temporal_state_model import HierarchicalTemporalStateModel
 from .model.state_tracker import StateTracker
-from .model.time_indexers import CompositeIndexer, DayOfWeekIndexer, MonthIndexer, TimeOfDayIndexer
-
-# from .old_discrete_conditional_model import (
-#     Confidence,
-#     DiscreteConditionalModel,
-#     FeatureKey,
-#     FeatureLabel,
-#     FeatureLabels,
-#     FeatureName,
-#     Probability,
-#     TargetLabel,
-# )
+from .model.time_indexers import (
+    CompositeIndexer,
+    DayOfWeekIndexer,
+    MonthIndexer,
+    TimeOfDayIndexer,
+)
 
 if TYPE_CHECKING:
     from . import DiscreteStateForecasterConfigEntry
-
-
-# @dataclass
-# class _StatePeriod:
-#     timestamp: float
-#     state: str | None
 
 
 @dataclass
 class DiscreteStateForecasterCoordinatorState:
     """State of the Discrete State Forecaster Coordinator."""
 
-    #     confidence: Confidence
-    #     distribution: tuple[dict[TargetLabel, Probability], FeatureKey]
-    #     drift_level: float
-    #     forecasts: list[TargetLabel]
-    ...
+    prediction: Prediction
+    current_state: str | None
+    timestamp: datetime
 
 
 class DiscreteStateForecasterCoordinator(
@@ -88,30 +79,43 @@ class DiscreteStateForecasterCoordinator(
         )
 
         self._config_entry = config_entry
-        self._time_indexers = (
-            [TimeOfDayIndexer(config_entry.data.get(CONF_TIME_BUCKET_SIZE_IN_MINUTES))]
-            + (
-                []
-                if not config_entry.data.get(CONF_USE_DAY_OF_WEEK_FEATURE, False)
-                else [DayOfWeekIndexer()]
-            )
-            + (
-                []
-                if not config_entry.data.get(CONF_USE_MONTH_OF_YEAR_FEATURE, False)
-                else [MonthIndexer()]
+        # Get time bucket size from configuration
+        time_bucket_minutes = int(
+            config_entry.data.get(
+                CONF_TIME_BUCKET_SIZE_IN_MINUTES, DEFAULT_TIME_BUCKET_SIZE_IN_MINUTES
             )
         )
+        
+        # Build indexers based on configuration
+        self._time_indexers = self._build_indexers(time_bucket_minutes, config_entry.options)
         self._composite_indexer = CompositeIndexer(self._time_indexers)
-        self._model = HierarchicalTemporalStateModel(3600 * 24 * 7)
-        self._forecaster = TimeAwareForecaster(self._composite_indexer)
+        self._forecaster = TimeAwareForecaster(
+            self._composite_indexer,
+            half_life=0.0,  # No temporal decay for now
+            state_persistence_factor=0.3,
+            adaptive_persistence=True,
+        )
         self._state_tracker = StateTracker(self._forecaster)
 
-        #         self._store = Store(
-        #             hass, 1, f"{config_entry.domain}_{config_entry.entry_id}_forecaster.json"
-        #         )
-        #         self._states: dict[FeatureLabel | TargetLabel, _StatePeriod] = {}
+        # Initialize storage for model persistence
+        self._store = Store(
+            hass, 1, f"{config_entry.domain}_{config_entry.entry_id}_forecaster.json"
+        )
         self._unsubscribe_callbacks: list[CALLBACK_TYPE] = []
         self._unsubscribe_time_indexer_change_callback: CALLBACK_TYPE | None = None
+        
+        # Track current indexer configuration for detecting changes
+        self._current_use_day_of_week = config_entry.options.get(
+            CONF_USE_DAY_OF_WEEK, DEFAULT_USE_DAY_OF_WEEK
+        )
+        self._current_use_month = config_entry.options.get(
+            CONF_USE_MONTH_OF_YEAR, DEFAULT_USE_MONTH_OF_YEAR
+        )
+        
+        # Listen for config entry updates
+        config_entry.async_on_unload(
+            config_entry.add_update_listener(self._async_config_entry_updated)
+        )
 
         #         self._t: None | int = None
         #         self._all_features: list[FeatureName] = sorted(
@@ -140,7 +144,9 @@ class DiscreteStateForecasterCoordinator(
             Event(
                 event_type=EventType("state_changed"),
                 data={
-                    "new_state": self.hass.states.get(self.config_entry.data[CONF_TARGET_ENTITY_ID])
+                    "new_state": self.hass.states.get(
+                        self.config_entry.data[CONF_TARGET_ENTITY_ID]
+                    )
                 },
                 time_fired_timestamp=now.timestamp(),
             )
@@ -175,7 +181,7 @@ class DiscreteStateForecasterCoordinator(
         #             )
 
         # Initiate time index changes
-        self._track_next_time_indexer_change(now)
+        await self._track_next_time_indexer_change(now)
 
         # # Start to listen to time bucket changes
         # self._unsubscribe_callbacks.append(
@@ -220,7 +226,7 @@ class DiscreteStateForecasterCoordinator(
 
         await self.async_refresh()
 
-    async def async_stop(self) -> None:
+    async def async_stop(self: Self) -> None:
         """Stops the coordinator."""
         for unsubscribe in self._unsubscribe_callbacks:
             unsubscribe()
@@ -233,50 +239,81 @@ class DiscreteStateForecasterCoordinator(
 
         await self._async_store_state()
 
-    async def _async_restore_state(self) -> None:
-        # data: dict[str, Any] | None = await self._store.async_load()
-        # model: None | DiscreteConditionalModel = None
+    async def _async_restore_state(self: Self) -> None:
+        """Restore forecaster state from storage."""
+        data: dict[str, Any] | None = await self._store.async_load()
 
-        # if data:
-        #     try:
-        #         model = DiscreteConditionalModel.from_dict(data)
-        #     except (KeyError, TypeError) as err:
-        #         self.logger.warning(
-        #             "Invalid stored state for %s: %s",
-        #             self._config_entry.data[CONF_TARGET_ENTITY_ID],
-        #             err,
-        #         )
-        # else:
-        #     self.logger.debug(
-        #         "No stored state found for %s.",
-        #         self._config_entry.data[CONF_TARGET_ENTITY_ID],
-        #     )
+        if data:
+            try:
+                # Restore forecaster from saved state
+                self._forecaster = TimeAwareForecaster.from_dict(
+                    data, self._composite_indexer
+                )
+                # Reconnect state tracker to restored forecaster
+                self._state_tracker = StateTracker(self._forecaster)
 
-        # self._model = model or HierarchicalTemporalStateModel()
-        # self._model.decay = self.config_entry.data.get(CONF_DECAY_SECONDS, 3600.0)
-        ...
+                self.logger.info(
+                    "Restored forecaster state for %s from storage.",
+                    self._config_entry.data[CONF_TARGET_ENTITY_ID],
+                )
+            except (KeyError, TypeError, ValueError) as err:
+                self.logger.warning(
+                    "Invalid stored state for %s: %s. Starting with fresh model.",
+                    self._config_entry.data[CONF_TARGET_ENTITY_ID],
+                    err,
+                )
+        else:
+            self.logger.debug(
+                "No stored state found for %s. Starting with fresh model.",
+                self._config_entry.data[CONF_TARGET_ENTITY_ID],
+            )
 
-    async def _async_store_state(self, *_args) -> None:
-        # await self._store.async_save(self._model.to_dict())
-        # TODO.JL
-
-        self.logger.debug(
-            "Forecaster state stored for %s. Config entry id: %s",
-            self._config_entry.data[CONF_TARGET_ENTITY_ID],
-            self._config_entry.entry_id,
-        )
+    async def _async_store_state(self: Self, *_args) -> None:
+        """Store forecaster state to persistent storage."""
+        try:
+            await self._store.async_save(self._forecaster.to_dict())
+            self.logger.debug(
+                "Forecaster state stored for %s. Config entry id: %s",
+                self._config_entry.data[CONF_TARGET_ENTITY_ID],
+                self._config_entry.entry_id,
+            )
+        except Exception as err:
+            self.logger.error(
+                "Failed to store forecaster state for %s: %s",
+                self._config_entry.data[CONF_TARGET_ENTITY_ID],
+                err,
+            )
 
     async def _async_update_data(self: Self) -> DiscreteStateForecasterCoordinatorState:
-        """Fetches the latest data."""
+        """Fetches the latest prediction data."""
         self.logger.debug(
             "Updating data for %s. Current data: %s",
             self._config_entry.data[CONF_TARGET_ENTITY_ID],
             self.data,
         )
 
-        return self.data
+        # Get current time and make prediction
+        now = dt_util.now()
 
-    async def _handle_target_entity_state_change(self, event: Event) -> None:
+        # Get current state from Home Assistant
+        target_entity = self.hass.states.get(
+            self._config_entry.data[CONF_TARGET_ENTITY_ID]
+        )
+        current_state = self._get_state_to_store(target_entity)
+
+        # Make prediction for current time
+        prediction = self._forecaster.predict(
+            now,
+            current_state=current_state,
+        )
+
+        return DiscreteStateForecasterCoordinatorState(
+            prediction=prediction,
+            current_state=current_state,
+            timestamp=now,
+        )
+
+    async def _handle_target_entity_state_change(self: Self, event: Event) -> None:
         """Handle state changes of the forecasted entity."""
         self.logger.debug(
             "Forecasted entity state change detected for %s, Event: %s",
@@ -301,9 +338,11 @@ class DiscreteStateForecasterCoordinator(
             event.time_fired,
         )
 
-        self._state_tracker.update(event.time_fired.timestamp(), new_state_to_store)
+        self._state_tracker.update(event.time_fired, new_state_to_store)
 
-    #     async def _handle_calendar_feature_state_change(self, event: Event) -> None:
+        await self.async_refresh()
+
+    #     async def _handle_calendar_feature_state_change(self: Self, event: Event) -> None:
     #         """Handle state changes of the calendar feature entities."""
     #         self.logger.debug(
     #             "Calendar feature entity state change detected for %s, Event: %s",
@@ -319,7 +358,7 @@ class DiscreteStateForecasterCoordinator(
     #             self.get_state_to_store(new_state),
     #         )
 
-    async def _handle_time_key_change(self, now: datetime) -> None:
+    async def _handle_time_key_change(self: Self, now: datetime) -> None:
         key = self._composite_indexer.key(now)
 
         self.logger.debug(
@@ -329,7 +368,9 @@ class DiscreteStateForecasterCoordinator(
             key,
         )
 
-        self._track_next_time_indexer_change(now)
+        await self._track_next_time_indexer_change(now)
+
+        await self.async_refresh()
 
         # bucket_size_in_minutes: int = self.config_entry.data.get(
         #     CONF_TIME_BUCKET_SIZE_IN_MINUTES
@@ -341,7 +382,7 @@ class DiscreteStateForecasterCoordinator(
     #             now.timestamp(), FEATURE_TIME_BUCKET, current_bucket_index
     #         )
 
-    #     async def _handle_day_of_week_change(self, now: datetime) -> None:
+    #     async def _handle_day_of_week_change(self: Self, now: datetime) -> None:
     #         self.logger.debug(
     #             "Day of week change detected for %s at %s.",
     #             self._config_entry.data[CONF_TARGET_ENTITY_ID],
@@ -471,9 +512,95 @@ class DiscreteStateForecasterCoordinator(
         if state is None:
             return None
 
-        return state.state if state.state not in (STATE_UNKNOWN, STATE_UNAVAILABLE) else None
+        return (
+            state.state
+            if state.state not in (STATE_UNKNOWN, STATE_UNAVAILABLE)
+            else None
+        )
 
-    def _track_next_time_indexer_change(self: Self, now: datetime) -> None:
+    def _build_indexers(
+        self: Self,
+        time_bucket_minutes: int,
+        options: dict[str, Any],
+    ) -> list:
+        """Build time indexers based on configuration."""
+        indexers = []
+        
+        # Day of week indexer (optional)
+        use_day_of_week = options.get(CONF_USE_DAY_OF_WEEK, DEFAULT_USE_DAY_OF_WEEK)
+        if use_day_of_week:
+            indexers.append(DayOfWeekIndexer())
+        
+        # Month of year indexer (optional)
+        use_month = options.get(CONF_USE_MONTH_OF_YEAR, DEFAULT_USE_MONTH_OF_YEAR)
+        if use_month:
+            indexers.append(MonthIndexer())
+        
+        # Time of day indexer (always included)
+        indexers.append(TimeOfDayIndexer(time_bucket_minutes))
+        
+        return indexers
+
+    async def _async_config_entry_updated(
+        self: Self,
+        hass: HomeAssistant,
+        config_entry: "DiscreteStateForecasterConfigEntry",
+    ) -> None:
+        """Handle config entry updates (options flow changes)."""
+        new_use_day_of_week = config_entry.options.get(
+            CONF_USE_DAY_OF_WEEK, DEFAULT_USE_DAY_OF_WEEK
+        )
+        new_use_month = config_entry.options.get(
+            CONF_USE_MONTH_OF_YEAR, DEFAULT_USE_MONTH_OF_YEAR
+        )
+        
+        # Check if indexer configuration changed
+        indexers_changed = (
+            new_use_day_of_week != self._current_use_day_of_week
+            or new_use_month != self._current_use_month
+        )
+        
+        if indexers_changed:
+            self.logger.info(
+                "Indexer configuration changed - resetting model. "
+                "Day of week: %s -> %s, Month: %s -> %s",
+                self._current_use_day_of_week,
+                new_use_day_of_week,
+                self._current_use_month,
+                new_use_month,
+            )
+            
+            # Update tracked configuration
+            self._current_use_day_of_week = new_use_day_of_week
+            self._current_use_month = new_use_month
+            
+            # Rebuild indexers
+            time_bucket_minutes = int(
+                config_entry.data.get(
+                    CONF_TIME_BUCKET_SIZE_IN_MINUTES, DEFAULT_TIME_BUCKET_SIZE_IN_MINUTES
+                )
+            )
+            self._time_indexers = self._build_indexers(time_bucket_minutes, config_entry.options)
+            self._composite_indexer = CompositeIndexer(self._time_indexers)
+            
+            # Create new forecaster (resets the model)
+            self._forecaster = TimeAwareForecaster(
+                self._composite_indexer,
+                half_life=0.0,
+                state_persistence_factor=0.3,
+                adaptive_persistence=True,
+            )
+            self._state_tracker = StateTracker(self._forecaster)
+            
+            # Delete old stored state
+            await self._store.async_remove()
+            
+            self.logger.info("Model reset complete - learning from scratch")
+            
+            # Trigger update to refresh all entities
+            await self.async_refresh()
+
+    async def _track_next_time_indexer_change(self: Self, now: datetime) -> None:
         next_boundary = self._composite_indexer.next_boundary(now)
 
         self.logger.debug(

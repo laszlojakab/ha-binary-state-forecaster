@@ -11,6 +11,7 @@ Tests cover:
 - Edge cases and error conditions
 """
 
+import json
 import math
 
 import pytest
@@ -420,7 +421,9 @@ class TestPrune:
         key = TimeKey((("time_of_day", 600),))
 
         model.update_duration(key, "on", 100.0, timestamp=1000.0)
-        model.update_duration(key, "off", 3.0, timestamp=1000.0)  # Below MIN_DURATION_THRESHOLD
+        model.update_duration(
+            key, "off", 3.0, timestamp=1000.0
+        )  # Below MIN_DURATION_THRESHOLD
 
         # 'off' never gets recorded due to MIN_DURATION_THRESHOLD filter
         stats = model.distribution(key, timestamp=1000.0)
@@ -688,3 +691,381 @@ class TestIntegration:
         updated_stats = model.distribution(key, timestamp=1000.0)
         # Now probabilities should be closer
         assert updated_stats.distribution["on"] > 0.4
+
+
+class TestHierarchicalTemporalStateModelSerialization:
+    """Tests for HierarchicalTemporalStateModel serialization (to_dict/from_dict)."""
+
+    def test_to_dict_empty_model(self) -> None:
+        """Test serializing empty HierarchicalTemporalStateModel."""
+        model = HierarchicalTemporalStateModel()
+        data = model.to_dict()
+
+        assert "stats" in data
+        assert "half_life" in data
+        assert "half_life_normal" in data
+        assert "half_life_fast" in data
+        assert data["half_life"] == 0.0
+        assert data["half_life_normal"] == 0.0
+        assert data["half_life_fast"] == 0.0
+
+    def test_to_dict_with_custom_half_life(self) -> None:
+        """Test serializing with custom half-life."""
+        model = HierarchicalTemporalStateModel(half_life=3600.0)
+        data = model.to_dict()
+
+        assert data["half_life"] == 3600.0
+        assert data["half_life_normal"] == 3600.0
+        assert data["half_life_fast"] == 360.0
+
+    def test_to_dict_with_data(self) -> None:
+        """Test serializing model with learned data."""
+        model = HierarchicalTemporalStateModel()
+        key = TimeKey((("hour", 10),))
+        model.update_duration(key, "on", 100.0, timestamp=1000.0)
+        model.update_duration(key, "off", 200.0, timestamp=1000.0)
+
+        data = model.to_dict()
+
+        assert "stats" in data
+        assert data["stats"]["stats"]  # Should have statistics data
+
+    def test_from_dict_empty_model(self) -> None:
+        """Test deserializing empty HierarchicalTemporalStateModel."""
+        data = {
+            "stats": {
+                "stats": [],
+                "half_life": 0.0,
+                "last_prune_ts": 0.0,
+                "prune_interval": 21600.0,
+                "prune_every_n_updates": None,
+                "update_count": 0,
+                "max_keys": 50_000,
+            },
+            "half_life": 0.0,
+            "half_life_normal": 0.0,
+            "half_life_fast": 0.0,
+        }
+
+        model = HierarchicalTemporalStateModel.from_dict(data)
+
+        assert model is not None
+        assert model.half_life == 0.0
+        assert model.half_life_normal == 0.0
+        assert model.half_life_fast == 0.0
+
+    def test_from_dict_with_custom_half_life(self) -> None:
+        """Test deserializing with custom half-life."""
+        data = {
+            "stats": {
+                "stats": [],
+                "half_life": 7200.0,
+                "last_prune_ts": 0.0,
+                "prune_interval": 21600.0,
+                "prune_every_n_updates": None,
+                "update_count": 0,
+                "max_keys": 50_000,
+            },
+            "half_life": 7200.0,
+            "half_life_normal": 7200.0,
+            "half_life_fast": 720.0,
+        }
+
+        model = HierarchicalTemporalStateModel.from_dict(data)
+
+        assert model.half_life == 7200.0
+        assert model.half_life_normal == 7200.0
+        assert model.half_life_fast == 720.0
+
+    def test_from_dict_with_data(self) -> None:
+        """Test deserializing model with learned data."""
+        data = {
+            "stats": {
+                "stats": [
+                    [
+                        [["hour", 10]],
+                        {
+                            "durations": {"on": 100.0, "off": 200.0},
+                            "last_update_ts": 1000.0,
+                            "baseline": None,
+                            "last_drift_ts": 0.0,
+                            "fast_decay_updates": 0,
+                        },
+                    ],
+                    [
+                        [],
+                        {
+                            "durations": {"on": 100.0, "off": 200.0},
+                            "last_update_ts": 1000.0,
+                            "baseline": None,
+                            "last_drift_ts": 0.0,
+                            "fast_decay_updates": 0,
+                        },
+                    ],
+                ],
+                "half_life": 3600.0,
+                "last_prune_ts": 0.0,
+                "prune_interval": 21600.0,
+                "prune_every_n_updates": None,
+                "update_count": 0,
+                "max_keys": 50_000,
+            },
+            "half_life": 3600.0,
+            "half_life_normal": 3600.0,
+            "half_life_fast": 360.0,
+        }
+
+        model = HierarchicalTemporalStateModel.from_dict(data)
+
+        key = TimeKey((("hour", 10),))
+        dist = model.distribution(key, timestamp=1000.0)
+
+        assert "on" in dist.distribution
+        assert "off" in dist.distribution
+
+    def test_roundtrip_empty_model(self) -> None:
+        """Test round-trip serialization of empty model."""
+        original = HierarchicalTemporalStateModel()
+        data = original.to_dict()
+        restored = HierarchicalTemporalStateModel.from_dict(data)
+
+        assert restored.half_life == original.half_life
+        assert restored.half_life_normal == original.half_life_normal
+        assert restored.half_life_fast == original.half_life_fast
+
+    def test_roundtrip_with_custom_half_life(self) -> None:
+        """Test round-trip with custom half-life."""
+        original = HierarchicalTemporalStateModel(half_life=7200.0)
+        data = original.to_dict()
+        restored = HierarchicalTemporalStateModel.from_dict(data)
+
+        assert restored.half_life == 7200.0
+        assert restored.half_life_normal == 7200.0
+        assert restored.half_life_fast == 720.0
+
+    def test_roundtrip_with_single_state(self) -> None:
+        """Test round-trip with single state observation."""
+        original = HierarchicalTemporalStateModel()
+        key = TimeKey((("hour", 10),))
+        original.update_duration(key, "on", 100.0, timestamp=1000.0)
+
+        data = original.to_dict()
+        restored = HierarchicalTemporalStateModel.from_dict(data)
+
+        original_dist = original.distribution(key, timestamp=1000.0)
+        restored_dist = restored.distribution(key, timestamp=1000.0)
+
+        assert original_dist.distribution == restored_dist.distribution
+        assert original_dist.support_time == restored_dist.support_time
+
+    def test_roundtrip_with_multiple_states(self) -> None:
+        """Test round-trip with multiple states."""
+        original = HierarchicalTemporalStateModel()
+        key = TimeKey((("hour", 10),))
+        original.update_duration(key, "on", 150.0, timestamp=1000.0)
+        original.update_duration(key, "off", 100.0, timestamp=1000.0)
+        original.update_duration(key, "idle", 50.0, timestamp=1000.0)
+
+        data = original.to_dict()
+        restored = HierarchicalTemporalStateModel.from_dict(data)
+
+        original_dist = original.distribution(key, timestamp=1000.0)
+        restored_dist = restored.distribution(key, timestamp=1000.0)
+
+        assert original_dist.distribution == restored_dist.distribution
+        assert original_dist.support_time == restored_dist.support_time
+
+    def test_roundtrip_with_multiple_keys(self) -> None:
+        """Test round-trip with multiple time keys."""
+        original = HierarchicalTemporalStateModel()
+        key1 = TimeKey((("hour", 10),))
+        key2 = TimeKey((("hour", 11),))
+        key3 = TimeKey((("hour", 10), ("weekday", 1)))
+
+        original.update_duration(key1, "on", 100.0, timestamp=1000.0)
+        original.update_duration(key2, "off", 200.0, timestamp=1000.0)
+        original.update_duration(key3, "idle", 150.0, timestamp=1000.0)
+
+        data = original.to_dict()
+        restored = HierarchicalTemporalStateModel.from_dict(data)
+
+        for key in [key1, key2, key3]:
+            original_dist = original.distribution(key, timestamp=1000.0)
+            restored_dist = restored.distribution(key, timestamp=1000.0)
+            assert original_dist.distribution == restored_dist.distribution
+
+    def test_roundtrip_preserves_predictions(self) -> None:
+        """Test that predictions are preserved after round-trip."""
+        original = HierarchicalTemporalStateModel()
+        key = TimeKey((("hour", 14),))
+        original.update_duration(key, "heating", 300.0, timestamp=1000.0)
+        original.update_duration(key, "cooling", 100.0, timestamp=1000.0)
+
+        original_pred = original.predict(key, timestamp=1000.0)
+
+        data = original.to_dict()
+        restored = HierarchicalTemporalStateModel.from_dict(data)
+
+        restored_pred = restored.predict(key, timestamp=1000.0)
+
+        assert original_pred.state == restored_pred.state
+        assert original_pred.distribution == restored_pred.distribution
+        assert (
+            original_pred.confidence.max_probability
+            == restored_pred.confidence.max_probability
+        )
+        assert (
+            original_pred.confidence.support_time
+            == restored_pred.confidence.support_time
+        )
+
+    def test_serialized_data_is_json_compatible(self) -> None:
+        """Test that serialized data can be JSON-encoded."""
+        model = HierarchicalTemporalStateModel(half_life=3600.0)
+        key = TimeKey((("hour", 10),))
+        model.update_duration(key, "on", 100.0, timestamp=1000.0)
+        model.update_duration(key, "off", 200.0, timestamp=1000.0)
+
+        data = model.to_dict()
+
+        # Should not raise
+        json_str = json.dumps(data)
+        parsed = json.loads(json_str)
+
+        # Verify we can restore from parsed JSON
+        restored = HierarchicalTemporalStateModel.from_dict(parsed)
+        assert restored.half_life == 3600.0
+
+    def test_roundtrip_hierarchical_keys(self) -> None:
+        """Test round-trip with hierarchical time keys."""
+        original = HierarchicalTemporalStateModel()
+
+        keys = [
+            TimeKey((("hour", 10),)),
+            TimeKey((("hour", 10), ("weekday", 1))),
+            TimeKey((("hour", 10), ("weekday", 1), ("month", 3))),
+        ]
+
+        for i, key in enumerate(keys):
+            original.update_duration(
+                key, "state", float(i * 100 + 100), timestamp=1000.0
+            )
+
+        data = original.to_dict()
+        restored = HierarchicalTemporalStateModel.from_dict(data)
+
+        for key in keys:
+            original_dist = original.distribution(key, timestamp=1000.0)
+            restored_dist = restored.distribution(key, timestamp=1000.0)
+            assert original_dist.distribution == restored_dist.distribution
+
+    def test_roundtrip_after_pruning(self) -> None:
+        """Test serialization after pruning operation."""
+        original = HierarchicalTemporalStateModel()
+        key = TimeKey((("hour", 10),))
+
+        # Add data to specific key only (avoid parent blending)
+        original.update_duration(key, "on", 1000.0, timestamp=1000.0)
+        original.update_duration(key, "small", 15.0, timestamp=1000.0)
+
+        # Prune with high threshold to remove small states
+        original.prune(now_ts=1000.0, absolute_min=100.0, min_total=60.0)
+
+        data = original.to_dict()
+        restored = HierarchicalTemporalStateModel.from_dict(data)
+
+        # Verify serialization preserved pruned state
+        original_dist = original.distribution(key, timestamp=1000.0)
+        restored_dist = restored.distribution(key, timestamp=1000.0)
+
+        assert original_dist.distribution == restored_dist.distribution
+        # After pruning, restored model should have same distribution as original
+        assert len(original_dist.distribution) == len(restored_dist.distribution)
+
+    def test_roundtrip_with_complex_distribution(self) -> None:
+        """Test round-trip with complex multi-state distribution."""
+        original = HierarchicalTemporalStateModel(half_life=3600.0)
+        key = TimeKey((("hour", 15), ("weekday", 2)))
+
+        states_durations = {
+            "heating": 500.0,
+            "cooling": 300.0,
+            "idle": 200.0,
+            "fan_only": 100.0,
+            "off": 50.0,
+        }
+
+        for state, duration in states_durations.items():
+            original.update_duration(key, state, duration, timestamp=1000.0)
+
+        data = original.to_dict()
+        restored = HierarchicalTemporalStateModel.from_dict(data)
+
+        original_pred = original.predict(key, timestamp=1000.0)
+        restored_pred = restored.predict(key, timestamp=1000.0)
+
+        assert original_pred.state == restored_pred.state
+        assert len(original_pred.distribution) == len(restored_pred.distribution)
+
+        for state in states_durations:
+            if state in original_pred.distribution:
+                assert state in restored_pred.distribution
+                assert original_pred.distribution[state] == pytest.approx(
+                    restored_pred.distribution[state]
+                )
+
+    def test_multiple_models_serialization(self) -> None:
+        """Test serializing multiple different model instances."""
+        models = [
+            HierarchicalTemporalStateModel(),
+            HierarchicalTemporalStateModel(half_life=3600.0),
+            HierarchicalTemporalStateModel(half_life=7200.0),
+        ]
+
+        key = TimeKey((("hour", 10),))
+        for i, model in enumerate(models):
+            model.update_duration(
+                key, f"state{i}", float(i * 100 + 100), timestamp=1000.0
+            )
+
+        # Serialize all
+        serialized = [model.to_dict() for model in models]
+
+        # Deserialize all
+        restored = [
+            HierarchicalTemporalStateModel.from_dict(data) for data in serialized
+        ]
+
+        # Verify all match
+        for original, restored_model in zip(models, restored, strict=True):
+            assert restored_model.half_life == original.half_life
+            assert restored_model.half_life_normal == original.half_life_normal
+            assert restored_model.half_life_fast == original.half_life_fast
+
+    def test_roundtrip_preserves_confidence_metrics(self) -> None:
+        """Test that confidence metrics are preserved through serialization."""
+        original = HierarchicalTemporalStateModel()
+        key = TimeKey((("hour", 10),))
+
+        # Create uneven distribution for interesting confidence metrics
+        original.update_duration(key, "dominant", 900.0, timestamp=1000.0)
+        original.update_duration(key, "minor", 100.0, timestamp=1000.0)
+
+        original_pred = original.predict(key, timestamp=1000.0)
+
+        data = original.to_dict()
+        restored = HierarchicalTemporalStateModel.from_dict(data)
+
+        restored_pred = restored.predict(key, timestamp=1000.0)
+
+        # All confidence metrics should match
+        assert original_pred.confidence.max_probability == pytest.approx(
+            restored_pred.confidence.max_probability
+        )
+        assert original_pred.confidence.entropy_confidence == pytest.approx(
+            restored_pred.confidence.entropy_confidence
+        )
+        assert original_pred.confidence.support_time == pytest.approx(
+            restored_pred.confidence.support_time
+        )
+        assert original_pred.confidence.depth == restored_pred.confidence.depth

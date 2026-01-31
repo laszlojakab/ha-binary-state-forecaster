@@ -57,9 +57,9 @@ async def async_setup_entry(
 
     await coordinator.async_start()
 
-    # await hass.config_entries.async_forward_entry_setups(
-    #     config_entry, ["sensor"]
-    # )
+    # Forward setup to sensor platform
+    await hass.config_entries.async_forward_entry_setups(config_entry, ["sensor"])
+
     return True
 
 
@@ -80,6 +80,7 @@ async def async_unload_entry(
     """
     await config_entry.runtime_data.coordinator.async_stop()
 
-    # await hass.config_entries.async_forward_entry_unload(config_entry, "sensor")
+    # Unload sensor platform
+    await hass.config_entries.async_unload_platforms(config_entry, ["sensor"])
 
     return True

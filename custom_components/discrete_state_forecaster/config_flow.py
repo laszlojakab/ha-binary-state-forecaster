@@ -1,27 +1,23 @@
-"""The configuration flow for Helios Easy Controls integration."""
+"""The configuration flow for Discrete State Forecaster integration."""
 
 from typing import Any
 
-import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
 from homeassistant import config_entries
-from homeassistant.const import CONF_NAME
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import selector
 
 from .const import (
-    CONF_CALENDAR_FEATURES,
-    CONF_DECAY_SECONDS,
-    CONF_FORECASTER_FEATURES,
-    CONF_STABILITY,
     CONF_TARGET_ENTITY_ID,
     CONF_TIME_BUCKET_SIZE_IN_MINUTES,
-    CONF_USE_DAY_OF_WEEK_FEATURE,
-    CONF_USE_MONTH_OF_YEAR_FEATURE,
+    CONF_USE_DAY_OF_WEEK,
+    CONF_USE_MONTH_OF_YEAR,
+    DEFAULT_TIME_BUCKET_SIZE_IN_MINUTES,
+    DEFAULT_USE_DAY_OF_WEEK,
+    DEFAULT_USE_MONTH_OF_YEAR,
     DOMAIN,
     LOGGER,
     SUPPORTED_BUCKET_SIZES,
-    SUPPORTED_STABILITY_OPTIONS,
     SUPPORTED_TARGET_DOMAINS,
 )
 
@@ -32,8 +28,48 @@ class DiscreteStateForecasterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN
 
     VERSION = 1
 
-    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> FlowResult:
-        """Handles the step when integration added from the UI."""
+    @staticmethod
+    def async_get_options_flow(
+        config_entry: config_entries.ConfigEntry,
+    ) -> config_entries.OptionsFlow:
+        """Get the options flow for this handler."""
+        return DiscreteStateForecasterOptionsFlow(config_entry)
+
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Handle the initial step when integration is added from the UI."""
+        if user_input is not None:
+            # Create unique ID from target entity to prevent duplicates
+            await self.async_set_unique_id(user_input[CONF_TARGET_ENTITY_ID])
+            self._abort_if_unique_id_configured()
+
+            # Get the entity friendly name for the title
+            target_entity = self.hass.states.get(user_input[CONF_TARGET_ENTITY_ID])
+            entity_name = (
+                target_entity.attributes.get("friendly_name")
+                if target_entity
+                else user_input[CONF_TARGET_ENTITY_ID]
+            )
+            title = f"{entity_name} Forecast"
+
+            # Convert time bucket from string to int
+            config_data = {
+                CONF_TARGET_ENTITY_ID: user_input[CONF_TARGET_ENTITY_ID],
+                CONF_TIME_BUCKET_SIZE_IN_MINUTES: int(
+                    user_input[CONF_TIME_BUCKET_SIZE_IN_MINUTES]
+                ),
+            }
+
+            LOGGER.info(
+                "Creating Discrete State Forecaster for entity: %s with bucket size: %s minutes",
+                config_data[CONF_TARGET_ENTITY_ID],
+                config_data[CONF_TIME_BUCKET_SIZE_IN_MINUTES],
+            )
+
+            return self.async_create_entry(title=title, data=config_data)
+
+        # Show form to select target entity and configuration
         data_schema = vol.Schema(
             {
                 vol.Required(CONF_TARGET_ENTITY_ID): selector.EntitySelector(
@@ -41,77 +77,109 @@ class DiscreteStateForecasterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN
                         domain=SUPPORTED_TARGET_DOMAINS,
                     )
                 ),
-                vol.Required(CONF_TIME_BUCKET_SIZE_IN_MINUTES): selector.SelectSelector(
+                vol.Required(
+                    CONF_TIME_BUCKET_SIZE_IN_MINUTES,
+                    default=str(DEFAULT_TIME_BUCKET_SIZE_IN_MINUTES),
+                ): selector.SelectSelector(
                     selector.SelectSelectorConfig(
+                        mode=selector.SelectSelectorMode.DROPDOWN,
                         options=SUPPORTED_BUCKET_SIZES,
                         translation_key=CONF_TIME_BUCKET_SIZE_IN_MINUTES,
-                        mode=selector.SelectSelectorMode.DROPDOWN,
                     )
                 ),
-                # vol.Required(CONF_STABILITY): selector.SelectSelector(
-                #     selector.SelectSelectorConfig(
-                #         options=SUPPORTED_STABILITY_OPTIONS,
-                #         translation_key=CONF_STABILITY,
-                #         mode=selector.SelectSelectorMode.DROPDOWN,
-                #     )
-                # ),
-                vol.Required(CONF_USE_DAY_OF_WEEK_FEATURE, default=False): cv.boolean,
-                vol.Required(CONF_USE_MONTH_OF_YEAR_FEATURE, default=False): cv.boolean,
-                # vol.Optional(CONF_CALENDAR_FEATURES): selector.EntitySelector(
-                #     selector.EntitySelectorConfig(
-                #         multiple=True,
-                #         domain=["calendar"],
-                #     )
-                # ),
-                # vol.Optional(CONF_FORECASTER_FEATURES): selector.EntitySelector(
-                #     selector.EntitySelectorConfig(
-                #         multiple=True,
-                #         integration=DOMAIN,
-                #     )
-                # ),
+                vol.Required(
+                    CONF_USE_DAY_OF_WEEK, default=DEFAULT_USE_DAY_OF_WEEK
+                ): bool,
+                vol.Required(
+                    CONF_USE_MONTH_OF_YEAR, default=DEFAULT_USE_MONTH_OF_YEAR
+                ): bool,
             }
         )
-
-        if user_input is not None:
-            # Get the binary sensor friendly name for the title
-            binary_sensor_entity = self.hass.states.get(user_input[CONF_TARGET_ENTITY_ID])
-            binary_sensor_name = (
-                binary_sensor_entity.attributes.get("friendly_name")
-                if binary_sensor_entity
-                else user_input[CONF_TARGET_ENTITY_ID]
-            )
-            name = f"{binary_sensor_name}"
-
-            def stability_to_decay_seconds(stability: str) -> int:
-                if stability == "stable":
-                    return 3600 * 24 * 14  # 2 weeks
-                if stability == "semi_stable":
-                    return 3600 * 24  # 24 hours
-                if stability == "quick_changing":
-                    return 3600  # 1 hour
-
-                return 3600 * 24 * 7  # default to 1 week
-
-            data = {
-                CONF_NAME: name,
-                CONF_TARGET_ENTITY_ID: user_input[CONF_TARGET_ENTITY_ID],
-                # CONF_DECAY_SECONDS: stability_to_decay_seconds(
-                #     user_input[CONF_STABILITY]
-                # ),
-                CONF_TIME_BUCKET_SIZE_IN_MINUTES: int(user_input[CONF_TIME_BUCKET_SIZE_IN_MINUTES]),
-                CONF_USE_DAY_OF_WEEK_FEATURE: user_input.get(CONF_USE_DAY_OF_WEEK_FEATURE, False),
-                CONF_USE_MONTH_OF_YEAR_FEATURE: user_input.get(
-                    CONF_USE_MONTH_OF_YEAR_FEATURE, False
-                ),
-                # CONF_CALENDAR_FEATURES: user_input.get(CONF_CALENDAR_FEATURES, []),
-                # CONF_FORECASTER_FEATURES: user_input.get(CONF_FORECASTER_FEATURES, []),
-            }
-
-            LOGGER.info("Creating Discrete State Forecaster with data: %s", data)
-
-            return self.async_create_entry(title=name + " forecaster", data=data)
 
         return self.async_show_form(
             step_id="user",
             data_schema=data_schema,
+        )
+
+
+class DiscreteStateForecasterOptionsFlow(config_entries.OptionsFlow):
+    """Handle options flow for Discrete State Forecaster."""
+
+    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+        """Initialize options flow."""
+        self._new_options: dict[str, Any] = {}
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Manage the options."""
+        if user_input is not None:
+            # Get current indexer configuration
+            current_use_day_of_week = self.config_entry.options.get(
+                CONF_USE_DAY_OF_WEEK, DEFAULT_USE_DAY_OF_WEEK
+            )
+            current_use_month = self.config_entry.options.get(
+                CONF_USE_MONTH_OF_YEAR, DEFAULT_USE_MONTH_OF_YEAR
+            )
+
+            # Check if indexer configuration changed
+            indexers_changed = (
+                user_input[CONF_USE_DAY_OF_WEEK] != current_use_day_of_week
+                or user_input[CONF_USE_MONTH_OF_YEAR] != current_use_month
+            )
+
+            if indexers_changed:
+                # Store new options and show confirmation warning
+                self._new_options = user_input
+                return await self.async_step_confirm_reset()
+
+            # No indexer change - save directly
+            return self.async_create_entry(title="", data=user_input)
+
+        # Get current values with defaults
+        current_use_day_of_week = self.config_entry.options.get(
+            CONF_USE_DAY_OF_WEEK, DEFAULT_USE_DAY_OF_WEEK
+        )
+        current_use_month = self.config_entry.options.get(
+            CONF_USE_MONTH_OF_YEAR, DEFAULT_USE_MONTH_OF_YEAR
+        )
+
+        data_schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_USE_DAY_OF_WEEK,
+                    default=current_use_day_of_week,
+                ): bool,
+                vol.Required(
+                    CONF_USE_MONTH_OF_YEAR,
+                    default=current_use_month,
+                ): bool,
+            }
+        )
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=data_schema,
+        )
+
+    async def async_step_confirm_reset(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Confirm model reset when indexers change."""
+        if user_input is not None:
+            if user_input.get("confirm"):
+                # User confirmed - save options
+                # The coordinator will detect the change and reset the model
+                return self.async_create_entry(title="", data=self._new_options)
+
+            # User cancelled - go back to options
+            return await self.async_step_init()
+
+        return self.async_show_form(
+            step_id="confirm_reset",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("confirm", default=False): bool,
+                }
+            ),
         )

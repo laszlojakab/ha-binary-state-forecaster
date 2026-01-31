@@ -252,6 +252,45 @@ class TimeKey:
             yield current
             current = current.parent()
 
+    def to_dict(self: Self) -> list[tuple[str, Hashable]]:
+        """
+        Serializes the TimeKey to a JSON-compatible list.
+
+        Returns:
+            List of [dimension_name, value] pairs for JSON serialization.
+
+        Examples:
+            >>> key = TimeKey((("hour", 15), ("weekday", 1)))
+            >>> key.to_dict()
+            [['hour', 15], ['weekday', 1]]
+            >>> TimeKey.GLOBAL.to_dict()
+            []
+        """
+        return [list(item) for item in self.items]
+
+    @classmethod
+    def from_dict(cls, data: list[tuple[str, Hashable]]) -> Self:
+        """
+        Deserializes a TimeKey from a JSON-compatible list.
+
+        Args:
+            data: List of [dimension_name, value] pairs from JSON.
+
+        Returns:
+            Restored TimeKey instance.
+
+        Examples:
+            >>> data = [['hour', 15], ['weekday', 1]]
+            >>> key = TimeKey.from_dict(data)
+            >>> key.items
+            (('hour', 15), ('weekday', 1))
+            >>> TimeKey.from_dict([])
+            TimeKey.GLOBAL
+        """
+        if not data:
+            return cls.GLOBAL
+        return cls(tuple(tuple(item) for item in data))
+
 
 # Initialize the GLOBAL constant
 TimeKey.GLOBAL = TimeKey()

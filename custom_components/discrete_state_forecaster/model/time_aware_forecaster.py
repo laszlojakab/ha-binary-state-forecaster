@@ -14,7 +14,7 @@ tracking.
 import math
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Self
+from typing import Any, Self
 
 from custom_components.discrete_state_forecaster.model.hierarchical_temporal_state_model import (
     HierarchicalTemporalStateModel,
@@ -93,6 +93,13 @@ class StatePersistenceTracker:
 
         # Blend with default for stability (80% learned, 20% default)
         return 0.8 * rate + 0.2 * default
+
+    def to_dict(self: Self) -> dict[str, Any]:
+        """Serialize to dictionary."""
+        return {
+            "total_count": dict(self.total_count),
+            "persist_count": dict(self.persistence_count),
+        }
 
 
 @dataclass
@@ -850,3 +857,44 @@ class TimeAwareForecaster:
 
         return timeline
 
+    def to_dict(self: Self) -> dict[str, Any]:
+        """Serialize forecaster state to dictionary for persistence."""
+        return {
+            "model": self.model.to_dict(),
+            "state_persistence_factor": self.state_persistence_factor,
+            "adaptive_persistence": self.adaptive_persistence,
+            "persistence_tracker": self.persistence_tracker.to_dict(),
+            "last_state": self.last_state,
+            "last_timestamp": self.last_timestamp,
+        }
+
+    @classmethod
+    def from_dict(
+        cls: type[Self],
+        data: dict[str, Any],
+        indexer: CompositeIndexer,
+    ) -> Self:
+        """Deserialize forecaster state from dictionary."""
+        # Create new instance with indexer and config from saved data
+        instance = cls(
+            indexer=indexer,
+            half_life=0.0,  # Will be restored from model
+            state_persistence_factor=data.get("state_persistence_factor", 0.3),
+            adaptive_persistence=data.get("adaptive_persistence", True),
+        )
+
+        # Restore model state
+        instance.model = HierarchicalTemporalStateModel.from_dict(data["model"])
+
+        # Restore persistence tracker
+        tracker_data = data.get("persistence_tracker", {})
+        instance.persistence_tracker.total_count = tracker_data.get("total_count", {})
+        instance.persistence_tracker.persistence_count = tracker_data.get(
+            "persist_count", {}
+        )
+
+        # Restore state tracking
+        instance.last_state = data.get("last_state")
+        instance.last_timestamp = data.get("last_timestamp")
+
+        return instance

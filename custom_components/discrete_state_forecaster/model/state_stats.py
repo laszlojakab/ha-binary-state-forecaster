@@ -613,3 +613,37 @@ class StateStats:
         m = {st: (p.get(st, 0.0) + q.get(st, 0.0)) / 2 for st in states}
 
         return 0.5 * kl(p, m) + 0.5 * kl(q, m)
+
+    def to_dict(self: Self) -> dict[str, any]:
+        """
+        Serializes the StateStats to a dictionary.
+
+        Returns:
+            Dictionary containing all state statistics data.
+        """
+        return {
+            "durations": dict(self.durations),
+            "last_update_ts": self.last_update_ts,
+            "baseline": dict(self.baseline) if self.baseline else None,
+            "last_drift_ts": self.last_drift_ts,
+            "fast_decay_updates": self.fast_decay_updates,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, any]) -> Self:
+        """
+        Deserializes a StateStats from a dictionary.
+
+        Args:
+            data: Dictionary containing serialized StateStats data.
+
+        Returns:
+            Restored StateStats instance.
+        """
+        stats = cls()
+        stats.durations.update(data.get("durations", {}))
+        stats.last_update_ts = data.get("last_update_ts")
+        stats.baseline = data.get("baseline")
+        stats.last_drift_ts = data.get("last_drift_ts", 0.0)
+        stats.fast_decay_updates = data.get("fast_decay_updates", 0)
+        return stats

@@ -456,3 +456,37 @@ class HierarchicalTemporalStateModel:
             ```
         """
         self._stats.prune(now_ts, epsilon, absolute_min, min_total)
+
+    def to_dict(self: Self) -> dict[str, any]:
+        """
+        Serializes the HierarchicalTemporalStateModel to a dictionary.
+
+        Returns:
+            Dictionary containing all model data including learned statistics.
+        """
+        return {
+            "stats": self._stats.to_dict(),
+            "half_life": self.half_life,
+            "half_life_normal": self.half_life_normal,
+            "half_life_fast": self.half_life_fast,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, any]) -> Self:
+        """
+        Deserializes a HierarchicalTemporalStateModel from a dictionary.
+
+        Args:
+            data: Dictionary containing serialized model data.
+
+        Returns:
+            Restored HierarchicalTemporalStateModel instance.
+        """
+        half_life = data.get("half_life", 0.0)
+        instance = cls(half_life=half_life)
+
+        # Restore the internal stats object
+        stats_data = data.get("stats", {})
+        instance._stats = HierarchicalStateStats.from_dict(stats_data)
+
+        return instance

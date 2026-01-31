@@ -2,33 +2,49 @@
   "config": {
     "step": {
       "user": {
+        "title": "Előrejelzési beállítások konfigurálása",
         "data": {
-          "target_entity_id": "Előrejelezni kívánt entitás",
-          "stability": "Milyen gyakran változtatja meg viselkedését az előrejelezni kívánt entitás az idő múlásával?",
-          "time_bucket_size": "Időablak mérete",
-          "use_day_of_week_feature": "A hét napjának figyelembe vétele",
-          "use_month_of_year_feature": "Az év hónapjának figyelembe vétele",
-          "calendar_features": "Figyelembe vett naptár entitások",
-          "forecaster_features": "Figyelembe vett egyéb előrejelzett entitások"
+          "target_entity_id": "Előrejelzendő entitás",
+          "time_bucket_size_in_minutes": "Idősáv mérete",
+          "use_day_of_week": "Hét napjainak mintázatának tanulása",
+          "use_month_of_year": "Szezonális (havi) mintázatok tanulása"
         },
-        "description": "Előrejelző szenzor beállítás részleteiért látogasd meg az integráció weboldalát!",
-        "title": "Előrejelző szenzor beállítása"
+        "data_description": {
+          "time_bucket_size_in_minutes": "Az időfelbontás a mintázatok tanulásához. Kisebb értékek (15-30 perc) a gyors változásokat rögzítik, nagyobb értékek (120-240 perc) az általánosabb mintázatokra fókuszálnak."
+        },
+        "description": "Előrejelzési beállítások konfigurálása"
       }
     },
     "error": {
-      "already_configured": "Ez az egyedi azonosító már használva van!"
+      "already_configured": "The unique ID is already used!"
     },
     "abort": {}
   },
-  "selector": {
-    "stability": {
-      "options": {
-        "stable": "Ritkán (napok vagy hetek vagy még több)",
-        "semi_stable": "Gyakran (órák vagy napok)",
-        "quick_changing": "Gyorsan (percek vagy órák)"
+  "options": {
+    "step": {
+      "init": {
+        "title": "Időmintázat konfiguráció",
+        "description": "Állítsa be, hogy mely időmintázatokat tanulja meg az előrejelző. Több mintázat jobb pontosságot eredményez, de több tanítási adatot igényel.",
+        "data": {
+          "use_day_of_week": "Hét napjainak mintázatának tanulása",
+          "use_month_of_year": "Szezonális (havi) mintázatok tanulása"
+        },
+        "data_description": {
+          "use_day_of_week": "Engedélyezze a hétköznapok és hétvégék közötti különböző mintázatok tanulását (pl. munkaidő, irodai berendezések)",
+          "use_month_of_year": "Engedélyezze a havonta ismétlődő szezonális mintázatok tanulását (pl. fűtés/hűtés, öntözés, kültéri világítás)"
+        }
+      },
+      "confirm_reset": {
+        "title": "⚠️ Mintázat visszaállításának megerősítése",
+        "description": "**Figyelmeztetés**: Az időmintázatok megváltoztatása (hét napja, hónap) **törli az összes megtanult adatot**.\n\nAz előrejelző teljesen elölről kezdi a tanulást, ami **több napot vagy hetet** vehet igénybe a pontos előrejelzések újbóli felépítéséhez.\n\n**Az összes jelenlegi megtanult mintázat véglegesen elveszik.**\n\nBiztos benne, hogy folytatja?",
+        "data": {
+          "confirm": "Igen, törölje a megtanult mintázatokat és alkalmazza az új beállításokat"
+        }
       }
-    },
-    "time_bucket_size": {
+    }
+  },
+  "selector": {
+    "time_bucket_size_in_minutes": {
       "options": {
         "5": "5 perc",
         "10": "10 perc",

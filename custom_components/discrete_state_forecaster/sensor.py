@@ -56,18 +56,15 @@ class DiscreteStateForecasterSensor(
 
     @property
     def native_value(self) -> str | None:
-        """Return the state with maximum probability from distribution."""
+        """Return the predicted state."""
         if self.coordinator.data is None:
-            return None
+            return "unknown"
 
-        distribution, _ = self.coordinator.data.distribution
+        prediction = self.coordinator.data.prediction
+        if prediction.state is None:
+            return "unknown"  # No data yet
 
-        if not distribution:
-            return None
-
-        # Find the key with maximum value
-        max_state = max(distribution.items(), key=lambda x: x[1])
-        return str(max_state[0])
+        return str(prediction.state)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -75,26 +72,46 @@ class DiscreteStateForecasterSensor(
         if self.coordinator.data is None:
             return {}
 
+        prediction = self.coordinator.data.prediction
         attributes: dict[str, Any] = {}
 
-        # Add confidence attributes
-        confidence = self.coordinator.data.confidence
-        attributes["max_probability"] = confidence.max_probability
-        attributes["entropy_confidence"] = confidence.entropy_confidence
-        attributes["support_time"] = confidence.support_time
+        # Add predicted state and probability
+        if prediction.state is not None:
+            attributes["predicted_state"] = str(prediction.state)
+            attributes["probability"] = prediction.distribution.get(
+                prediction.state, 0.0
+            )
 
-        # Add used features
-        attributes["used_features"] = dict(confidence.used_features)
+        # Add current actual state for comparison
+        if self.coordinator.data.current_state:
+            attributes["current_state"] = self.coordinator.data.current_state
 
-        # Add drift level
-        attributes["drift_level"] = self.coordinator.data.drift_level
+        # Add confidence metrics
+        confidence = prediction.confidence
+        attributes["confidence"] = {
+            "max_probability": confidence.max_probability,
+            "entropy_confidence": confidence.entropy_confidence,
+            "support_time": confidence.support_time,
+            "depth": confidence.depth,
+        }
 
-        # Add full distribution for reference
-        distribution, feature_key = self.coordinator.data.distribution
-        attributes["distribution"] = {str(k): v for k, v in distribution.items()}
-        attributes["feature_key"] = [
-            {"feature": name, "value": str(label)} for name, label in feature_key
-        ]
+        # Add full probability distribution
+        attributes["distribution"] = {
+            str(state): prob for state, prob in prediction.distribution.items()
+        }
+
+        # Add timestamp of prediction
+        attributes["timestamp"] = self.coordinator.data.timestamp.isoformat()
+
+        # Add learned persistence factors if available
+        try:
+            learned_persistence = self.coordinator._forecaster.get_learned_persistence()
+            if learned_persistence:
+                attributes["learned_persistence"] = {
+                    str(state): factor for state, factor in learned_persistence.items()
+                }
+        except Exception:  # noqa: S110
+            pass  # Not critical if this fails
 
         return attributes
 

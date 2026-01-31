@@ -1,5 +1,6 @@
 """Tests for HierarchicalStateStats class."""
 
+import json
 import time
 
 import pytest
@@ -332,7 +333,7 @@ class TestHierarchicalStateStatsConceptDrift:
 
         # Check drift on parent (should detect due to manual change)
         ts = 1000.0 + 3700.0  # After cooldown
-        parent_drift = parent_stats.check_drift(ts)
+        parent_stats.check_drift(ts)
 
         # Parent might detect drift, specific should not (if checked)
         # This verifies independence of drift detection per level
@@ -370,7 +371,8 @@ class TestHierarchicalStateStatsConceptDrift:
 
         # Should not have triggered drift (within cooldown)
         # check_drift uses default cooldown of 3600s
-        first_check_ts = stats.stats[key].last_drift_ts
+        # Verify drift timestamp exists
+        assert stats.stats[key].last_drift_ts >= 0.0
 
         # Now wait past cooldown and trigger drift
         ts_past_cooldown = baseline_set_ts + 3700.0
@@ -577,7 +579,9 @@ class TestHierarchicalStateStatsDistribution:
         # Global has: 100 "on", 100 "off" (total 200)
 
         # Add more data to parent manually
-        stats.stats[parent].update_duration("on", 300.0)  # Parent now has 400 "on", 100 "off"
+        stats.stats[parent].update_duration(
+            "on", 300.0
+        )  # Parent now has 400 "on", 100 "off"
         stats.stats[parent].update_duration(
             "idle", 100.0
         )  # Parent now has 400 "on", 100 "off", 100 "idle"
@@ -717,7 +721,9 @@ class TestHierarchicalStateStatsPrune:
         key_low = TimeKey((("hour", 10),))
         key_high = TimeKey((("hour", 11),))
 
-        stats.update(key_low, "on", 50.0, timestamp=1000.0)  # Below default min_total=60
+        stats.update(
+            key_low, "on", 50.0, timestamp=1000.0
+        )  # Below default min_total=60
         stats.update(key_high, "on", 200.0, timestamp=1000.0)  # Above min_total
 
         stats.prune(timestamp=1000.0, min_total=60.0)
@@ -1003,7 +1009,7 @@ class TestHierarchicalStateStatsIntegration:
     def test_realistic_scenario_daily_patterns(self) -> None:
         """Test realistic scenario with daily time patterns."""
         # Disable auto-pruning for this test to preserve all entries
-        stats = HierarchicalStateStats(prune_interval=float('inf'))
+        stats = HierarchicalStateStats(prune_interval=float("inf"))
 
         # Simulate one week of hourly observations
         for day in range(7):
@@ -1011,9 +1017,13 @@ class TestHierarchicalStateStatsIntegration:
                 key = TimeKey((("hour", hour), ("weekday", day)))
                 # Different patterns for day vs night
                 if 8 <= hour <= 20:
-                    stats.update(key, "on", 3600.0, timestamp=1000.0 + day * 86400 + hour * 3600)
+                    stats.update(
+                        key, "on", 3600.0, timestamp=1000.0 + day * 86400 + hour * 3600
+                    )
                 else:
-                    stats.update(key, "off", 3600.0, timestamp=1000.0 + day * 86400 + hour * 3600)
+                    stats.update(
+                        key, "off", 3600.0, timestamp=1000.0 + day * 86400 + hour * 3600
+                    )
 
         # Check daytime pattern - now includes parent levels in blending
         day_key = TimeKey((("hour", 14), ("weekday", 3)))
@@ -1187,7 +1197,7 @@ class TestOptionalTimestampInUpdate:
     def test_update_default_timestamp_applies_decay(self) -> None:
         """Test that default timestamp applies decay correctly."""
         # Disable auto-pruning to prevent test entries from being removed
-        stats = HierarchicalStateStats(prune_interval=float('inf'))
+        stats = HierarchicalStateStats(prune_interval=float("inf"))
         stats.half_life = 0.1  # Very short half-life
         key = TimeKey((("hour", 10),))
 
@@ -1250,8 +1260,6 @@ class TestOptionalTimestampInDistribution:
         key = TimeKey((("hour", 10),))
 
         # Use recent timestamps so data doesn't completely decay
-        import time
-
         recent_time = time.time() - 100  # 100 seconds ago
 
         stats.update(key, "on", 100.0, timestamp=recent_time)
@@ -1420,7 +1428,9 @@ class TestAutoPruning:
 
     def test_auto_prune_on_update_count(self) -> None:
         """Test that auto-pruning triggers based on update count."""
-        stats = HierarchicalStateStats(prune_interval=float('inf'), prune_every_n_updates=5)
+        stats = HierarchicalStateStats(
+            prune_interval=float("inf"), prune_every_n_updates=5
+        )
         key1 = TimeKey((("hour", 10),))
         key2 = TimeKey((("hour", 11),))
 
@@ -1451,7 +1461,9 @@ class TestAutoPruning:
 
     def test_auto_prune_disabled_when_both_none(self) -> None:
         """Test that setting prune_every_n_updates=None uses only time-based pruning."""
-        stats = HierarchicalStateStats(prune_interval=1000.0, prune_every_n_updates=None)
+        stats = HierarchicalStateStats(
+            prune_interval=1000.0, prune_every_n_updates=None
+        )
         key = TimeKey((("hour", 10),))
 
         # Add low-support data
@@ -1464,3 +1476,378 @@ class TestAutoPruning:
 
         # Key should still exist (time interval not reached)
         assert key in stats.stats
+
+
+class TestHierarchicalStateStatsSerialization:
+    """Tests for HierarchicalStateStats serialization (to_dict/from_dict)."""
+
+    def test_to_dict_empty_stats(self) -> None:
+        """Test serializing empty HierarchicalStateStats."""
+        stats = HierarchicalStateStats()
+        data = stats.to_dict()
+
+        assert data["stats"] == []
+        assert data["half_life"] == 3600.0
+        assert data["last_prune_ts"] == 0.0
+        assert data["prune_interval"] == 21600.0
+        assert data["prune_every_n_updates"] is None
+        assert data["update_count"] == 0
+        assert data["max_keys"] == 50_000
+
+    def test_to_dict_with_single_key(self) -> None:
+        """Test serializing with a single TimeKey."""
+        stats = HierarchicalStateStats()
+        key = TimeKey((("hour", 10),))
+        stats.update(key, "on", 100.0, timestamp=1000.0)
+
+        data = stats.to_dict()
+
+        # update() creates entries for both the key and its parents (including empty key)
+        assert len(data["stats"]) == 2  # key + empty key
+
+        # Check that both keys are present
+        serialized_keys = [item[0] for item in data["stats"]]
+        assert [["hour", 10]] in serialized_keys
+        assert [] in serialized_keys  # empty key (root)
+
+    def test_to_dict_with_multiple_keys(self) -> None:
+        """Test serializing with multiple TimeKeys."""
+        stats = HierarchicalStateStats()
+        key1 = TimeKey((("hour", 10),))
+        key2 = TimeKey((("hour", 11), ("weekday", 1)))
+
+        stats.update(key1, "on", 100.0, timestamp=1000.0)
+        stats.update(key2, "off", 200.0, timestamp=1000.0)
+
+        data = stats.to_dict()
+
+        # update() creates entries for keys and their parents:
+        # key1 creates: [("hour", 10)], []
+        # key2 creates: [("hour", 11), ("weekday", 1)], [("hour", 11)], []
+        # Total unique keys: 4
+        assert len(data["stats"]) == 4
+
+    def test_to_dict_includes_all_config(self) -> None:
+        """Test that all configuration parameters are included."""
+        stats = HierarchicalStateStats(
+            half_life=7200.0,
+            prune_interval=3600.0,
+            prune_every_n_updates=100,
+        )
+        stats.max_keys = 10000
+
+        data = stats.to_dict()
+
+        assert data["half_life"] == 7200.0
+        assert data["prune_interval"] == 3600.0
+        assert data["prune_every_n_updates"] == 100
+        assert data["max_keys"] == 10000
+
+    def test_to_dict_preserves_prune_state(self) -> None:
+        """Test that pruning state is preserved."""
+        stats = HierarchicalStateStats()
+        key = TimeKey((("hour", 10),))
+        stats.update(key, "on", 100.0, timestamp=1000.0)
+        stats.last_prune_ts = 5000.0
+        stats.update_count = 42
+
+        data = stats.to_dict()
+
+        assert data["last_prune_ts"] == 5000.0
+        assert data["update_count"] == 42
+
+    def test_from_dict_empty_stats(self) -> None:
+        """Test deserializing empty HierarchicalStateStats."""
+        data = {
+            "stats": [],
+            "half_life": 3600.0,
+            "last_prune_ts": 0.0,
+            "prune_interval": 21600.0,
+            "prune_every_n_updates": None,
+            "update_count": 0,
+            "max_keys": 50_000,
+        }
+
+        stats = HierarchicalStateStats.from_dict(data)
+
+        assert stats.stats == {}
+        assert stats.half_life == 3600.0
+        assert stats.last_prune_ts == 0.0
+        assert stats.prune_interval == 21600.0
+        assert stats.prune_every_n_updates is None
+        assert stats.update_count == 0
+        assert stats.max_keys == 50_000
+
+    def test_from_dict_with_single_key(self) -> None:
+        """Test deserializing with a single TimeKey."""
+        data = {
+            "stats": [
+                [
+                    [["hour", 10]],
+                    {
+                        "durations": {"on": 150.0},
+                        "last_update_ts": 1000.0,
+                        "baseline": None,
+                        "last_drift_ts": 0.0,
+                        "fast_decay_updates": 0,
+                    },
+                ],
+            ],
+            "half_life": 3600.0,
+            "last_prune_ts": 0.0,
+            "prune_interval": 21600.0,
+            "prune_every_n_updates": None,
+            "update_count": 0,
+            "max_keys": 50_000,
+        }
+
+        stats = HierarchicalStateStats.from_dict(data)
+
+        key = TimeKey((("hour", 10),))
+        assert key in stats.stats
+        assert stats.stats[key].durations == {"on": 150.0}
+        assert stats.stats[key].last_update_ts == 1000.0
+
+    def test_from_dict_with_multiple_keys(self) -> None:
+        """Test deserializing with multiple TimeKeys."""
+        data = {
+            "stats": [
+                [
+                    [["hour", 10]],
+                    {
+                        "durations": {"on": 100.0},
+                        "last_update_ts": None,
+                        "baseline": None,
+                        "last_drift_ts": 0.0,
+                        "fast_decay_updates": 0,
+                    },
+                ],
+                [
+                    [["hour", 11], ["weekday", 1]],
+                    {
+                        "durations": {"off": 200.0},
+                        "last_update_ts": None,
+                        "baseline": None,
+                        "last_drift_ts": 0.0,
+                        "fast_decay_updates": 0,
+                    },
+                ],
+            ],
+            "half_life": 3600.0,
+            "last_prune_ts": 0.0,
+            "prune_interval": 21600.0,
+            "prune_every_n_updates": None,
+            "update_count": 0,
+            "max_keys": 50_000,
+        }
+
+        stats = HierarchicalStateStats.from_dict(data)
+
+        key1 = TimeKey((("hour", 10),))
+        key2 = TimeKey((("hour", 11), ("weekday", 1)))
+
+        assert key1 in stats.stats
+        assert key2 in stats.stats
+        assert stats.stats[key1].durations == {"on": 100.0}
+        assert stats.stats[key2].durations == {"off": 200.0}
+
+    def test_from_dict_restores_config(self) -> None:
+        """Test that configuration is properly restored."""
+        data = {
+            "stats": [],
+            "half_life": 7200.0,
+            "last_prune_ts": 5000.0,
+            "prune_interval": 3600.0,
+            "prune_every_n_updates": 50,
+            "update_count": 25,
+            "max_keys": 10000,
+        }
+
+        stats = HierarchicalStateStats.from_dict(data)
+
+        assert stats.half_life == 7200.0
+        assert stats.last_prune_ts == 5000.0
+        assert stats.prune_interval == 3600.0
+        assert stats.prune_every_n_updates == 50
+        assert stats.update_count == 25
+        assert stats.max_keys == 10000
+
+    def test_roundtrip_empty_stats(self) -> None:
+        """Test round-trip serialization of empty stats."""
+        original = HierarchicalStateStats()
+        data = original.to_dict()
+        restored = HierarchicalStateStats.from_dict(data)
+
+        assert restored.stats == original.stats
+        assert restored.half_life == original.half_life
+        assert restored.last_prune_ts == original.last_prune_ts
+        assert restored.prune_interval == original.prune_interval
+        assert restored.max_keys == original.max_keys
+
+    def test_roundtrip_with_single_key(self) -> None:
+        """Test round-trip with a single TimeKey."""
+        original = HierarchicalStateStats()
+        key = TimeKey((("hour", 15),))
+        original.update(key, "on", 300.0, timestamp=2000.0)
+
+        data = original.to_dict()
+        restored = HierarchicalStateStats.from_dict(data)
+
+        assert key in restored.stats
+        assert restored.stats[key].durations == original.stats[key].durations
+        assert restored.stats[key].last_update_ts == original.stats[key].last_update_ts
+
+    def test_roundtrip_with_multiple_keys(self) -> None:
+        """Test round-trip with multiple TimeKeys."""
+        original = HierarchicalStateStats()
+        key1 = TimeKey((("hour", 10),))
+        key2 = TimeKey((("hour", 10), ("weekday", 2)))
+        key3 = TimeKey((("month", 5),))
+
+        original.update(key1, "on", 100.0, timestamp=1000.0)
+        original.update(key2, "off", 200.0, timestamp=1000.0)
+        original.update(key3, "idle", 50.0, timestamp=1000.0)
+
+        data = original.to_dict()
+        restored = HierarchicalStateStats.from_dict(data)
+
+        assert len(restored.stats) == len(original.stats)
+        assert key1 in restored.stats
+        assert key2 in restored.stats
+        assert key3 in restored.stats
+
+    def test_roundtrip_preserves_distribution(self) -> None:
+        """Test that distribution is preserved after round-trip."""
+        original = HierarchicalStateStats()
+        key = TimeKey((("hour", 10),))
+        original.update(key, "on", 300.0, timestamp=1000.0)
+        original.update(key, "off", 100.0, timestamp=1000.0)
+
+        original_dist = original.distribution(key, timestamp=1000.0)
+
+        data = original.to_dict()
+        restored = HierarchicalStateStats.from_dict(data)
+
+        restored_dist = restored.distribution(key, timestamp=1000.0)
+
+        assert restored_dist.distribution == original_dist.distribution
+        assert restored_dist.support_time == original_dist.support_time
+
+    def test_roundtrip_with_custom_config(self) -> None:
+        """Test round-trip with custom configuration."""
+        original = HierarchicalStateStats(
+            half_life=1800.0,
+            prune_interval=7200.0,
+            prune_every_n_updates=200,
+        )
+        original.max_keys = 20000
+
+        key = TimeKey((("hour", 12),))
+        original.update(key, "heating", 500.0, timestamp=3000.0)
+
+        data = original.to_dict()
+        restored = HierarchicalStateStats.from_dict(data)
+
+        assert restored.half_life == 1800.0
+        assert restored.prune_interval == 7200.0
+        assert restored.prune_every_n_updates == 200
+        assert restored.max_keys == 20000
+
+    def test_serialized_data_is_json_compatible(self) -> None:
+        """Test that serialized data can be JSON-encoded."""
+        stats = HierarchicalStateStats()
+        key1 = TimeKey((("hour", 10),))
+        key2 = TimeKey((("hour", 10), ("weekday", 1)))
+
+        stats.update(key1, "on", 100.0, timestamp=1000.0)
+        stats.update(key2, "off", 200.0, timestamp=1000.0)
+
+        data = stats.to_dict()
+
+        # Should not raise
+        json_str = json.dumps(data)
+        parsed = json.loads(json_str)
+
+        # Verify we can restore from parsed JSON
+        restored = HierarchicalStateStats.from_dict(parsed)
+        assert key1 in restored.stats
+        assert key2 in restored.stats
+
+    def test_roundtrip_after_decay(self) -> None:
+        """Test serialization preserves state after decay operations."""
+        stats = HierarchicalStateStats(half_life=3600.0)
+        key = TimeKey((("hour", 10),))
+
+        stats.update(key, "on", 1000.0, timestamp=0.0)
+        stats.update(key, "off", 500.0, timestamp=0.0)
+
+        # Apply decay
+        stats.update(key, "on", 0.0, timestamp=3600.0)  # One half-life later
+
+        data = stats.to_dict()
+        restored = HierarchicalStateStats.from_dict(data)
+
+        # Durations should be halved
+        assert restored.stats[key].durations["on"] == pytest.approx(500.0)
+        assert restored.stats[key].durations["off"] == pytest.approx(250.0)
+
+    def test_roundtrip_complex_hierarchy(self) -> None:
+        """Test round-trip with complex hierarchical keys."""
+        stats = HierarchicalStateStats()
+
+        # Create various hierarchy levels
+        keys = [
+            TimeKey((("hour", 10),)),
+            TimeKey((("hour", 10), ("weekday", 1))),
+            TimeKey((("hour", 10), ("weekday", 1), ("month", 3))),
+            TimeKey((("hour", 11),)),
+        ]
+
+        for i, key in enumerate(keys):
+            stats.update(key, "state", float(i * 100), timestamp=1000.0)
+
+        data = stats.to_dict()
+        restored = HierarchicalStateStats.from_dict(data)
+
+        for key in keys:
+            assert key in restored.stats
+
+    def test_roundtrip_preserves_prune_state(self) -> None:
+        """Test that pruning state is preserved through serialization."""
+        stats = HierarchicalStateStats()
+        key = TimeKey((("hour", 10),))
+        stats.update(key, "on", 100.0, timestamp=1000.0)
+
+        # Set pruning state
+        stats.last_prune_ts = 2000.0
+        stats.update_count = 15
+
+        data = stats.to_dict()
+        restored = HierarchicalStateStats.from_dict(data)
+
+        assert restored.last_prune_ts == 2000.0
+        assert restored.update_count == 15
+
+    def test_multiple_instances_serialization(self) -> None:
+        """Test serializing multiple different instances."""
+        instances = [
+            HierarchicalStateStats(),
+            HierarchicalStateStats(half_life=7200.0),
+            HierarchicalStateStats(prune_every_n_updates=50),
+        ]
+
+        # Add some data to each
+        key = TimeKey((("hour", 10),))
+        for i, instance in enumerate(instances):
+            instance.update(key, f"state{i}", float(i * 100), timestamp=1000.0)
+
+        # Serialize all
+        serialized = [inst.to_dict() for inst in instances]
+
+        # Deserialize all
+        restored = [HierarchicalStateStats.from_dict(data) for data in serialized]
+
+        # Verify all match
+        for original, restored_inst in zip(instances, restored, strict=True):
+            assert restored_inst.half_life == original.half_life
+            assert len(restored_inst.stats) == len(original.stats)

@@ -82,7 +82,9 @@ class HierarchicalStateStats:
         self.update_count: int = 0
         self.max_keys: int = 50_000
 
-    def distribution(self: Self, key: TimeKey, timestamp: float | None = None) -> AggregatedStats:
+    def distribution(
+        self: Self, key: TimeKey, timestamp: float | None = None
+    ) -> AggregatedStats:
         """
         Computes state probability distribution using hierarchical blending.
 
@@ -164,7 +166,9 @@ class HierarchicalStateStats:
         # normalize
         norm_dist = {state: w / total_support for state, w in weighted.items()}
 
-        return AggregatedStats(distribution=norm_dist, support_time=total_support, depth=depth)
+        return AggregatedStats(
+            distribution=norm_dist, support_time=total_support, depth=depth
+        )
 
     def prune(
         self: Self,
@@ -345,3 +349,56 @@ class HierarchicalStateStats:
 
         for key, _ in sorted_keys[:overflow]:
             del self.stats[key]
+
+    def to_dict(self: Self) -> dict[str, any]:
+        """
+        Serializes the HierarchicalStateStats to a dictionary.
+
+        Returns:
+            Dictionary containing all hierarchical state statistics data.
+        """
+        return {
+            "stats": [
+                # Convert TimeKey to JSON-serializable format
+                # Store as list of [key_data, stats_data] pairs
+                [key.to_dict(), stats.to_dict()]
+                for key, stats in self.stats.items()
+            ],
+            "half_life": self.half_life,
+            "last_prune_ts": self.last_prune_ts,
+            "prune_interval": self.prune_interval,
+            "prune_every_n_updates": self.prune_every_n_updates,
+            "update_count": self.update_count,
+            "max_keys": self.max_keys,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, any]) -> Self:
+        """
+        Deserializes a HierarchicalStateStats from a dictionary.
+
+        Args:
+            data: Dictionary containing serialized HierarchicalStateStats data.
+
+        Returns:
+            Restored HierarchicalStateStats instance.
+        """
+        instance = cls(
+            half_life=data.get("half_life", 3600.0),
+            prune_interval=data.get("prune_interval", 21600.0),
+            prune_every_n_updates=data.get("prune_every_n_updates"),
+        )
+
+        # Restore stats dictionary with TimeKey conversion
+        # Data is stored as list of [key_data, stats_data] pairs
+        stats_data = data.get("stats", [])
+        for key_data, stats_dict in stats_data:
+            # Convert list back to TimeKey
+            key = TimeKey.from_dict(key_data)
+            instance.stats[key] = StateStats.from_dict(stats_dict)
+
+        instance.last_prune_ts = data.get("last_prune_ts", 0.0)
+        instance.update_count = data.get("update_count", 0)
+        instance.max_keys = data.get("max_keys", 50_000)
+
+        return instance

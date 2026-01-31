@@ -15,6 +15,15 @@ CONF_CALENDAR_FEATURES: Final = "calendar_features"
 CONF_FORECASTER_FEATURES: Final = "forecaster_features"
 CONF_DECAY_SECONDS: Final = "decay_seconds"
 
+# Indexer configuration
+CONF_USE_DAY_OF_WEEK: Final = "use_day_of_week"
+CONF_USE_MONTH_OF_YEAR: Final = "use_month_of_year"
+
+# Default configuration values
+DEFAULT_TIME_BUCKET_SIZE_IN_MINUTES: Final = 60
+DEFAULT_USE_DAY_OF_WEEK: Final = True
+DEFAULT_USE_MONTH_OF_YEAR: Final = False
+
 SUPPORTED_TARGET_DOMAINS: Final = [
     "alarm_control_panel",
     "automation",
@@ -42,7 +51,7 @@ SUPPORTED_STABILITY_OPTIONS: Final = [
 ]
 
 SUPPORTED_BUCKET_SIZES: Final = [
-    "1",  # TODO: remove?
+    "1",
     "5",
     "10",
     "15",
@@ -65,8 +74,12 @@ ATTR_PROBABILITY: Final = "probability"
 
 
 STORING_TIME_PATTERN: Final = {
-    "minute": 0,
-    "second": 0,
+    # TODO: restore later
+    # "minute": 0,
+    # "second": 0,
+    # "hour": "*",
+    "minute": "*",
+    "second": "0",
     "hour": "*",
 }
 """The pattern specifying the time at which to store the state of the discrete state forecaster."""
