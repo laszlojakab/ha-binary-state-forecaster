@@ -78,7 +78,7 @@ class StateTracker:
         self.last_state: State | None = None
         self.last_ts: datetime | None = None
 
-    def update(self: Self, timestamp: datetime, new_state: State) -> None:
+    async def update(self: Self, timestamp: datetime, new_state: State) -> None:
         """
         Update the tracker with a new state observation.
 
@@ -102,12 +102,12 @@ class StateTracker:
             >>> tracker = StateTracker(forecaster)
             >>>
             >>> # First update establishes baseline
-            >>> tracker.update(datetime(2024, 1, 1, 10, 0), "idle")
+            >>> await tracker.update(datetime(2024, 1, 1, 10, 0), "idle")
             >>> assert tracker.last_state == "idle"
             >>> assert tracker.last_ts == datetime(2024, 1, 1, 10, 0)
             >>>
             >>> # Second update records interval and updates state
-            >>> tracker.update(datetime(2024, 1, 1, 10, 30), "active")
+            >>> await tracker.update(datetime(2024, 1, 1, 10, 30), "active")
             >>> assert tracker.last_state == "active"
             >>> # Forecaster now knows "idle" lasted 30 minutes at 10:00
             ```
@@ -119,7 +119,7 @@ class StateTracker:
             return
 
         # Record the interval for the previous state
-        self.forecaster.update_interval(
+        await self.forecaster.update_interval(
             self.last_ts,
             timestamp,
             self.last_state,

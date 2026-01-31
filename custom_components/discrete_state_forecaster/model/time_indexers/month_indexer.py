@@ -54,7 +54,7 @@ class MonthIndexer(TimeIndexer):
 
     name = "month"
 
-    def key(self: Self, ts: datetime) -> int:
+    async def key(self: Self, ts: datetime) -> int:
         """
         Returns the month number for a timestamp.
 
@@ -79,7 +79,7 @@ class MonthIndexer(TimeIndexer):
         """
         return ts.month
 
-    def next_boundary(self: Self, ts: datetime) -> datetime:
+    async def next_boundary(self: Self, ts: datetime) -> datetime:
         """
         Returns midnight of the first day of the next month.
 

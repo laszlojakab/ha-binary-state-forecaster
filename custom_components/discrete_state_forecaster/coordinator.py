@@ -97,7 +97,7 @@ class DiscreteStateForecasterCoordinator(
             time_bucket_minutes, config_entry.options
         )
         self._composite_indexer = CompositeIndexer(self._time_indexers)
-        
+
         # Get persistence settings from options
         state_persistence_factor = config_entry.options.get(
             CONF_STATE_PERSISTENCE_FACTOR, DEFAULT_STATE_PERSISTENCE_FACTOR
@@ -108,7 +108,7 @@ class DiscreteStateForecasterCoordinator(
         half_life_hours = config_entry.options.get(
             CONF_HALF_LIFE_HOURS, DEFAULT_HALF_LIFE_HOURS
         )
-        
+
         self._forecaster = TimeAwareForecaster(
             self._composite_indexer,
             half_life=half_life_hours * 3600,  # Convert hours to seconds
@@ -267,7 +267,7 @@ class DiscreteStateForecasterCoordinator(
         current_state = self._get_state_to_store(target_entity)
 
         # Make prediction for current time
-        prediction = self._forecaster.predict(
+        prediction = await self._forecaster.predict(
             now,
             current_state=current_state,
         )
@@ -303,7 +303,7 @@ class DiscreteStateForecasterCoordinator(
             event.time_fired,
         )
 
-        self._state_tracker.update(event.time_fired, new_state_to_store)
+        await self._state_tracker.update(event.time_fired, new_state_to_store)
 
         await self.async_refresh()
 
@@ -429,7 +429,7 @@ class DiscreteStateForecasterCoordinator(
             await self.async_refresh()
 
     async def _track_next_time_indexer_change(self: Self, now: datetime) -> None:
-        next_boundary = self._composite_indexer.next_boundary(now)
+        next_boundary = await self._composite_indexer.next_boundary(now)
 
         self.logger.debug(
             "Scheduling next time indexer change tracking for %s at %s.",

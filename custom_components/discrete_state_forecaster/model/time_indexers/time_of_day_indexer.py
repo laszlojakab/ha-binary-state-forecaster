@@ -58,7 +58,7 @@ class TimeOfDayIndexer(TimeIndexer):
         self.bucket = bucket_minutes
         self.name = "time_bucket"
 
-    def key(self: Self, ts: datetime) -> int:
+    async def key(self: Self, ts: datetime) -> int:
         """
         Calculate the bucket key for a timestamp based on time of day.
 
@@ -84,7 +84,7 @@ class TimeOfDayIndexer(TimeIndexer):
         """
         return (ts.hour * 60 + ts.minute) // self.bucket
 
-    def next_boundary(self: Self, ts: datetime) -> datetime:
+    async def next_boundary(self: Self, ts: datetime) -> datetime:
         """
         Calculate the next bucket boundary timestamp.
 

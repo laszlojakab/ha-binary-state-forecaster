@@ -27,7 +27,7 @@ class TimeIndexer(Protocol):
 
     name: Final[str]
 
-    def key(self: Self, ts: datetime) -> Hashable:
+    async def key(self: Self, ts: datetime) -> Hashable:
         """
         Returns the bucket key for a given timestamp.
 
@@ -49,7 +49,7 @@ class TimeIndexer(Protocol):
             - 15:00 -> key 30 (15 * 2 + 0)
         """
 
-    def next_boundary(self: Self, ts: datetime) -> datetime:
+    async def next_boundary(self: Self, ts: datetime) -> datetime:
         """
         Returns the next timestamp where the bucket key may change.
 

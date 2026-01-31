@@ -51,7 +51,7 @@ class DayOfWeekIndexer(TimeIndexer):
 
     name = "weekday"
 
-    def key(self: Self, ts: datetime) -> int:
+    async def key(self: Self, ts: datetime) -> int:
         """
         Returns the day of week for a timestamp.
 
@@ -78,7 +78,7 @@ class DayOfWeekIndexer(TimeIndexer):
         """
         return ts.weekday()
 
-    def next_boundary(self: Self, ts: datetime) -> datetime:
+    async def next_boundary(self: Self, ts: datetime) -> datetime:
         """
         Returns midnight of the next day.
 

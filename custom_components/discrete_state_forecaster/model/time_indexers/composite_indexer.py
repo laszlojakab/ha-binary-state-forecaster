@@ -69,7 +69,7 @@ class CompositeIndexer(TimeIndexer):
         """
         self.indexers = list(indexers)
 
-    def key(self: Self, ts: datetime) -> TimeKey:
+    async def key(self: Self, ts: datetime) -> TimeKey:
         """
         Generates a composite key from all constituent indexers.
 
@@ -95,9 +95,13 @@ class CompositeIndexer(TimeIndexer):
             >>> composite.key(datetime(2026, 1, 31, 14, 30))  # Saturday
             (('weekday', 5), ('time_bucket', 14))
         """
-        return TimeKey(tuple((idx.name, idx.key(ts)) for idx in self.indexers))
+        keys = []
+        for idx in self.indexers:
+            key_value = await idx.key(ts)
+            keys.append((idx.name, key_value))
+        return TimeKey(tuple(keys))
 
-    def next_boundary(self: Self, ts: datetime) -> datetime:
+    async def next_boundary(self: Self, ts: datetime) -> datetime:
         """
         Returns the earliest next boundary across all constituent indexers.
 
@@ -123,7 +127,11 @@ class CompositeIndexer(TimeIndexer):
             >>> composite.next_boundary(datetime(2026, 1, 26, 23, 30))
             datetime(2026, 1, 27, 0, 0)  # Midnight (both boundaries coincide)
         """
-        return min(idx.next_boundary(ts) for idx in self.indexers)
+        boundaries = []
+        for idx in self.indexers:
+            boundary = await idx.next_boundary(ts)
+            boundaries.append(boundary)
+        return min(boundaries)
 
     def smallest_bucket_size_minutes(self: Self) -> int:
         """

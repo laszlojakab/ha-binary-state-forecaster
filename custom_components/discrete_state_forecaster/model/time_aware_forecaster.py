@@ -243,7 +243,7 @@ class TimeAwareForecaster:
         self.last_state: State | None = None
         self.last_timestamp: float | None = None
 
-    def update_interval(
+    async def update_interval(
         self: Self,
         start: datetime,
         end: datetime,
@@ -316,13 +316,13 @@ class TimeAwareForecaster:
 
         while cursor < end:
             next_ts = min(
-                self.indexer.next_boundary(cursor),
+                await self.indexer.next_boundary(cursor),
                 end,
             )
 
             duration = (next_ts - cursor).total_seconds()
 
-            key = self.indexer.key(cursor)
+            key = await self.indexer.key(cursor)
 
             self.model.update_duration(
                 key,
@@ -384,7 +384,7 @@ class TimeAwareForecaster:
         # Apply multiplier and cap at 1.0
         return min(1.0, base_factor * duration_multiplier)
 
-    def predict(
+    async def predict(
         self: Self,
         timestamp: datetime,
         current_state: State | None = None,
@@ -447,7 +447,7 @@ class TimeAwareForecaster:
             >>> # Probability of "on" will be higher due to learned persistence
             ```
         """
-        key = self.indexer.key(timestamp)
+        key = await self.indexer.key(timestamp)
         base_prediction = self.model.predict(key, timestamp.timestamp())
 
         # If no current state provided, return base prediction
@@ -553,7 +553,7 @@ class TimeAwareForecaster:
             )
         return result
 
-    def predict_horizon(
+    async def predict_horizon(
         self: Self,
         start_time: datetime,
         horizon_minutes: int,
@@ -657,7 +657,7 @@ class TimeAwareForecaster:
                 context_duration = predicted_duration
 
             # Make prediction at this time point
-            pred = self.predict(current_ts, context_state, context_duration)
+            pred = await self.predict(current_ts, context_state, context_duration)
 
             # Calculate confidence decay based on distance from present
             # Logarithmic decay: near future has high confidence, distant has lower
@@ -692,7 +692,7 @@ class TimeAwareForecaster:
 
         return predictions
 
-    def find_next_transition(
+    async def find_next_transition(
         self: Self,
         start_time: datetime,
         max_horizon_minutes: int = 120,
@@ -745,7 +745,7 @@ class TimeAwareForecaster:
             - Transitions with low confidence (high decay_factor) should be
               interpreted cautiously
         """
-        predictions = self.predict_horizon(
+        predictions = await self.predict_horizon(
             start_time,
             max_horizon_minutes,
             interval_minutes,
@@ -759,7 +759,7 @@ class TimeAwareForecaster:
 
         return None
 
-    def get_state_timeline(
+    async def get_state_timeline(
         self: Self,
         start_time: datetime,
         horizon_minutes: int,
@@ -822,7 +822,7 @@ class TimeAwareForecaster:
             - States with None are included (representing no prediction data)
             - For energy optimization, calculate duration * power for each interval
         """
-        predictions = self.predict_horizon(
+        predictions = await self.predict_horizon(
             start_time,
             horizon_minutes,
             interval_minutes,
