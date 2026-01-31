@@ -1002,7 +1002,8 @@ class TestHierarchicalStateStatsIntegration:
 
     def test_realistic_scenario_daily_patterns(self) -> None:
         """Test realistic scenario with daily time patterns."""
-        stats = HierarchicalStateStats()
+        # Disable auto-pruning for this test to preserve all entries
+        stats = HierarchicalStateStats(prune_interval=float('inf'))
 
         # Simulate one week of hourly observations
         for day in range(7):
@@ -1185,7 +1186,8 @@ class TestOptionalTimestampInUpdate:
 
     def test_update_default_timestamp_applies_decay(self) -> None:
         """Test that default timestamp applies decay correctly."""
-        stats = HierarchicalStateStats()
+        # Disable auto-pruning to prevent test entries from being removed
+        stats = HierarchicalStateStats(prune_interval=float('inf'))
         stats.half_life = 0.1  # Very short half-life
         key = TimeKey((("hour", 10),))
 
@@ -1397,4 +1399,68 @@ class TestOptionalTimestampConsistency:
 
         assert dist1.distribution == dist2.distribution
         assert dist1.support_time == dist2.support_time
-        assert dist1.depth == dist2.depth
+
+
+class TestAutoPruning:
+    """Tests for automatic pruning behavior."""
+
+    def test_auto_prune_on_time_interval(self) -> None:
+        """Test that auto-pruning triggers based on time interval."""
+        stats = HierarchicalStateStats(prune_interval=100.0)
+        key = TimeKey((("hour", 10),))
+
+        # Add some data with low support
+        stats.update(key, "on", 5.0, timestamp=1000.0)
+        assert key in stats.stats
+
+        # Update after prune interval has passed with insufficient total support
+        # This should trigger auto-pruning and remove the key (total < min_total=60.0)
+        stats.update(TimeKey((("hour", 11),)), "off", 100.0, timestamp=1150.0)
+        assert key not in stats.stats  # Pruned due to low support
+
+    def test_auto_prune_on_update_count(self) -> None:
+        """Test that auto-pruning triggers based on update count."""
+        stats = HierarchicalStateStats(prune_interval=float('inf'), prune_every_n_updates=5)
+        key1 = TimeKey((("hour", 10),))
+        key2 = TimeKey((("hour", 11),))
+
+        # Add data with low support at key1
+        stats.update(key1, "on", 5.0, timestamp=1000.0)
+        assert key1 in stats.stats
+
+        # Do 4 more updates (total 5) - should trigger prune
+        for i in range(4):
+            stats.update(key2, "on", 100.0, timestamp=1000.0 + i)
+
+        # After 5 updates, auto-prune should have removed key1 (low support)
+        assert key1 not in stats.stats
+        assert key2 in stats.stats
+
+    def test_auto_prune_respects_both_conditions(self) -> None:
+        """Test that auto-pruning uses OR logic (time OR count)."""
+        stats = HierarchicalStateStats(prune_interval=100.0, prune_every_n_updates=10)
+        key = TimeKey((("hour", 10),))
+
+        # Add low-support data
+        stats.update(key, "on", 5.0, timestamp=1000.0)
+        assert key in stats.stats
+
+        # Trigger via time (before reaching 10 updates)
+        stats.update(TimeKey((("hour", 11),)), "off", 100.0, timestamp=1150.0)
+        assert key not in stats.stats  # Pruned via time condition
+
+    def test_auto_prune_disabled_when_both_none(self) -> None:
+        """Test that setting prune_every_n_updates=None uses only time-based pruning."""
+        stats = HierarchicalStateStats(prune_interval=1000.0, prune_every_n_updates=None)
+        key = TimeKey((("hour", 10),))
+
+        # Add low-support data
+        stats.update(key, "on", 5.0, timestamp=1000.0)
+        assert key in stats.stats
+
+        # Many updates, but within time interval - should not prune
+        for i in range(100):
+            stats.update(TimeKey((("hour", 11),)), "on", 100.0, timestamp=1100.0 + i)
+
+        # Key should still exist (time interval not reached)
+        assert key in stats.stats

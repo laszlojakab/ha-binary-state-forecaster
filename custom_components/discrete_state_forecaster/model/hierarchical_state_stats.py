@@ -61,7 +61,8 @@ class HierarchicalStateStats:
         prune_interval: float = 21600.0,
         prune_every_n_updates: int | None = None,
     ) -> None:
-        """Initialize an empty hierarchical state statistics tracker.
+        """
+        Initializes an empty hierarchical state statistics tracker.
 
         Args:
             half_life: Time in seconds for exponential decay. Default is 3600.0 (1 hour).
@@ -202,6 +203,11 @@ class HierarchicalStateStats:
         if timestamp is None:
             timestamp = time.time()
 
+        # Initialize last_prune_ts on first call to prevent immediate pruning
+        if self.last_prune_ts == 0.0:
+            self.last_prune_ts = timestamp
+            return
+
         # Check both time-based and update-based pruning conditions
         time_based_prune = timestamp - self.last_prune_ts >= self.prune_interval
         update_based_prune = (
@@ -282,6 +288,8 @@ class HierarchicalStateStats:
             - Sets fast_decay_updates=15 when drift is detected
             - Decrements fast_decay_updates counter if > 0
             - May trigger key limit enforcement if max_keys threshold is exceeded
+            - Automatically triggers pruning when conditions are met (based on prune_interval
+              or prune_every_n_updates), removing insignificant entries to manage memory
 
         Example:
             >>> stats = HierarchicalStateStats()
@@ -315,6 +323,9 @@ class HierarchicalStateStats:
 
         if len(self.stats) > self.max_keys * 1.1:
             self.enforce_key_limit()
+
+        # Auto-prune when conditions are met (respects prune_interval and prune_every_n_updates)
+        self.prune(timestamp)
 
     def enforce_key_limit(self: Self) -> None:
         """
