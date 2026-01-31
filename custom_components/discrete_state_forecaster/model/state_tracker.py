@@ -78,7 +78,7 @@ class StateTracker:
         self.last_state: State | None = None
         self.last_ts: datetime | None = None
 
-    def update(self: Self, ts: datetime, new_state: State) -> None:
+    def update(self: Self, timestamp: datetime, new_state: State) -> None:
         """
         Update the tracker with a new state observation.
 
@@ -92,7 +92,7 @@ class StateTracker:
         state, and pass this information to the forecaster for learning.
 
         Args:
-            ts: The timestamp when the new state was observed. Must be greater
+            timestamp: The timestamp when the new state was observed. Must be greater
                 than or equal to the previous timestamp for meaningful intervals.
             new_state: The newly observed state. Can be any hashable value
                 representing a discrete state.
@@ -115,16 +115,16 @@ class StateTracker:
         if self.last_state is None:
             # First observation - just record state and timestamp
             self.last_state = new_state
-            self.last_ts = ts
+            self.last_ts = timestamp
             return
 
         # Record the interval for the previous state
         self.forecaster.update_interval(
             self.last_ts,
-            ts,
+            timestamp,
             self.last_state,
         )
 
         # Update to the new state
         self.last_state = new_state
-        self.last_ts = ts
+        self.last_ts = timestamp
