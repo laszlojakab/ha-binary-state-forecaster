@@ -10,10 +10,12 @@ Available indexers:
     - TimeOfDayIndexer: Buckets by time of day (e.g., hourly, 30-minute intervals)
     - DayOfWeekIndexer: Buckets by day of week (Monday-Sunday)
     - MonthIndexer: Buckets by calendar month (January-December)
+    - CalendarIndexer: Buckets by calendar event presence (active/inactive)
     - CompositeIndexer: Combines multiple indexers for multi-dimensional keys
     - TimeIndexer: Protocol defining the indexer interface
 """
 
+from .calendar_indexer import CalendarIndexer
 from .composite_indexer import CompositeIndexer
 from .day_of_week_indexer import DayOfWeekIndexer
 from .month_indexer import MonthIndexer
@@ -22,6 +24,7 @@ from .time_key import TimeKey
 from .time_of_day_indexer import TimeOfDayIndexer
 
 __all__ = [
+    "CalendarIndexer",
     "CompositeIndexer",
     "DayOfWeekIndexer",
     "MonthIndexer",
