@@ -66,8 +66,8 @@ class TestUpdateDuration:
 
         stats = model.distribution(key, timestamp=1000.0)
         assert stats.distribution == {"on": 1.0}
-        # Support includes both specific key and GLOBAL (hierarchical blending)
-        assert stats.support_time == pytest.approx(200.0)  # 100 + 100 from GLOBAL
+        # With sufficient data, uses only specific key (no blending)
+        assert stats.support_time == pytest.approx(100.0)
 
     def test_update_multiple_observations_same_state(self) -> None:
         """Test multiple updates for the same state."""
@@ -79,8 +79,8 @@ class TestUpdateDuration:
 
         stats = model.distribution(key, timestamp=1000.0)
         assert stats.distribution == {"on": 1.0}
-        # Support includes both specific key (150) and GLOBAL (150)
-        assert stats.support_time == pytest.approx(300.0)
+        # With sufficient data, uses only specific key (no blending)
+        assert stats.support_time == pytest.approx(150.0)
 
     def test_update_multiple_states(self) -> None:
         """Test updating with different states."""
@@ -93,8 +93,8 @@ class TestUpdateDuration:
         stats = model.distribution(key, timestamp=1000.0)
         assert stats.distribution["on"] == pytest.approx(1 / 3)
         assert stats.distribution["off"] == pytest.approx(2 / 3)
-        # Support includes both specific key (300) and GLOBAL (300)
-        assert stats.support_time == pytest.approx(600.0)
+        # With sufficient data, uses only specific key (no blending)
+        assert stats.support_time == pytest.approx(300.0)
 
     def test_update_filters_short_durations(self) -> None:
         """Test that durations below MIN_DURATION_THRESHOLD are filtered."""
@@ -224,18 +224,18 @@ class TestDistribution:
         assert hasattr(stats, "depth")
 
     def test_distribution_hierarchical_blending(self) -> None:
-        """Test hierarchical blending from parent keys."""
+        """Test hierarchical blending when specific key has insufficient data."""
         model = DiscreteConditionalModel()
 
         # Add data to parent (general) key
         parent_key = TimeKey((("hour", 10),))
         model.update_duration(parent_key, "on", 600.0, timestamp=1000.0)
 
-        # Add smaller amount to specific key
+        # Add insufficient data to specific key (< MIN_SUPPORT of 30)
         specific_key = TimeKey((("hour", 10), ("minute", 30)))
-        model.update_duration(specific_key, "off", 100.0, timestamp=1000.0)
+        model.update_duration(specific_key, "off", 10.0, timestamp=1000.0)
 
-        # Distribution should blend both levels
+        # With insufficient specific data, should blend with parent
         stats = model.distribution(specific_key, timestamp=1000.0)
         assert "on" in stats.distribution
         assert "off" in stats.distribution
@@ -331,8 +331,8 @@ class TestPredict:
         model.update_duration(key, "off", 200.0, timestamp=1000.0)
 
         prediction = model.predict(key, timestamp=1000.0)
-        # Support includes both specific key (300) and GLOBAL (300)
-        assert prediction.confidence.support_time == pytest.approx(600.0)
+        # With sufficient data, uses only specific key (no blending)
+        assert prediction.confidence.support_time == pytest.approx(300.0)
 
 
 class TestEntropy:
@@ -613,20 +613,21 @@ class TestIntegration:
         assert stats_after.distribution["on"] == pytest.approx(0.75)
 
     def test_hierarchical_pattern_learning(self) -> None:
-        """Test learning patterns across hierarchy levels."""
+        """Test that specific patterns override general when sufficient data exists."""
         model = DiscreteConditionalModel()
 
         # Add data to general pattern (hour level)
         hour_key = TimeKey((("hour", 10),))
         model.update_duration(hour_key, "working", 3000.0, timestamp=1000.0)
 
-        # Add data to specific pattern (hour + minute)
+        # Add sufficient data to specific pattern (hour + minute)
         specific_key = TimeKey((("hour", 10), ("minute", 30)))
         model.update_duration(specific_key, "meeting", 300.0, timestamp=1000.0)
 
-        # Specific key should blend both patterns
+        # With sufficient specific data, should use only specific key
         stats = model.distribution(specific_key, timestamp=1000.0)
-        assert "working" in stats.distribution
+        assert "meeting" in stats.distribution
+        assert "working" not in stats.distribution
         assert "meeting" in stats.distribution
 
         # meeting should have non-zero probability from specific data
