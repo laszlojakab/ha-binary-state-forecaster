@@ -8,10 +8,14 @@ from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import selector
 
 from .const import (
+    CONF_ADAPTIVE_PERSISTENCE,
+    CONF_STATE_PERSISTENCE_FACTOR,
     CONF_TARGET_ENTITY_ID,
     CONF_TIME_BUCKET_SIZE_IN_MINUTES,
     CONF_USE_DAY_OF_WEEK,
     CONF_USE_MONTH_OF_YEAR,
+    DEFAULT_ADAPTIVE_PERSISTENCE,
+    DEFAULT_STATE_PERSISTENCE_FACTOR,
     DEFAULT_TIME_BUCKET_SIZE_IN_MINUTES,
     DEFAULT_USE_DAY_OF_WEEK,
     DEFAULT_USE_MONTH_OF_YEAR,
@@ -60,6 +64,22 @@ class DiscreteStateForecasterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN
                     user_input[CONF_TIME_BUCKET_SIZE_IN_MINUTES]
                 ),
             }
+            
+            # Store initial options (indexers and prediction settings)
+            options_data = {
+                CONF_USE_DAY_OF_WEEK: user_input.get(
+                    CONF_USE_DAY_OF_WEEK, DEFAULT_USE_DAY_OF_WEEK
+                ),
+                CONF_USE_MONTH_OF_YEAR: user_input.get(
+                    CONF_USE_MONTH_OF_YEAR, DEFAULT_USE_MONTH_OF_YEAR
+                ),
+                CONF_STATE_PERSISTENCE_FACTOR: user_input.get(
+                    CONF_STATE_PERSISTENCE_FACTOR, DEFAULT_STATE_PERSISTENCE_FACTOR
+                ),
+                CONF_ADAPTIVE_PERSISTENCE: user_input.get(
+                    CONF_ADAPTIVE_PERSISTENCE, DEFAULT_ADAPTIVE_PERSISTENCE
+                ),
+            }
 
             LOGGER.info(
                 "Creating Discrete State Forecaster for entity: %s with bucket size: %s minutes",
@@ -67,7 +87,7 @@ class DiscreteStateForecasterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN
                 config_data[CONF_TIME_BUCKET_SIZE_IN_MINUTES],
             )
 
-            return self.async_create_entry(title=title, data=config_data)
+            return self.async_create_entry(title=title, data=config_data, options=options_data)
 
         # Show form to select target entity and configuration
         data_schema = vol.Schema(
@@ -92,6 +112,13 @@ class DiscreteStateForecasterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN
                 ): bool,
                 vol.Required(
                     CONF_USE_MONTH_OF_YEAR, default=DEFAULT_USE_MONTH_OF_YEAR
+                ): bool,
+                vol.Required(
+                    CONF_STATE_PERSISTENCE_FACTOR,
+                    default=DEFAULT_STATE_PERSISTENCE_FACTOR,
+                ): vol.All(vol.Coerce(float), vol.Range(min=0.0, max=1.0)),
+                vol.Required(
+                    CONF_ADAPTIVE_PERSISTENCE, default=DEFAULT_ADAPTIVE_PERSISTENCE
                 ): bool,
             }
         )
@@ -143,6 +170,12 @@ class DiscreteStateForecasterOptionsFlow(config_entries.OptionsFlow):
         current_use_month = self.config_entry.options.get(
             CONF_USE_MONTH_OF_YEAR, DEFAULT_USE_MONTH_OF_YEAR
         )
+        current_persistence_factor = self.config_entry.options.get(
+            CONF_STATE_PERSISTENCE_FACTOR, DEFAULT_STATE_PERSISTENCE_FACTOR
+        )
+        current_adaptive = self.config_entry.options.get(
+            CONF_ADAPTIVE_PERSISTENCE, DEFAULT_ADAPTIVE_PERSISTENCE
+        )
 
         data_schema = vol.Schema(
             {
@@ -153,6 +186,14 @@ class DiscreteStateForecasterOptionsFlow(config_entries.OptionsFlow):
                 vol.Required(
                     CONF_USE_MONTH_OF_YEAR,
                     default=current_use_month,
+                ): bool,
+                vol.Required(
+                    CONF_STATE_PERSISTENCE_FACTOR,
+                    default=current_persistence_factor,
+                ): vol.All(vol.Coerce(float), vol.Range(min=0.0, max=1.0)),
+                vol.Required(
+                    CONF_ADAPTIVE_PERSISTENCE,
+                    default=current_adaptive,
                 ): bool,
             }
         )

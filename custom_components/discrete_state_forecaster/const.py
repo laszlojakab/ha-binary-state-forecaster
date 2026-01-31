@@ -19,10 +19,16 @@ CONF_DECAY_SECONDS: Final = "decay_seconds"
 CONF_USE_DAY_OF_WEEK: Final = "use_day_of_week"
 CONF_USE_MONTH_OF_YEAR: Final = "use_month_of_year"
 
+# Prediction configuration
+CONF_STATE_PERSISTENCE_FACTOR: Final = "state_persistence_factor"
+CONF_ADAPTIVE_PERSISTENCE: Final = "adaptive_persistence"
+
 # Default configuration values
 DEFAULT_TIME_BUCKET_SIZE_IN_MINUTES: Final = 60
 DEFAULT_USE_DAY_OF_WEEK: Final = True
 DEFAULT_USE_MONTH_OF_YEAR: Final = False
+DEFAULT_STATE_PERSISTENCE_FACTOR: Final = 0.3
+DEFAULT_ADAPTIVE_PERSISTENCE: Final = True
 
 SUPPORTED_TARGET_DOMAINS: Final = [
     "alarm_control_panel",

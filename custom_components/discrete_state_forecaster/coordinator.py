@@ -27,15 +27,19 @@ from custom_components.discrete_state_forecaster.model.time_aware_forecaster imp
 )
 
 from .const import (
+    CONF_ADAPTIVE_PERSISTENCE,
     CONF_CALENDAR_FEATURES,
     CONF_DECAY_SECONDS,
     CONF_FORECASTER_FEATURES,
+    CONF_STATE_PERSISTENCE_FACTOR,
     CONF_TARGET_ENTITY_ID,
     CONF_TIME_BUCKET_SIZE_IN_MINUTES,
     CONF_USE_DAY_OF_WEEK,
     CONF_USE_DAY_OF_WEEK_FEATURE,
     CONF_USE_MONTH_OF_YEAR,
     CONF_USE_MONTH_OF_YEAR_FEATURE,
+    DEFAULT_ADAPTIVE_PERSISTENCE,
+    DEFAULT_STATE_PERSISTENCE_FACTOR,
     DEFAULT_TIME_BUCKET_SIZE_IN_MINUTES,
     DEFAULT_USE_DAY_OF_WEEK,
     DEFAULT_USE_MONTH_OF_YEAR,
@@ -91,11 +95,20 @@ class DiscreteStateForecasterCoordinator(
             time_bucket_minutes, config_entry.options
         )
         self._composite_indexer = CompositeIndexer(self._time_indexers)
+        
+        # Get persistence settings from options
+        state_persistence_factor = config_entry.options.get(
+            CONF_STATE_PERSISTENCE_FACTOR, DEFAULT_STATE_PERSISTENCE_FACTOR
+        )
+        adaptive_persistence = config_entry.options.get(
+            CONF_ADAPTIVE_PERSISTENCE, DEFAULT_ADAPTIVE_PERSISTENCE
+        )
+        
         self._forecaster = TimeAwareForecaster(
             self._composite_indexer,
             half_life=0.0,  # No temporal decay for now
-            state_persistence_factor=0.3,
-            adaptive_persistence=True,
+            state_persistence_factor=state_persistence_factor,
+            adaptive_persistence=adaptive_persistence,
         )
         self._state_tracker = StateTracker(self._forecaster)
 
@@ -382,12 +395,20 @@ class DiscreteStateForecasterCoordinator(
             )
             self._composite_indexer = CompositeIndexer(self._time_indexers)
 
+            # Get persistence settings from options
+            state_persistence_factor = config_entry.options.get(
+                CONF_STATE_PERSISTENCE_FACTOR, DEFAULT_STATE_PERSISTENCE_FACTOR
+            )
+            adaptive_persistence = config_entry.options.get(
+                CONF_ADAPTIVE_PERSISTENCE, DEFAULT_ADAPTIVE_PERSISTENCE
+            )
+
             # Create new forecaster (resets the model)
             self._forecaster = TimeAwareForecaster(
                 self._composite_indexer,
                 half_life=0.0,
-                state_persistence_factor=0.3,
-                adaptive_persistence=True,
+                state_persistence_factor=state_persistence_factor,
+                adaptive_persistence=adaptive_persistence,
             )
             self._state_tracker = StateTracker(self._forecaster)
 
