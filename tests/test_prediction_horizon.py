@@ -1,7 +1,8 @@
 """Tests for prediction horizon functionality in TimeAwareForecaster."""
 
-import pytest
 from datetime import datetime, timedelta
+
+import pytest
 
 from custom_components.discrete_state_forecaster.model.time_aware_forecaster import (
     TimeAwareForecaster,

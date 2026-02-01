@@ -74,6 +74,7 @@ class DiscreteStateForecasterCoordinatorState:
     prediction: Prediction
     current_state: str | None
     timestamp: datetime
+    next_transition_timestamp: datetime | None = None
 
 
 class DiscreteStateForecasterCoordinator(
@@ -287,10 +288,16 @@ class DiscreteStateForecasterCoordinator(
             current_state=current_state,
         )
 
+        # Calculate next transition time
+        next_transition_timestamp = await self._forecaster.find_next_transition(
+            now, max_horizon_minutes=1440
+        )
+
         return DiscreteStateForecasterCoordinatorState(
             prediction=prediction,
             current_state=current_state,
             timestamp=now,
+            next_transition_timestamp=next_transition_timestamp,
         )
 
     async def _handle_target_entity_state_change(self: Self, event: Event) -> None:
@@ -357,7 +364,9 @@ class DiscreteStateForecasterCoordinator(
 
         # Calendar feature indexers (optional)
         for calendar_feature in options.get(CONF_CALENDAR_FEATURES, []):
-            indexers.append(CalendarIndexer(self.hass, calendar_feature))  # noqa: PERF401
+            indexers.append(
+                CalendarIndexer(self.hass, calendar_feature)
+            )  # noqa: PERF401
 
         # Day of week indexer (optional)
         use_day_of_week = options.get(CONF_USE_DAY_OF_WEEK, DEFAULT_USE_DAY_OF_WEEK)

@@ -10,8 +10,9 @@ Tests cover:
 - Temporal pattern learning and retrieval
 """
 
-import pytest
 from datetime import datetime, timedelta
+
+import pytest
 
 from custom_components.discrete_state_forecaster.model.time_aware_forecaster import (
     TimeAwareForecaster,
@@ -31,8 +32,6 @@ class TestInitialization:
     """Tests for TimeAwareForecaster initialization."""
 
     @pytest.mark.asyncio
-
-
     async def test_init_with_simple_indexer(self) -> None:
         """Test initialization with a simple time-of-day indexer."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -42,8 +41,6 @@ class TestInitialization:
         assert forecaster.model is not None
 
     @pytest.mark.asyncio
-
-
     async def test_init_with_composite_indexer(self) -> None:
         """Test initialization with multiple indexers."""
         indexer = CompositeIndexer([DayOfWeekIndexer(), TimeOfDayIndexer(30)])
@@ -52,8 +49,6 @@ class TestInitialization:
         assert forecaster.indexer == indexer
 
     @pytest.mark.asyncio
-
-
     async def test_init_with_default_half_life(self) -> None:
         """Test initialization with default half_life (no decay)."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -61,8 +56,6 @@ class TestInitialization:
         assert forecaster is not None
 
     @pytest.mark.asyncio
-
-
     async def test_init_with_custom_half_life(self) -> None:
         """Test initialization with custom half_life."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -74,8 +67,6 @@ class TestUpdateInterval:
     """Tests for update_interval method."""
 
     @pytest.mark.asyncio
-
-
     async def test_update_single_bucket(self) -> None:
         """Test updating with interval entirely within one bucket."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])  # 1-hour buckets
@@ -91,8 +82,6 @@ class TestUpdateInterval:
         assert prediction is not None
 
     @pytest.mark.asyncio
-
-
     async def test_update_crossing_bucket_boundary(self) -> None:
         """Test updating with interval crossing bucket boundary."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])  # 1-hour buckets
@@ -112,8 +101,6 @@ class TestUpdateInterval:
         assert pred_after is not None
 
     @pytest.mark.asyncio
-
-
     async def test_update_multiple_buckets(self) -> None:
         """Test updating with interval spanning multiple buckets."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])  # 1-hour buckets
@@ -135,8 +122,6 @@ class TestUpdateInterval:
         assert pred_11.state == "on"
 
     @pytest.mark.asyncio
-
-
     async def test_update_invalid_interval_end_before_start(self) -> None:
         """Test that invalid interval (end <= start) is ignored."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -153,8 +138,6 @@ class TestUpdateInterval:
         assert prediction.state is None
 
     @pytest.mark.asyncio
-
-
     async def test_update_invalid_interval_end_equals_start(self) -> None:
         """Test that zero-duration interval is ignored."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -170,8 +153,6 @@ class TestUpdateInterval:
         assert prediction.state is None
 
     @pytest.mark.asyncio
-
-
     async def test_update_multiple_states_same_bucket(self) -> None:
         """Test updating same bucket with different states."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -193,8 +174,6 @@ class TestUpdateInterval:
         assert len(prediction.distribution) == 2
 
     @pytest.mark.asyncio
-
-
     async def test_update_crossing_midnight(self) -> None:
         """Test updating with interval crossing midnight."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -214,8 +193,6 @@ class TestUpdateInterval:
         assert pred_after.state == "on"
 
     @pytest.mark.asyncio
-
-
     async def test_update_crossing_month_boundary(self) -> None:
         """Test updating with interval crossing month boundary."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -234,8 +211,6 @@ class TestUpdateInterval:
         assert pred_feb.state == "on"
 
     @pytest.mark.asyncio
-
-
     async def test_update_very_long_interval(self) -> None:
         """Test updating with very long interval."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -253,8 +228,6 @@ class TestUpdateInterval:
             assert pred.state == "on"
 
     @pytest.mark.asyncio
-
-
     async def test_update_very_short_interval(self) -> None:
         """Test updating with very short interval (should be filtered)."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -275,8 +248,6 @@ class TestPredict:
     """Tests for predict method."""
 
     @pytest.mark.asyncio
-
-
     async def test_predict_after_single_update(self) -> None:
         """Test prediction after single update."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -293,8 +264,6 @@ class TestPredict:
         assert prediction.confidence.max_probability == 1.0
 
     @pytest.mark.asyncio
-
-
     async def test_predict_after_multiple_updates(self) -> None:
         """Test prediction after multiple updates with different states."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -322,8 +291,6 @@ class TestPredict:
         assert prediction.distribution["on"] > prediction.distribution["off"]
 
     @pytest.mark.asyncio
-
-
     async def test_predict_no_data(self) -> None:
         """Test prediction when no data exists for bucket."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -336,8 +303,6 @@ class TestPredict:
         assert prediction.confidence.max_probability == 0.0
 
     @pytest.mark.asyncio
-
-
     async def test_predict_confidence_metrics(self) -> None:
         """Test that prediction includes confidence metrics."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -357,8 +322,6 @@ class TestPredict:
         assert prediction.confidence.support_time > 0
 
     @pytest.mark.asyncio
-
-
     async def test_predict_with_day_of_week_indexer(self) -> None:
         """Test prediction with day-of-week temporal pattern."""
         indexer = CompositeIndexer([DayOfWeekIndexer()])
@@ -387,8 +350,6 @@ class TestPredict:
         assert pred_saturday.state == "off"
 
     @pytest.mark.asyncio
-
-
     async def test_predict_with_hierarchical_indexer(self) -> None:
         """Test prediction with hierarchical time indexer."""
         indexer = CompositeIndexer([DayOfWeekIndexer(), TimeOfDayIndexer(60)])
@@ -421,8 +382,6 @@ class TestEdgeCases:
     """Tests for edge cases and boundary conditions."""
 
     @pytest.mark.asyncio
-
-
     async def test_exact_bucket_boundary_start(self) -> None:
         """Test interval starting exactly at bucket boundary."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -437,8 +396,6 @@ class TestEdgeCases:
         assert prediction.state == "on"
 
     @pytest.mark.asyncio
-
-
     async def test_exact_bucket_boundary_end(self) -> None:
         """Test interval ending exactly at bucket boundary."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -453,8 +410,6 @@ class TestEdgeCases:
         assert prediction.state == "on"
 
     @pytest.mark.asyncio
-
-
     async def test_exact_bucket_boundary_both(self) -> None:
         """Test interval with both start and end at bucket boundaries."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -469,8 +424,6 @@ class TestEdgeCases:
         assert prediction.state == "on"
 
     @pytest.mark.asyncio
-
-
     async def test_microsecond_precision(self) -> None:
         """Test handling of microsecond precision in timestamps."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -485,8 +438,6 @@ class TestEdgeCases:
         assert prediction.state == "on"
 
     @pytest.mark.asyncio
-
-
     async def test_very_fine_grained_indexer(self) -> None:
         """Test with very fine-grained time buckets (1-minute)."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])  # 1-minute buckets
@@ -505,8 +456,6 @@ class TestEdgeCases:
         assert pred_16.state == "on"
 
     @pytest.mark.asyncio
-
-
     async def test_very_coarse_grained_indexer(self) -> None:
         """Test with very coarse-grained time buckets (1-day)."""
         indexer = CompositeIndexer([TimeOfDayIndexer(86400)])  # 1-day buckets
@@ -525,8 +474,6 @@ class TestEdgeCases:
         assert pred_afternoon.state == "on"
 
     @pytest.mark.asyncio
-
-
     async def test_leap_year_handling(self) -> None:
         """Test handling of leap year dates."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -542,8 +489,6 @@ class TestEdgeCases:
         assert prediction.state == "on"
 
     @pytest.mark.asyncio
-
-
     async def test_dst_transition(self) -> None:
         """Test handling near DST transition (naive datetimes)."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -564,8 +509,6 @@ class TestIntegration:
     """Integration tests combining multiple features."""
 
     @pytest.mark.asyncio
-
-
     async def test_realistic_daily_pattern(self) -> None:
         """Test learning and predicting realistic daily patterns."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -606,8 +549,6 @@ class TestIntegration:
         assert pred_evening.state == "off"
 
     @pytest.mark.asyncio
-
-
     async def test_realistic_weekly_pattern(self) -> None:
         """Test learning and predicting realistic weekly patterns."""
         indexer = CompositeIndexer([DayOfWeekIndexer(), TimeOfDayIndexer(60)])
@@ -639,8 +580,6 @@ class TestIntegration:
         assert pred_saturday.state == "leisure"
 
     @pytest.mark.asyncio
-
-
     async def test_pattern_update_over_time(self) -> None:
         """Test that patterns update as new data is added."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -670,8 +609,6 @@ class TestIntegration:
         assert prediction2 is not None
 
     @pytest.mark.asyncio
-
-
     async def test_multiple_concurrent_patterns(self) -> None:
         """Test learning multiple independent temporal patterns."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])

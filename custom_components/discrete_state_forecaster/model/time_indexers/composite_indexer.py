@@ -158,6 +158,9 @@ class CompositeIndexer(TimeIndexer):
         """
         min_size = float("inf")
 
+        # # TODO.JL: nem tetszik...
+        # return 1
+
         for idx in self.indexers:
             # Check if indexer has bucket_minutes attribute
             if hasattr(idx, "bucket"):

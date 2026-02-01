@@ -89,19 +89,27 @@ class DiscreteStateForecasterSensor(
         # Add confidence metrics
         confidence = prediction.confidence
         attributes["confidence"] = {
-            "max_probability": confidence.max_probability,
-            "entropy_confidence": confidence.entropy_confidence,
-            "support_time": confidence.support_time,
+            "max_probability": round(confidence.max_probability, 3),
+            "entropy_confidence": round(confidence.entropy_confidence, 3),
+            "support_time": round(confidence.support_time),
             "depth": confidence.depth,
         }
 
         # Add full probability distribution
         attributes["distribution"] = {
-            str(state): prob for state, prob in prediction.distribution.items()
+            str(state): round(prob, 3)
+            for state, prob in prediction.distribution.items()
         }
 
         # Add timestamp of prediction
         attributes["timestamp"] = self.coordinator.data.timestamp.isoformat()
+
+        # Add next transition time if available
+        attributes["next_transition_time"] = (
+            self.coordinator.data.next_transition_timestamp.isoformat()
+            if self.coordinator.data.next_transition_timestamp
+            else None
+        )
 
         # Add learned persistence factors if available
         try:
