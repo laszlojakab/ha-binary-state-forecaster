@@ -288,10 +288,15 @@ class DiscreteStateForecasterCoordinator(
             current_state=current_state,
         )
 
-        # Calculate next transition time
-        next_transition_timestamp = await self._forecaster.find_next_transition(
-            now, max_horizon_minutes=1440
-        )
+        # Calculate next transition time, using a binary search approach
+        interval_minutes = 1440
+        while interval_minutes > 1:
+            next_transition_timestamp = await self._forecaster.find_next_transition(
+                now, max_horizon_minutes=1440, interval_minutes=interval_minutes
+            )
+            if next_transition_timestamp is None:
+                break
+            interval_minutes = interval_minutes // 2
 
         return DiscreteStateForecasterCoordinatorState(
             prediction=prediction,
