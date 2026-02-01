@@ -14,7 +14,9 @@ from typing import Self
 from custom_components.discrete_state_forecaster.model.time_indexers.time_indexer import (
     TimeIndexer,
 )
-from custom_components.discrete_state_forecaster.model.time_indexers.time_key import TimeKey
+from custom_components.discrete_state_forecaster.model.time_indexers.time_key import (
+    TimeKey,
+)
 
 
 class CompositeIndexer(TimeIndexer):
@@ -132,46 +134,3 @@ class CompositeIndexer(TimeIndexer):
             boundary = await idx.next_boundary(ts)
             boundaries.append(boundary)
         return min(boundaries)
-
-    def smallest_bucket_size_minutes(self: Self) -> int:
-        """
-        Returns the smallest bucket size in minutes across all constituent indexers.
-
-        This is useful for determining appropriate prediction intervals in
-        horizon forecasting. The smallest bucket size represents the finest
-        temporal granularity at which the model learns patterns.
-
-        Returns:
-            Smallest bucket size in minutes. If an indexer doesn't have a
-            bucket_minutes attribute (e.g., DayOfWeekIndexer), it uses
-            a default of 1440 minutes (1 day). Returns minimum of 1 minute.
-
-        Example:
-            ```
-            >>> composite = CompositeIndexer([
-            ...     DayOfWeekIndexer(),               # 1440 minutes (1 day)
-            ...     TimeOfDayIndexer(bucket_minutes=30)  # 30 minutes
-            ... ])
-            >>> composite.smallest_bucket_size_minutes()
-            30  # Smallest bucket is 30 minutes
-            ```
-        """
-        min_size = float("inf")
-
-        # # TODO.JL: nem tetszik...
-        # return 1
-
-        for idx in self.indexers:
-            # Check if indexer has bucket_minutes attribute
-            if hasattr(idx, "bucket"):
-                # TimeOfDayIndexer uses 'bucket' attribute
-                min_size = min(min_size, idx.bucket)
-            elif hasattr(idx, "bucket_minutes"):
-                min_size = min(min_size, idx.bucket_minutes)
-            else:
-                # Indexers without explicit bucket size (e.g., DayOfWeekIndexer)
-                # default to daily granularity
-                min_size = min(min_size, 1440)
-
-        return max(1, int(min_size)) if min_size != float("inf") else 60
-

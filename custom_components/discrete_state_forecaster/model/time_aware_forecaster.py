@@ -557,7 +557,7 @@ class TimeAwareForecaster:
         self: Self,
         start_time: datetime,
         horizon_minutes: int,
-        interval_minutes: int | None = None,
+        interval_minutes: int,
         current_state: State | None = None,
         state_duration: float | None = None,
     ) -> list[HorizonPrediction]:
@@ -626,10 +626,7 @@ class TimeAwareForecaster:
             - Decay factors help quantify increasing uncertainty
             - For accurate long-term forecasts, retrain model frequently
         """
-        # Determine interval if not specified
-        if interval_minutes is None:
-            # Use smallest bucket size from indexer
-            interval_minutes = self.indexer.smallest_bucket_size_minutes()
+        # Interval minutes must be provided by caller. Use sensible minimum.
 
         # Validate inputs
         if horizon_minutes <= 0:
@@ -695,8 +692,8 @@ class TimeAwareForecaster:
     async def find_next_transition(
         self: Self,
         start_time: datetime,
+        interval_minutes: int,
         max_horizon_minutes: int = 120,
-        interval_minutes: int | None = None,
         current_state: State | None = None,
         state_duration: float | None = None,
     ) -> datetime | None:
@@ -710,11 +707,10 @@ class TimeAwareForecaster:
 
         Args:
             start_time: Starting point for the search (typically current time).
+            interval_minutes: Time step between predictions (in minutes).
             max_horizon_minutes: How far ahead to search (default: 120 minutes).
                 Longer horizons have more uncertainty but may find transitions
                 that occur less frequently.
-            interval_minutes: Time step between predictions. If None, uses
-                smallest bucket size from indexer for optimal granularity.
             current_state: Current state to detect transitions from. If None,
                 detects transitions between any predicted states.
             state_duration: How long current_state has been active (seconds).
@@ -763,7 +759,7 @@ class TimeAwareForecaster:
         self: Self,
         start_time: datetime,
         horizon_minutes: int,
-        interval_minutes: int | None = None,
+        interval_minutes: int,
         current_state: State | None = None,
         state_duration: float | None = None,
     ) -> list[tuple[datetime, datetime, State]]:
@@ -777,8 +773,7 @@ class TimeAwareForecaster:
         Args:
             start_time: Starting point for the timeline.
             horizon_minutes: How far ahead to generate the timeline.
-            interval_minutes: Time step between predictions. If None, uses
-                smallest bucket size from indexer.
+            interval_minutes: Time step between predictions (in minutes).
             current_state: Current state for initialization.
             state_duration: How long current_state has been active (seconds).
 
@@ -833,9 +828,7 @@ class TimeAwareForecaster:
         if not predictions:
             return []
 
-        # Determine actual interval size used
-        if interval_minutes is None:
-            interval_minutes = self.indexer.smallest_bucket_size_minutes()
+        # interval_minutes is required and already represents the step size used
 
         timeline: list[tuple[datetime, datetime, State]] = []
         current_interval_state = predictions[0].prediction.state

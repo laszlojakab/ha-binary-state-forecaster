@@ -19,8 +19,6 @@ class TestPredictHorizon:
     """Tests for predict_horizon() method."""
 
     @pytest.mark.asyncio
-
-
     async def test_empty_horizon_returns_empty_list(self) -> None:
         """Test that zero or negative horizon returns empty list."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -28,19 +26,17 @@ class TestPredictHorizon:
 
         # Zero horizon
         predictions = await forecaster.predict_horizon(
-            datetime(2024, 1, 1, 10, 0), horizon_minutes=0
+            datetime(2024, 1, 1, 10, 0), horizon_minutes=0, interval_minutes=1
         )
         assert predictions == []
 
         # Negative horizon
         predictions = await forecaster.predict_horizon(
-            datetime(2024, 1, 1, 10, 0), horizon_minutes=-10
+            datetime(2024, 1, 1, 10, 0), horizon_minutes=-10, interval_minutes=1
         )
         assert predictions == []
 
     @pytest.mark.asyncio
-
-
     async def test_single_step_horizon_returns_one_prediction(self) -> None:
         """Test that horizon equal to interval returns single prediction."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -60,8 +56,6 @@ class TestPredictHorizon:
         assert predictions[0].timestamp == datetime(2024, 1, 2, 10, 0)
 
     @pytest.mark.asyncio
-
-
     async def test_horizon_creates_multiple_predictions(self) -> None:
         """Test that horizon creates predictions at regular intervals."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -83,30 +77,6 @@ class TestPredictHorizon:
         assert predictions[2].timestamp == datetime(2024, 1, 2, 10, 20)
 
     @pytest.mark.asyncio
-
-
-    async def test_default_interval_uses_smallest_bucket(self) -> None:
-        """Test that default interval equals smallest bucket size."""
-        # 30-minute buckets
-        indexer = CompositeIndexer([TimeOfDayIndexer(30)])
-        forecaster = TimeAwareForecaster(indexer)
-
-        await forecaster.update_interval(
-            datetime(2024, 1, 1, 10, 0), datetime(2024, 1, 1, 11, 0), "on"
-        )
-
-        # Don't specify interval - should default to 30 minutes
-        predictions = await forecaster.predict_horizon(
-            datetime(2024, 1, 2, 10, 0), horizon_minutes=60
-        )
-
-        assert len(predictions) == 2  # 0 and 30 minutes
-        assert predictions[0].timestamp == datetime(2024, 1, 2, 10, 0)
-        assert predictions[1].timestamp == datetime(2024, 1, 2, 10, 30)
-
-    @pytest.mark.asyncio
-
-
     async def test_predictions_carry_full_prediction_objects(self) -> None:
         """Test that each horizon prediction contains full Prediction object."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -132,8 +102,6 @@ class TestSequentialChaining:
     """Tests for sequential state chaining across horizon."""
 
     @pytest.mark.asyncio
-
-
     async def test_state_persists_across_predictions(self) -> None:
         """Test that predicted state persists in sequential predictions."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -158,8 +126,6 @@ class TestSequentialChaining:
             assert pred.is_transition is False
 
     @pytest.mark.asyncio
-
-
     async def test_state_duration_accumulates(self) -> None:
         """Test that state_duration accumulates when state persists."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -188,8 +154,6 @@ class TestSequentialChaining:
         assert predictions[2].state_duration == 1500
 
     @pytest.mark.asyncio
-
-
     async def test_state_duration_resets_on_transition(self) -> None:
         """Test that state_duration resets when state changes."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -234,8 +198,6 @@ class TestSequentialChaining:
         assert transition_found, "Expected to find state transition"
 
     @pytest.mark.asyncio
-
-
     async def test_transition_detection(self) -> None:
         """Test that is_transition flag is set correctly."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -272,8 +234,6 @@ class TestConfidenceDecay:
     """Tests for confidence decay over horizon."""
 
     @pytest.mark.asyncio
-
-
     async def test_decay_factor_decreases_over_time(self) -> None:
         """Test that decay_factor decreases for predictions further in future."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -299,8 +259,6 @@ class TestConfidenceDecay:
             assert 0.0 < pred.decay_factor <= 1.0
 
     @pytest.mark.asyncio
-
-
     async def test_decay_factor_formula(self) -> None:
         """Test that decay factor follows expected formula."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -329,8 +287,6 @@ class TestFindNextTransition:
     """Tests for find_next_transition() utility method."""
 
     @pytest.mark.asyncio
-
-
     async def test_finds_first_transition(self) -> None:
         """Test that it finds the first predicted state transition."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -362,8 +318,6 @@ class TestFindNextTransition:
         assert transition.hour == 11
 
     @pytest.mark.asyncio
-
-
     async def test_returns_none_when_no_transition(self) -> None:
         """Test that it returns None when no transition is predicted."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -388,8 +342,6 @@ class TestFindNextTransition:
         assert transition is None
 
     @pytest.mark.asyncio
-
-
     async def test_respects_max_horizon(self) -> None:
         """Test that search stops at max_horizon."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -423,8 +375,6 @@ class TestGetStateTimeline:
     """Tests for get_state_timeline() utility method."""
 
     @pytest.mark.asyncio
-
-
     async def test_creates_continuous_intervals(self) -> None:
         """Test that timeline creates continuous non-overlapping intervals."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -446,8 +396,6 @@ class TestGetStateTimeline:
             assert timeline[i][0] == timeline[i - 1][1]
 
     @pytest.mark.asyncio
-
-
     async def test_timeline_covers_full_horizon(self) -> None:
         """Test that timeline spans the entire horizon."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -473,8 +421,6 @@ class TestGetStateTimeline:
         assert timeline[-1][1] >= expected_end
 
     @pytest.mark.asyncio
-
-
     async def test_merges_consecutive_same_states(self) -> None:
         """Test that consecutive predictions with same state are merged."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -497,8 +443,6 @@ class TestGetStateTimeline:
         assert timeline[0][2] == "on"
 
     @pytest.mark.asyncio
-
-
     async def test_splits_on_state_transitions(self) -> None:
         """Test that timeline splits when state changes."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -530,15 +474,13 @@ class TestGetStateTimeline:
             assert len(set(states)) > 1  # At least 2 different states
 
     @pytest.mark.asyncio
-
-
     async def test_empty_horizon_returns_empty_timeline(self) -> None:
         """Test that zero horizon returns empty timeline."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
         forecaster = TimeAwareForecaster(indexer)
 
         timeline = await forecaster.get_state_timeline(
-            datetime(2024, 1, 1, 10, 0), horizon_minutes=0
+            datetime(2024, 1, 1, 10, 0), horizon_minutes=0, interval_minutes=1
         )
 
         assert timeline == []
@@ -548,8 +490,6 @@ class TestBucketBoundaryCrossing:
     """Tests for horizon predictions crossing temporal bucket boundaries."""
 
     @pytest.mark.asyncio
-
-
     async def test_predictions_cross_hour_boundary(self) -> None:
         """Test that predictions correctly handle crossing hour boundaries."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
@@ -584,8 +524,6 @@ class TestBucketBoundaryCrossing:
         assert 11 in hours
 
     @pytest.mark.asyncio
-
-
     async def test_maintains_accuracy_across_boundaries(self) -> None:
         """Test that state predictions remain accurate across boundaries."""
         indexer = CompositeIndexer([TimeOfDayIndexer(60)])
