@@ -9,18 +9,21 @@ from homeassistant.helpers import selector
 
 from .const import (
     CONF_ADAPTIVE_PERSISTENCE,
+    CONF_CALENDAR_FEATURES,
     CONF_HALF_LIFE_HOURS,
     CONF_STATE_PERSISTENCE_FACTOR,
     CONF_TARGET_ENTITY_ID,
     CONF_TIME_BUCKET_SIZE_IN_MINUTES,
     CONF_USE_DAY_OF_WEEK,
     CONF_USE_MONTH_OF_YEAR,
+    CONF_USE_SEASON,
     DEFAULT_ADAPTIVE_PERSISTENCE,
     DEFAULT_HALF_LIFE_HOURS,
     DEFAULT_STATE_PERSISTENCE_FACTOR,
     DEFAULT_TIME_BUCKET_SIZE_IN_MINUTES,
     DEFAULT_USE_DAY_OF_WEEK,
     DEFAULT_USE_MONTH_OF_YEAR,
+    DEFAULT_USE_SEASON,
     DOMAIN,
     LOGGER,
     SUPPORTED_BUCKET_SIZES,
@@ -62,19 +65,23 @@ class DiscreteStateForecasterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN
             # Convert time bucket from string to int
             config_data = {
                 CONF_TARGET_ENTITY_ID: user_input[CONF_TARGET_ENTITY_ID],
-                CONF_TIME_BUCKET_SIZE_IN_MINUTES: int(
-                    user_input[CONF_TIME_BUCKET_SIZE_IN_MINUTES]
-                ),
             }
 
             # Store initial options (indexers and prediction settings)
             options_data = {
+                CONF_TIME_BUCKET_SIZE_IN_MINUTES: int(
+                    user_input.get(
+                        CONF_TIME_BUCKET_SIZE_IN_MINUTES,
+                        DEFAULT_TIME_BUCKET_SIZE_IN_MINUTES,
+                    )
+                ),
                 CONF_USE_DAY_OF_WEEK: user_input.get(
                     CONF_USE_DAY_OF_WEEK, DEFAULT_USE_DAY_OF_WEEK
                 ),
                 CONF_USE_MONTH_OF_YEAR: user_input.get(
                     CONF_USE_MONTH_OF_YEAR, DEFAULT_USE_MONTH_OF_YEAR
                 ),
+                CONF_USE_SEASON: user_input.get(CONF_USE_SEASON, DEFAULT_USE_SEASON),
                 CONF_STATE_PERSISTENCE_FACTOR: user_input.get(
                     CONF_STATE_PERSISTENCE_FACTOR, DEFAULT_STATE_PERSISTENCE_FACTOR
                 ),
@@ -84,12 +91,13 @@ class DiscreteStateForecasterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN
                 CONF_HALF_LIFE_HOURS: user_input.get(
                     CONF_HALF_LIFE_HOURS, DEFAULT_HALF_LIFE_HOURS
                 ),
+                CONF_CALENDAR_FEATURES: user_input.get(CONF_CALENDAR_FEATURES, []),
             }
 
             LOGGER.info(
-                "Creating Discrete State Forecaster for entity: %s with bucket size: %s minutes",
+                "Creating Discrete State Forecaster for entity: %s. Config data: %s",
                 config_data[CONF_TARGET_ENTITY_ID],
-                config_data[CONF_TIME_BUCKET_SIZE_IN_MINUTES],
+                config_data,
             )
 
             return self.async_create_entry(
@@ -120,6 +128,7 @@ class DiscreteStateForecasterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN
                 vol.Required(
                     CONF_USE_MONTH_OF_YEAR, default=DEFAULT_USE_MONTH_OF_YEAR
                 ): bool,
+                vol.Required(CONF_USE_SEASON, default=DEFAULT_USE_SEASON): bool,
                 vol.Required(
                     CONF_STATE_PERSISTENCE_FACTOR,
                     default=DEFAULT_STATE_PERSISTENCE_FACTOR,
@@ -130,6 +139,12 @@ class DiscreteStateForecasterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN
                 vol.Required(
                     CONF_HALF_LIFE_HOURS, default=DEFAULT_HALF_LIFE_HOURS
                 ): vol.All(vol.Coerce(float), vol.Range(min=0.0, max=8760.0)),
+                vol.Optional(CONF_CALENDAR_FEATURES): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        multiple=True,
+                        domain=["calendar"],
+                    )
+                ),
             }
         )
 
@@ -158,11 +173,25 @@ class DiscreteStateForecasterOptionsFlow(config_entries.OptionsFlow):
             current_use_month = self.config_entry.options.get(
                 CONF_USE_MONTH_OF_YEAR, DEFAULT_USE_MONTH_OF_YEAR
             )
+            current_use_season = self.config_entry.options.get(
+                CONF_USE_SEASON, DEFAULT_USE_SEASON
+            )
+            current_calendar_features = self.config_entry.options.get(
+                CONF_CALENDAR_FEATURES, []
+            )
+            current_time_bucket_size_in_minutes = self.config_entry.options.get(
+                CONF_TIME_BUCKET_SIZE_IN_MINUTES, DEFAULT_TIME_BUCKET_SIZE_IN_MINUTES
+            )
 
             # Check if indexer configuration changed
             indexers_changed = (
                 user_input[CONF_USE_DAY_OF_WEEK] != current_use_day_of_week
                 or user_input[CONF_USE_MONTH_OF_YEAR] != current_use_month
+                or user_input[CONF_USE_SEASON] != current_use_season
+                or user_input.get(CONF_CALENDAR_FEATURES, [])
+                != current_calendar_features
+                or user_input[CONF_TIME_BUCKET_SIZE_IN_MINUTES]
+                != current_time_bucket_size_in_minutes
             )
 
             if indexers_changed:
@@ -180,6 +209,9 @@ class DiscreteStateForecasterOptionsFlow(config_entries.OptionsFlow):
         current_use_month = self.config_entry.options.get(
             CONF_USE_MONTH_OF_YEAR, DEFAULT_USE_MONTH_OF_YEAR
         )
+        current_use_season = self.config_entry.options.get(
+            CONF_USE_SEASON, DEFAULT_USE_SEASON
+        )
         current_persistence_factor = self.config_entry.options.get(
             CONF_STATE_PERSISTENCE_FACTOR, DEFAULT_STATE_PERSISTENCE_FACTOR
         )
@@ -189,9 +221,25 @@ class DiscreteStateForecasterOptionsFlow(config_entries.OptionsFlow):
         current_half_life = self.config_entry.options.get(
             CONF_HALF_LIFE_HOURS, DEFAULT_HALF_LIFE_HOURS
         )
+        current_calendar_features = self.config_entry.options.get(
+            CONF_CALENDAR_FEATURES, []
+        )
+        current_time_bucket_size_in_minutes = self.config_entry.options.get(
+            CONF_TIME_BUCKET_SIZE_IN_MINUTES, DEFAULT_TIME_BUCKET_SIZE_IN_MINUTES
+        )
 
         data_schema = vol.Schema(
             {
+                vol.Required(
+                    CONF_TIME_BUCKET_SIZE_IN_MINUTES,
+                    default=str(current_time_bucket_size_in_minutes),
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                        options=SUPPORTED_BUCKET_SIZES,
+                        translation_key=CONF_TIME_BUCKET_SIZE_IN_MINUTES,
+                    )
+                ),
                 vol.Required(
                     CONF_USE_DAY_OF_WEEK,
                     default=current_use_day_of_week,
@@ -199,6 +247,10 @@ class DiscreteStateForecasterOptionsFlow(config_entries.OptionsFlow):
                 vol.Required(
                     CONF_USE_MONTH_OF_YEAR,
                     default=current_use_month,
+                ): bool,
+                vol.Required(
+                    CONF_USE_SEASON,
+                    default=current_use_season,
                 ): bool,
                 vol.Required(
                     CONF_STATE_PERSISTENCE_FACTOR,
@@ -212,6 +264,14 @@ class DiscreteStateForecasterOptionsFlow(config_entries.OptionsFlow):
                     CONF_HALF_LIFE_HOURS,
                     default=current_half_life,
                 ): vol.All(vol.Coerce(float), vol.Range(min=0.0, max=8760.0)),
+                vol.Optional(
+                    CONF_CALENDAR_FEATURES, default=current_calendar_features
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        multiple=True,
+                        domain=["calendar"],
+                    ),
+                ),
             }
         )
 

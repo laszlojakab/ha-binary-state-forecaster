@@ -1,7 +1,8 @@
 """Tests for DayOfWeekIndexer class."""
 
-import pytest
 from datetime import datetime, timedelta
+
+import pytest
 
 from custom_components.discrete_state_forecaster.model.time_indexers.day_of_week_indexer import (
     DayOfWeekIndexer,
@@ -12,8 +13,6 @@ class TestDayOfWeekIndexerInitialization:
     """Test DayOfWeekIndexer initialization."""
 
     @pytest.mark.asyncio
-
-
     async def test_initialization(self) -> None:
         """Test indexer initializes with correct name."""
         indexer = DayOfWeekIndexer()
@@ -24,8 +23,6 @@ class TestDayOfWeekIndexerKey:
     """Test DayOfWeekIndexer key calculation."""
 
     @pytest.mark.asyncio
-
-
     async def test_key_monday(self) -> None:
         """Test key for Monday."""
         indexer = DayOfWeekIndexer()
@@ -34,8 +31,6 @@ class TestDayOfWeekIndexerKey:
         assert await indexer.key(ts) == 0
 
     @pytest.mark.asyncio
-
-
     async def test_key_tuesday(self) -> None:
         """Test key for Tuesday."""
         indexer = DayOfWeekIndexer()
@@ -44,8 +39,6 @@ class TestDayOfWeekIndexerKey:
         assert await indexer.key(ts) == 1
 
     @pytest.mark.asyncio
-
-
     async def test_key_wednesday(self) -> None:
         """Test key for Wednesday."""
         indexer = DayOfWeekIndexer()
@@ -54,8 +47,6 @@ class TestDayOfWeekIndexerKey:
         assert await indexer.key(ts) == 2
 
     @pytest.mark.asyncio
-
-
     async def test_key_thursday(self) -> None:
         """Test key for Thursday."""
         indexer = DayOfWeekIndexer()
@@ -64,8 +55,6 @@ class TestDayOfWeekIndexerKey:
         assert await indexer.key(ts) == 3
 
     @pytest.mark.asyncio
-
-
     async def test_key_friday(self) -> None:
         """Test key for Friday."""
         indexer = DayOfWeekIndexer()
@@ -74,8 +63,6 @@ class TestDayOfWeekIndexerKey:
         assert await indexer.key(ts) == 4
 
     @pytest.mark.asyncio
-
-
     async def test_key_saturday(self) -> None:
         """Test key for Saturday."""
         indexer = DayOfWeekIndexer()
@@ -84,8 +71,6 @@ class TestDayOfWeekIndexerKey:
         assert await indexer.key(ts) == 5
 
     @pytest.mark.asyncio
-
-
     async def test_key_sunday(self) -> None:
         """Test key for Sunday."""
         indexer = DayOfWeekIndexer()
@@ -94,8 +79,6 @@ class TestDayOfWeekIndexerKey:
         assert await indexer.key(ts) == 6
 
     @pytest.mark.asyncio
-
-
     async def test_key_same_weekday_different_weeks(self) -> None:
         """Test that same weekday returns same key across different weeks."""
         indexer = DayOfWeekIndexer()
@@ -105,11 +88,14 @@ class TestDayOfWeekIndexerKey:
         monday2 = datetime(2026, 2, 2, 15, 30, 0)  # Monday, different week
         monday3 = datetime(2026, 3, 9, 8, 45, 0)  # Monday, different month
 
-        assert await indexer.key(monday1) == await indexer.key(monday2) == await indexer.key(monday3) == 0
+        assert (
+            await indexer.key(monday1)
+            == await indexer.key(monday2)
+            == await indexer.key(monday3)
+            == 0
+        )
 
     @pytest.mark.asyncio
-
-
     async def test_key_ignores_time_of_day(self) -> None:
         """Test that key only depends on date, not time of day."""
         indexer = DayOfWeekIndexer()
@@ -119,11 +105,14 @@ class TestDayOfWeekIndexerKey:
         ts2 = datetime(2026, 1, 26, 12, 0, 0)  # Monday noon
         ts3 = datetime(2026, 1, 26, 23, 59, 59)  # Monday almost midnight
 
-        assert await indexer.key(ts1) == await indexer.key(ts2) == await indexer.key(ts3) == 0
+        assert (
+            await indexer.key(ts1)
+            == await indexer.key(ts2)
+            == await indexer.key(ts3)
+            == 0
+        )
 
     @pytest.mark.asyncio
-
-
     async def test_key_full_week_sequence(self) -> None:
         """Test a complete week sequence."""
         indexer = DayOfWeekIndexer()
@@ -140,8 +129,6 @@ class TestDayOfWeekIndexerNextBoundary:
     """Test DayOfWeekIndexer next_boundary calculation."""
 
     @pytest.mark.asyncio
-
-
     async def test_next_boundary_at_midnight(self) -> None:
         """Test next_boundary when timestamp is at midnight."""
         indexer = DayOfWeekIndexer()
@@ -151,8 +138,6 @@ class TestDayOfWeekIndexerNextBoundary:
         assert next_bound == datetime(2026, 1, 27, 0, 0, 0)
 
     @pytest.mark.asyncio
-
-
     async def test_next_boundary_at_noon(self) -> None:
         """Test next_boundary when timestamp is at noon."""
         indexer = DayOfWeekIndexer()
@@ -162,8 +147,6 @@ class TestDayOfWeekIndexerNextBoundary:
         assert next_bound == datetime(2026, 1, 27, 0, 0, 0)
 
     @pytest.mark.asyncio
-
-
     async def test_next_boundary_near_midnight(self) -> None:
         """Test next_boundary when timestamp is near end of day."""
         indexer = DayOfWeekIndexer()
@@ -173,8 +156,6 @@ class TestDayOfWeekIndexerNextBoundary:
         assert next_bound == datetime(2026, 1, 27, 0, 0, 0)
 
     @pytest.mark.asyncio
-
-
     async def test_next_boundary_weekday_to_weekday(self) -> None:
         """Test next_boundary from weekday to next weekday."""
         indexer = DayOfWeekIndexer()
@@ -186,8 +167,6 @@ class TestDayOfWeekIndexerNextBoundary:
         assert await indexer.key(next_bound) == 1  # Tuesday
 
     @pytest.mark.asyncio
-
-
     async def test_next_boundary_friday_to_saturday(self) -> None:
         """Test next_boundary from Friday to Saturday."""
         indexer = DayOfWeekIndexer()
@@ -198,8 +177,6 @@ class TestDayOfWeekIndexerNextBoundary:
         assert await indexer.key(next_bound) == 5
 
     @pytest.mark.asyncio
-
-
     async def test_next_boundary_saturday_to_sunday(self) -> None:
         """Test next_boundary from Saturday to Sunday."""
         indexer = DayOfWeekIndexer()
@@ -210,8 +187,6 @@ class TestDayOfWeekIndexerNextBoundary:
         assert await indexer.key(next_bound) == 6
 
     @pytest.mark.asyncio
-
-
     async def test_next_boundary_sunday_to_monday(self) -> None:
         """Test next_boundary from Sunday to Monday (week wrap)."""
         indexer = DayOfWeekIndexer()
@@ -222,8 +197,6 @@ class TestDayOfWeekIndexerNextBoundary:
         assert await indexer.key(next_bound) == 0
 
     @pytest.mark.asyncio
-
-
     async def test_next_boundary_month_transition(self) -> None:
         """Test next_boundary across month boundary."""
         indexer = DayOfWeekIndexer()
@@ -236,8 +209,6 @@ class TestDayOfWeekIndexerNextBoundary:
         assert next_bound.month == 2
 
     @pytest.mark.asyncio
-
-
     async def test_next_boundary_year_transition(self) -> None:
         """Test next_boundary across year boundary."""
         indexer = DayOfWeekIndexer()
@@ -250,8 +221,6 @@ class TestDayOfWeekIndexerNextBoundary:
         assert next_bound.year == 2027
 
     @pytest.mark.asyncio
-
-
     async def test_next_boundary_always_midnight(self) -> None:
         """Test that next_boundary always returns midnight."""
         indexer = DayOfWeekIndexer()
@@ -271,8 +240,6 @@ class TestDayOfWeekIndexerNextBoundary:
             assert next_bound.microsecond == 0
 
     @pytest.mark.asyncio
-
-
     async def test_next_boundary_sequence(self) -> None:
         """Test a sequence of next_boundary calls."""
         indexer = DayOfWeekIndexer()
@@ -294,8 +261,6 @@ class TestDayOfWeekIndexerEdgeCases:
     """Test edge cases for DayOfWeekIndexer."""
 
     @pytest.mark.asyncio
-
-
     async def test_leap_year_february_29(self) -> None:
         """Test handling of leap year date."""
         indexer = DayOfWeekIndexer()
@@ -307,8 +272,6 @@ class TestDayOfWeekIndexerEdgeCases:
         assert next_bound == datetime(2024, 3, 1, 0, 0, 0)
 
     @pytest.mark.asyncio
-
-
     async def test_key_consistency_across_boundaries(self) -> None:
         """Test that keys change correctly across boundaries."""
         indexer = DayOfWeekIndexer()
@@ -326,8 +289,6 @@ class TestDayOfWeekIndexerEdgeCases:
         assert key2 == 1  # Tuesday
 
     @pytest.mark.asyncio
-
-
     async def test_same_time_different_years(self) -> None:
         """Test same date/time in different years may have different weekdays."""
         indexer = DayOfWeekIndexer()

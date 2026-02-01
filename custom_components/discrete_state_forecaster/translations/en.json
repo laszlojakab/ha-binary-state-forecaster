@@ -7,16 +7,22 @@
           "target_entity_id": "Entity to forecast",
           "time_bucket_size_in_minutes": "Time bucket size",
           "use_day_of_week": "Learn day-of-week patterns",
-          "use_month_of_year": "Learn seasonal (monthly) patterns",
+          "use_month_of_year": "Learn monthly patterns",
+          "use_season": "Learn seasonal patterns",
           "state_persistence_factor": "State persistence factor",
           "adaptive_persistence": "Adaptive state persistence",
-          "half_life_hours": "Pattern decay half-life (hours)"
+          "half_life_hours": "Pattern decay half-life (hours)",
+          "calendar_features": "Calendar entities for special days"
         },
         "data_description": {
           "time_bucket_size_in_minutes": "The time resolution for learning patterns. Smaller values (15-30 min) capture quick changes, larger values (120-240 min) focus on broader patterns.",
-          "state_persistence_factor": "How strongly states tend to persist (0.0 = states change freely, 1.0 = states rarely change). Typical: 0.1-0.5. Adjust based on device behavior.",
-          "adaptive_persistence": "Learn state-specific persistence (e.g., ON states may be stickier than OFF states). Recommended for most devices.",
-          "half_life_hours": "How quickly old patterns fade (0 = never fade, 168 = 1 week half-life, 720 = 30 days). Use 0 for stable patterns, higher values for evolving habits or seasonal changes. Max: 8760 hours (1 year)."
+          "use_day_of_week": "Enable to learn different patterns for weekdays vs weekends (e.g., work schedules, office equipment)",
+          "use_month_of_year": "Enable to learn monthly that repeat monthly (e.g., HVAC, irrigation, outdoor lighting)",
+          "use_season": "Enable to learn seasonal patterns tied to seasons (e.g., HVAC, irrigation, outdoor lighting)",
+          "state_persistence_factor": "How strongly states tend to persist (0.0 = states change freely, 1.0 = states rarely change). Typical: 0.1-0.5. Can be tuned without resetting learned patterns.",
+          "adaptive_persistence": "Learn state-specific persistence (e.g., ON states may be stickier than OFF states). Can be toggled without resetting learned patterns.",
+          "half_life_hours": "How quickly old patterns fade (0 = never fade, 168 = 1 week, 720 = 30 days). Useful for evolving habits or seasonal changes. Can be adjusted without resetting learned patterns.",
+          "calendar_features": "Select calendar entities to account for special days (e.g., holidays) that may affect usage patterns."
         },
         "description": "Configure prediction settings"
       }
@@ -32,18 +38,24 @@
         "title": "Temporal Pattern Configuration",
         "description": "Configure which temporal patterns the forecaster should learn. More patterns provide better accuracy but require more training data.",
         "data": {
+          "time_bucket_size_in_minutes": "Time bucket size",
           "use_day_of_week": "Learn day-of-week patterns",
-          "use_month_of_year": "Learn seasonal (monthly) patterns",
+          "use_month_of_year": "Learn monthly patterns",
+          "use_season": "Learn seasonal patterns",
           "state_persistence_factor": "State persistence factor",
           "adaptive_persistence": "Adaptive state persistence",
-          "half_life_hours": "Pattern decay half-life (hours)"
+          "half_life_hours": "Pattern decay half-life (hours)",
+          "calendar_features": "Calendar entities for special days"
         },
         "data_description": {
+          "time_bucket_size_in_minutes": "The time resolution for learning patterns. Smaller values (15-30 min) capture quick changes, larger values (120-240 min) focus on broader patterns.",
           "use_day_of_week": "Enable to learn different patterns for weekdays vs weekends (e.g., work schedules, office equipment)",
-          "use_month_of_year": "Enable to learn seasonal patterns that repeat monthly (e.g., HVAC, irrigation, outdoor lighting)",
+          "use_month_of_year": "Enable to learn monthly that repeat monthly (e.g., HVAC, irrigation, outdoor lighting)",
+          "use_season": "Enable to learn seasonal patterns tied to seasons (e.g., HVAC, irrigation, outdoor lighting)",
           "state_persistence_factor": "How strongly states tend to persist (0.0 = states change freely, 1.0 = states rarely change). Typical: 0.1-0.5. Can be tuned without resetting learned patterns.",
           "adaptive_persistence": "Learn state-specific persistence (e.g., ON states may be stickier than OFF states). Can be toggled without resetting learned patterns.",
-          "half_life_hours": "How quickly old patterns fade (0 = never fade, 168 = 1 week, 720 = 30 days). Useful for evolving habits or seasonal changes. Can be adjusted without resetting learned patterns."
+          "half_life_hours": "How quickly old patterns fade (0 = never fade, 168 = 1 week, 720 = 30 days). Useful for evolving habits or seasonal changes. Can be adjusted without resetting learned patterns.",
+          "calendar_features": "Select calendar entities to account for special days (e.g., holidays) that may affect usage patterns."
         }
       },
       "confirm_reset": {

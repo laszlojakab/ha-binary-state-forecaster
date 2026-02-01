@@ -25,6 +25,12 @@ from custom_components.discrete_state_forecaster.model.prediction import Predict
 from custom_components.discrete_state_forecaster.model.time_aware_forecaster import (
     TimeAwareForecaster,
 )
+from custom_components.discrete_state_forecaster.model.time_indexers.calendar_indexer import (
+    CalendarIndexer,
+)
+from custom_components.discrete_state_forecaster.model.time_indexers.season_indexer import (
+    SeasonIndexer,
+)
 
 from .const import (
     CONF_ADAPTIVE_PERSISTENCE,
@@ -39,12 +45,14 @@ from .const import (
     CONF_USE_DAY_OF_WEEK_FEATURE,
     CONF_USE_MONTH_OF_YEAR,
     CONF_USE_MONTH_OF_YEAR_FEATURE,
+    CONF_USE_SEASON,
     DEFAULT_ADAPTIVE_PERSISTENCE,
     DEFAULT_HALF_LIFE_HOURS,
     DEFAULT_STATE_PERSISTENCE_FACTOR,
     DEFAULT_TIME_BUCKET_SIZE_IN_MINUTES,
     DEFAULT_USE_DAY_OF_WEEK,
     DEFAULT_USE_MONTH_OF_YEAR,
+    DEFAULT_USE_SEASON,
     STORING_TIME_PATTERN,
 )
 from .model.state_tracker import StateTracker
@@ -87,7 +95,7 @@ class DiscreteStateForecasterCoordinator(
         self._config_entry = config_entry
         # Get time bucket size from configuration
         time_bucket_minutes = int(
-            config_entry.data.get(
+            config_entry.options.get(
                 CONF_TIME_BUCKET_SIZE_IN_MINUTES, DEFAULT_TIME_BUCKET_SIZE_IN_MINUTES
             )
         )
@@ -131,6 +139,13 @@ class DiscreteStateForecasterCoordinator(
         self._current_use_month = config_entry.options.get(
             CONF_USE_MONTH_OF_YEAR, DEFAULT_USE_MONTH_OF_YEAR
         )
+        self._current_use_season = config_entry.options.get(
+            CONF_USE_SEASON, DEFAULT_USE_SEASON
+        )
+        self._current_calendar_features = config_entry.options.get(
+            CONF_CALENDAR_FEATURES, []
+        )
+        self._current_time_bucket_size = time_bucket_minutes
 
         # Listen for config entry updates
         config_entry.async_on_unload(
@@ -308,7 +323,7 @@ class DiscreteStateForecasterCoordinator(
         await self.async_refresh()
 
     async def _handle_time_key_change(self: Self, now: datetime) -> None:
-        key = self._composite_indexer.key(now)
+        key = await self._composite_indexer.key(now)
 
         self.logger.debug(
             "Time key change detected for %s at %s. Key: %s",
@@ -340,6 +355,10 @@ class DiscreteStateForecasterCoordinator(
         """Build time indexers based on configuration."""
         indexers = []
 
+        # Calendar feature indexers (optional)
+        for calendar_feature in options.get(CONF_CALENDAR_FEATURES, []):
+            indexers.append(CalendarIndexer(self.hass, calendar_feature))  # noqa: PERF401
+
         # Day of week indexer (optional)
         use_day_of_week = options.get(CONF_USE_DAY_OF_WEEK, DEFAULT_USE_DAY_OF_WEEK)
         if use_day_of_week:
@@ -349,6 +368,10 @@ class DiscreteStateForecasterCoordinator(
         use_month = options.get(CONF_USE_MONTH_OF_YEAR, DEFAULT_USE_MONTH_OF_YEAR)
         if use_month:
             indexers.append(MonthIndexer())
+
+        use_season = options.get(CONF_USE_SEASON, DEFAULT_USE_SEASON)
+        if use_season:
+            indexers.append(SeasonIndexer())
 
         # Time of day indexer (always included)
         indexers.append(TimeOfDayIndexer(time_bucket_minutes))
@@ -361,42 +384,56 @@ class DiscreteStateForecasterCoordinator(
         config_entry: "DiscreteStateForecasterConfigEntry",
     ) -> None:
         """Handle config entry updates (options flow changes)."""
+        new_time_bucket_size = int(
+            config_entry.options.get(
+                CONF_TIME_BUCKET_SIZE_IN_MINUTES,
+                DEFAULT_TIME_BUCKET_SIZE_IN_MINUTES,
+            )
+        )
         new_use_day_of_week = config_entry.options.get(
             CONF_USE_DAY_OF_WEEK, DEFAULT_USE_DAY_OF_WEEK
         )
         new_use_month = config_entry.options.get(
             CONF_USE_MONTH_OF_YEAR, DEFAULT_USE_MONTH_OF_YEAR
         )
+        new_use_season = config_entry.options.get(CONF_USE_SEASON, DEFAULT_USE_SEASON)
+        new_calendar_features = config_entry.options.get(CONF_CALENDAR_FEATURES, [])
 
         # Check if indexer configuration changed
         indexers_changed = (
             new_use_day_of_week != self._current_use_day_of_week
             or new_use_month != self._current_use_month
+            or new_use_season != self._current_use_season
+            or new_calendar_features != self._current_calendar_features
+            or new_time_bucket_size != self._current_time_bucket_size
         )
 
         if indexers_changed:
             self.logger.info(
                 "Indexer configuration changed - resetting model. "
-                "Day of week: %s -> %s, Month: %s -> %s",
+                "Time bucket size: %s -> %s, Day of week: %s -> %s, Month: %s -> %s, "
+                "Season: %s -> %s, Calendar features: %s -> %s",
+                self._current_time_bucket_size,
+                new_time_bucket_size,
                 self._current_use_day_of_week,
                 new_use_day_of_week,
                 self._current_use_month,
                 new_use_month,
+                self._current_use_season,
+                new_use_season,
+                self._current_calendar_features,
+                new_calendar_features,
             )
 
             # Update tracked configuration
             self._current_use_day_of_week = new_use_day_of_week
             self._current_use_month = new_use_month
+            self._current_calendar_features = new_calendar_features
+            self._current_time_bucket_size = new_time_bucket_size
 
             # Rebuild indexers
-            time_bucket_minutes = int(
-                config_entry.data.get(
-                    CONF_TIME_BUCKET_SIZE_IN_MINUTES,
-                    DEFAULT_TIME_BUCKET_SIZE_IN_MINUTES,
-                )
-            )
             self._time_indexers = self._build_indexers(
-                time_bucket_minutes, config_entry.options
+                new_time_bucket_size, config_entry.options
             )
             self._composite_indexer = CompositeIndexer(self._time_indexers)
 
