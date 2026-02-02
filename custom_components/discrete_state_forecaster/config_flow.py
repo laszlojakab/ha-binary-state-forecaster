@@ -49,10 +49,6 @@ class DiscreteStateForecasterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN
     ) -> FlowResult:
         """Handle the initial step when integration is added from the UI."""
         if user_input is not None:
-            # Create unique ID from target entity to prevent duplicates
-            await self.async_set_unique_id(user_input[CONF_TARGET_ENTITY_ID])
-            self._abort_if_unique_id_configured()
-
             # Get the entity friendly name for the title
             target_entity = self.hass.states.get(user_input[CONF_TARGET_ENTITY_ID])
             entity_name = (

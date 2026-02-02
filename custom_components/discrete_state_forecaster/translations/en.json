@@ -27,9 +27,7 @@
         "description": "Configure prediction settings"
       }
     },
-    "error": {
-      "already_configured": "The unique ID is already used!"
-    },
+    "error": {},
     "abort": {}
   },
   "options": {
