@@ -2,7 +2,7 @@
 
 import logging
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import TYPE_CHECKING, Any, Self, cast
 
 from homeassistant.const import (
@@ -345,6 +345,8 @@ class DiscreteStateForecasterCoordinator(
         )
 
         await self._track_next_time_indexer_change(now)
+
+        await self._state_tracker.update(now)
 
         await self.async_refresh()
 

@@ -132,13 +132,16 @@ class HierarchicalStateStats:
                 return AggregatedStats(
                     distribution=specific_stats.distribution(),
                     support_time=specific_support,
-                    depth=1,
+                    key=key,
                 )
 
         # Specific key lacks sufficient data, blend across hierarchy
         weighted: dict[State, float] = {}
         total_support = 0.0
-        depth = 0
+
+        # Track the parent key that provides the most support (for traceability)
+        best_key: TimeKey | None = None
+        best_support = 0.0
 
         # Traverse from exact → parent → GLOBAL hierarchy
         for k in key.parents():
@@ -158,16 +161,24 @@ class HierarchicalStateStats:
                 weighted[state] = weighted.get(state, 0.0) + prob * support
 
             total_support += support
-            depth += 1
+
+            # remember which key had the largest raw support
+            if support > best_support:
+                best_support = support
+                best_key = k
 
         if total_support == 0.0:
-            return AggregatedStats(distribution={}, support_time=0.0, depth=depth)
+            return AggregatedStats(
+                distribution={}, support_time=0.0, key=TimeKey.GLOBAL
+            )
 
         # normalize
         norm_dist = {state: w / total_support for state, w in weighted.items()}
 
         return AggregatedStats(
-            distribution=norm_dist, support_time=total_support, depth=depth
+            distribution=norm_dist,
+            support_time=total_support,
+            key=best_key or TimeKey.GLOBAL,
         )
 
     def prune(
@@ -361,7 +372,7 @@ class HierarchicalStateStats:
             "stats": [
                 # Convert TimeKey to JSON-serializable format
                 # Store as list of [key_data, stats_data] pairs
-                [key.to_dict(), stats.to_dict()]
+                [key.to_tuple(), stats.to_dict()]
                 for key, stats in self.stats.items()
             ],
             "half_life": self.half_life,
@@ -394,7 +405,7 @@ class HierarchicalStateStats:
         stats_data = data.get("stats", [])
         for key_data, stats_dict in stats_data:
             # Convert list back to TimeKey
-            key = TimeKey.from_dict(key_data)
+            key = TimeKey.from_tuple(key_data)
             instance.stats[key] = StateStats.from_dict(stats_dict)
 
         instance.last_prune_ts = data.get("last_prune_ts", 0.0)

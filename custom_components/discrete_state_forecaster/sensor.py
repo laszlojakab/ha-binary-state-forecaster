@@ -88,6 +88,7 @@ class DiscreteStateForecasterSensor(
 
         # Add confidence metrics
         confidence = prediction.confidence
+        attributes["key"] = str(prediction.key) if prediction.key else None
         attributes["confidence"] = {
             "max_probability": round(confidence.max_probability, 3),
             "entropy_confidence": round(confidence.entropy_confidence, 3),

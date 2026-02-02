@@ -1,4 +1,5 @@
-"""Season time indexer.
+"""
+Season time indexer.
 
 This module provides `SeasonIndexer`, a `TimeIndexer` implementation that
 maps timestamps to meteorological seasons and computes the next season

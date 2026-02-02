@@ -182,8 +182,30 @@ class TimeKey:
             "TimeKey((('hour', 15),))"
         """
         if self.items:
-            return f"TimeKey({self.items})"
+            return f"TimeKey({", ".join(str(item) for item in self.items)})"
         return "TimeKey.GLOBAL"
+
+    def __add__(self: Self, other: tuple[str, Hashable]) -> Self:
+        """
+        Returns a new TimeKey with an additional (name, value) pair appended.
+
+        Args:
+            other: A tuple of (dimension_name, value) to append to this key.
+
+        Returns:
+            TimeKey: New TimeKey instance with the additional dimension.
+
+        Examples:
+            >>> key = TimeKey.GLOBAL
+            >>> new_key = key + ("hour", 15)
+            >>> print(new_key)
+            TimeKey((('hour', 15),))
+            >>> another_key = new_key + ("weekday", 1)
+            >>> print(another_key)
+            TimeKey((('hour', 15), ('weekday', 1)))
+        """
+        name, value = other
+        return TimeKey((*self.items, (name, value)))
 
     def parent(self: Self) -> Self | None:
         """
@@ -252,7 +274,7 @@ class TimeKey:
             yield current
             current = current.parent()
 
-    def to_dict(self: Self) -> list[tuple[str, Hashable]]:
+    def to_tuple(self: Self) -> list[tuple[str, Hashable]]:
         """
         Serializes the TimeKey to a JSON-compatible list.
 
@@ -261,15 +283,15 @@ class TimeKey:
 
         Examples:
             >>> key = TimeKey((("hour", 15), ("weekday", 1)))
-            >>> key.to_dict()
+            >>> key.to_tuple()
             [['hour', 15], ['weekday', 1]]
-            >>> TimeKey.GLOBAL.to_dict()
+            >>> TimeKey.GLOBAL.to_tuple()
             []
         """
         return [list(item) for item in self.items]
 
     @classmethod
-    def from_dict(cls, data: list[tuple[str, Hashable]]) -> Self:
+    def from_tuple(cls, data: list[tuple[str, Hashable]]) -> Self:
         """
         Deserializes a TimeKey from a JSON-compatible list.
 
@@ -281,10 +303,10 @@ class TimeKey:
 
         Examples:
             >>> data = [['hour', 15], ['weekday', 1]]
-            >>> key = TimeKey.from_dict(data)
+            >>> key = TimeKey.from_tuple(data)
             >>> key.items
             (('hour', 15), ('weekday', 1))
-            >>> TimeKey.from_dict([])
+            >>> TimeKey.from_tuple([])
             TimeKey.GLOBAL
         """
         if not data:

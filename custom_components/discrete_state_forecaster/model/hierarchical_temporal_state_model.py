@@ -335,6 +335,7 @@ class HierarchicalTemporalStateModel:
             return Prediction(
                 state=None,
                 distribution={},
+                key=None,
                 confidence=Confidence(
                     max_probability=0.0, entropy_confidence=0.0, support_time=0.0, depth=0
                 ),
@@ -351,6 +352,7 @@ class HierarchicalTemporalStateModel:
         return Prediction(
             state=state,
             distribution=stats.distribution,
+            key=stats.key,
             confidence=Confidence(
                 max_probability=max_p,
                 entropy_confidence=entropy_conf,

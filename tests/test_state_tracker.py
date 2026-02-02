@@ -12,8 +12,9 @@ Tests cover:
 - Realistic workflow patterns
 """
 
-import pytest
 from datetime import datetime, timedelta
+
+import pytest
 
 from custom_components.discrete_state_forecaster.model.state_tracker import (
     StateTracker,

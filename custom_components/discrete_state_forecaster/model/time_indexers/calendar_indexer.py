@@ -70,7 +70,7 @@ class CalendarIndexer(TimeIndexer):
 
         self.hass: HomeAssistant = hass
         self.entity_id: str = entity_id
-        self.name: str = f"calendar:{entity_id}"
+        self.name: str = f"{entity_id}"
 
     async def key(self: Self, ts: datetime) -> int:
         """

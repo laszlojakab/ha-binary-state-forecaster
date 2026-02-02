@@ -13,6 +13,9 @@ from dataclasses import dataclass
 
 from custom_components.discrete_state_forecaster.model.confidence import Confidence
 from custom_components.discrete_state_forecaster.model.state import State
+from custom_components.discrete_state_forecaster.model.time_indexers.time_key import (
+    TimeKey,
+)
 
 
 @dataclass
@@ -57,3 +60,4 @@ class Prediction:
     state: State | None
     distribution: dict[State, float]
     confidence: Confidence
+    key: TimeKey | None = None

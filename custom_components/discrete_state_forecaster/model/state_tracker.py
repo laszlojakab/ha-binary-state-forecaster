@@ -78,7 +78,9 @@ class StateTracker:
         self.last_state: State | None = None
         self.last_ts: datetime | None = None
 
-    async def update(self: Self, timestamp: datetime, new_state: State) -> None:
+    async def update(
+        self: Self, timestamp: datetime, new_state: State | None = None
+    ) -> None:
         """
         Update the tracker with a new state observation.
 
@@ -95,7 +97,8 @@ class StateTracker:
             timestamp: The timestamp when the new state was observed. Must be greater
                 than or equal to the previous timestamp for meaningful intervals.
             new_state: The newly observed state. Can be any hashable value
-                representing a discrete state.
+                representing a discrete state. If None, the last known state is retained
+                with the given timestamp.
 
         Example:
             ```
@@ -112,6 +115,10 @@ class StateTracker:
             >>> # Forecaster now knows "idle" lasted 30 minutes at 10:00
             ```
         """
+        if self.last_state is None and new_state is None:
+            # No state to track yet
+            return
+
         if self.last_state is None:
             # First observation - just record state and timestamp
             self.last_state = new_state
@@ -126,5 +133,5 @@ class StateTracker:
         )
 
         # Update to the new state
-        self.last_state = new_state
+        self.last_state = new_state if new_state is not None else self.last_state
         self.last_ts = timestamp

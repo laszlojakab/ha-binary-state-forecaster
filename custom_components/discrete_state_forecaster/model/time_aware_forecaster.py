@@ -507,6 +507,7 @@ class TimeAwareForecaster:
             state=new_state,
             distribution=adjusted_dist,
             confidence=base_prediction.confidence,  # Keep original confidence metrics
+            key=base_prediction.key,
         )
 
     def get_learned_persistence(

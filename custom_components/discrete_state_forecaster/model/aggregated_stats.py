@@ -9,6 +9,9 @@ more levels of a hierarchical time-based model.
 from dataclasses import dataclass
 
 from custom_components.discrete_state_forecaster.model.state import State
+from custom_components.discrete_state_forecaster.model.time_indexers.time_key import (
+    TimeKey,
+)
 
 
 @dataclass
@@ -31,17 +34,12 @@ class AggregatedStats:
             this distribution. This represents the cumulative duration of
             observations used to calculate the probabilities. Higher values
             indicate more data and typically more reliable predictions.
-        depth: Number of hierarchical levels that were aggregated to produce
-            this distribution. A depth of 1 means only a single specific
-            level was used, while higher values indicate blending across
-            multiple levels (e.g., specific time + parent time + global).
 
     Example:
         ```
         >>> stats = AggregatedStats(
         ...     distribution={"on": 0.7, "off": 0.3},
         ...     support_time=3600.0,  # 1 hour of observations
-        ...     depth=2  # Specific level + parent level
         ... )
         >>> print(stats.distribution["on"])
         0.7
@@ -52,4 +50,4 @@ class AggregatedStats:
 
     distribution: dict[State, float]
     support_time: float
-    depth: int
+    key: TimeKey | None
