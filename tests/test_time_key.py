@@ -181,17 +181,17 @@ class TestTimeKeyStringRepresentation:
     def test_repr_single_dimension(self: Self) -> None:
         """Test repr for a single dimension key."""
         key = TimeKey((("hour", 15),))
-        assert repr(key) == "TimeKey((('hour', 15),))"
+        assert repr(key) == "TimeKey(('hour', 15))"
 
     def test_repr_multiple_dimensions(self: Self) -> None:
         """Test repr for a multiple dimension key."""
         key = TimeKey((("weekday", 1), ("hour", 15)))
-        assert repr(key) == "TimeKey((('weekday', 1), ('hour', 15)))"
+        assert repr(key) == "TimeKey(('weekday', 1), ('hour', 15))"
 
     def test_repr_with_string_values(self: Self) -> None:
         """Test repr with string dimension values."""
         key = TimeKey((("period", "morning"),))
-        assert repr(key) == "TimeKey((('period', 'morning'),))"
+        assert repr(key) == "TimeKey(('period', 'morning'))"
 
 
 class TestTimeKeyLength:
@@ -453,36 +453,36 @@ class TestTimeKeyUsagePatterns:
 
 
 class TestTimeKeySerialization:
-    """Tests for TimeKey serialization (to_dict/from_dict)."""
+    """Tests for TimeKey serialization (to_tuple/from_tuple)."""
 
-    def test_to_dict_empty_key(self: Self) -> None:
+    def test_to_tuple_empty_key(self: Self) -> None:
         """Test serializing an empty TimeKey (GLOBAL)."""
         key = TimeKey.GLOBAL
-        data = key.to_dict()
+        data = key.to_tuple()
         assert data == []
         assert isinstance(data, list)
 
-    def test_to_dict_single_dimension(self: Self) -> None:
+    def test_to_tuple_single_dimension(self: Self) -> None:
         """Test serializing a TimeKey with one dimension."""
         key = TimeKey((("hour", 15),))
-        data = key.to_dict()
+        data = key.to_tuple()
         assert data == [["hour", 15]]
         assert isinstance(data, list)
         assert len(data) == 1
 
-    def test_to_dict_multiple_dimensions(self: Self) -> None:
+    def test_to_tuple_multiple_dimensions(self: Self) -> None:
         """Test serializing a TimeKey with multiple dimensions."""
         key = TimeKey((("weekday", 1), ("hour", 15)))
-        data = key.to_dict()
+        data = key.to_tuple()
         assert data == [["weekday", 1], ["hour", 15]]
         assert len(data) == 2
 
-    def test_to_dict_complex_key(self: Self) -> None:
+    def test_to_tuple_complex_key(self: Self) -> None:
         """Test serializing a complex TimeKey."""
         key = TimeKey(
             (("month", 3), ("weekday", 2), ("hour", 14), ("minute_bucket", 1))
         )
-        data = key.to_dict()
+        data = key.to_tuple()
         assert data == [
             ["month", 3],
             ["weekday", 2],
@@ -491,37 +491,37 @@ class TestTimeKeySerialization:
         ]
         assert len(data) == 4
 
-    def test_to_dict_with_string_values(self: Self) -> None:
+    def test_to_tuple_with_string_values(self: Self) -> None:
         """Test serializing a TimeKey with string values."""
         key = TimeKey((("category", "work"), ("priority", "high")))
-        data = key.to_dict()
+        data = key.to_tuple()
         assert data == [["category", "work"], ["priority", "high"]]
 
-    def test_from_dict_empty_list(self: Self) -> None:
+    def test_from_tuple_empty_list(self: Self) -> None:
         """Test deserializing an empty list to GLOBAL."""
         data = []
-        key = TimeKey.from_dict(data)
+        key = TimeKey.from_tuple(data)
         assert key == TimeKey.GLOBAL
         assert len(key) == 0
 
-    def test_from_dict_single_dimension(self: Self) -> None:
+    def test_from_tuple_single_dimension(self: Self) -> None:
         """Test deserializing a single dimension."""
         data = [["hour", 15]]
-        key = TimeKey.from_dict(data)
+        key = TimeKey.from_tuple(data)
         assert key.items == (("hour", 15),)
         assert len(key) == 1
 
-    def test_from_dict_multiple_dimensions(self: Self) -> None:
+    def test_from_tuple_multiple_dimensions(self: Self) -> None:
         """Test deserializing multiple dimensions."""
         data = [["weekday", 1], ["hour", 15]]
-        key = TimeKey.from_dict(data)
+        key = TimeKey.from_tuple(data)
         assert key.items == (("weekday", 1), ("hour", 15))
         assert len(key) == 2
 
-    def test_from_dict_complex_key(self: Self) -> None:
+    def test_from_tuple_complex_key(self: Self) -> None:
         """Test deserializing a complex key."""
         data = [["month", 3], ["weekday", 2], ["hour", 14], ["minute_bucket", 1]]
-        key = TimeKey.from_dict(data)
+        key = TimeKey.from_tuple(data)
         assert key.items == (
             ("month", 3),
             ("weekday", 2),
@@ -530,25 +530,25 @@ class TestTimeKeySerialization:
         )
         assert len(key) == 4
 
-    def test_from_dict_with_string_values(self: Self) -> None:
+    def test_from_tuple_with_string_values(self: Self) -> None:
         """Test deserializing with string values."""
         data = [["category", "work"], ["priority", "high"]]
-        key = TimeKey.from_dict(data)
+        key = TimeKey.from_tuple(data)
         assert key.items == (("category", "work"), ("priority", "high"))
 
     def test_roundtrip_empty_key(self: Self) -> None:
         """Test round-trip serialization of empty key."""
         original = TimeKey.GLOBAL
-        data = original.to_dict()
-        restored = TimeKey.from_dict(data)
+        data = original.to_tuple()
+        restored = TimeKey.from_tuple(data)
         assert restored == original
         assert hash(restored) == hash(original)
 
     def test_roundtrip_single_dimension(self: Self) -> None:
         """Test round-trip serialization of single dimension."""
         original = TimeKey((("hour", 15),))
-        data = original.to_dict()
-        restored = TimeKey.from_dict(data)
+        data = original.to_tuple()
+        restored = TimeKey.from_tuple(data)
         assert restored == original
         assert restored.items == original.items
         assert hash(restored) == hash(original)
@@ -556,8 +556,8 @@ class TestTimeKeySerialization:
     def test_roundtrip_multiple_dimensions(self: Self) -> None:
         """Test round-trip serialization of multiple dimensions."""
         original = TimeKey((("weekday", 1), ("hour", 15), ("minute_bucket", 2)))
-        data = original.to_dict()
-        restored = TimeKey.from_dict(data)
+        data = original.to_tuple()
+        restored = TimeKey.from_tuple(data)
         assert restored == original
         assert restored.items == original.items
         assert hash(restored) == hash(original)
@@ -565,8 +565,8 @@ class TestTimeKeySerialization:
     def test_roundtrip_preserves_order(self: Self) -> None:
         """Test that round-trip preserves dimension order."""
         original = TimeKey((("hour", 15), ("weekday", 1)))
-        data = original.to_dict()
-        restored = TimeKey.from_dict(data)
+        data = original.to_tuple()
+        restored = TimeKey.from_tuple(data)
         # Order matters for equality
         assert restored.items == original.items
         assert restored == original
@@ -575,22 +575,22 @@ class TestTimeKeySerialization:
         """Test round-trip with various hashable value types."""
         # int, str, float, tuple
         original = TimeKey((("int_val", 42), ("str_val", "test"), ("float_val", 3.14)))
-        data = original.to_dict()
-        restored = TimeKey.from_dict(data)
+        data = original.to_tuple()
+        restored = TimeKey.from_tuple(data)
         assert restored == original
         assert restored.items == original.items
 
     def test_serialized_data_is_json_compatible(self: Self) -> None:
         """Test that serialized data can be JSON-encoded."""
         key = TimeKey((("hour", 15), ("weekday", 1)))
-        data = key.to_dict()
+        data = key.to_tuple()
 
         # Should not raise
         json_str = json.dumps(data)
         parsed = json.loads(json_str)
 
         # Verify we can restore from parsed JSON
-        restored = TimeKey.from_dict(parsed)
+        restored = TimeKey.from_tuple(parsed)
         assert restored == key
 
     def test_multiple_keys_serialization(self: Self) -> None:
@@ -603,10 +603,10 @@ class TestTimeKeySerialization:
         ]
 
         # Serialize all
-        serialized = [k.to_dict() for k in keys]
+        serialized = [k.to_tuple() for k in keys]
 
         # Deserialize all
-        restored = [TimeKey.from_dict(data) for data in serialized]
+        restored = [TimeKey.from_tuple(data) for data in serialized]
 
         # Verify all match
         for original, restored_key in zip(keys, restored, strict=True):
