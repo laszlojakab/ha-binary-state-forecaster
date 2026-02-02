@@ -411,7 +411,7 @@ class TestHierarchicalStateStatsDistribution:
 
         assert result.distribution == {}
         assert result.support_time == 0.0
-        assert result.depth == 0
+        assert result.key == TimeKey.GLOBAL
 
     def test_distribution_insufficient_support(self) -> None:
         """Test distribution returns empty AggregatedStats when support < MIN_SUPPORT."""
@@ -426,7 +426,7 @@ class TestHierarchicalStateStatsDistribution:
         assert result.distribution == {}
         assert result.support_time == 0.0
         # depth tracks levels examined even if none had sufficient support
-        assert result.depth == 0
+        assert result.key == TimeKey.GLOBAL
 
     def test_distribution_single_level_single_state(self) -> None:
         """Test distribution with single level and single state."""
@@ -440,7 +440,7 @@ class TestHierarchicalStateStatsDistribution:
         assert result.distribution == {"on": pytest.approx(1.0)}
         # With sufficient data, uses only specific key (no blending)
         assert result.support_time == pytest.approx(31.0)
-        assert result.depth == 1  # only specific level
+        assert result.key == key  # only specific level
 
     def test_distribution_single_level_multiple_states(self) -> None:
         """Test distribution with single level and multiple states."""
@@ -457,7 +457,7 @@ class TestHierarchicalStateStatsDistribution:
         assert sum(result.distribution.values()) == pytest.approx(1.0)
         # With sufficient data, uses only specific key (no blending)
         assert result.support_time == pytest.approx(400.0)
-        assert result.depth == 1
+        assert result.key == key  # only specific level
 
     def test_distribution_hierarchical_blending(self) -> None:
         """Test that specific data is used without blending when sufficient."""
@@ -482,7 +482,7 @@ class TestHierarchicalStateStatsDistribution:
         assert "off" not in result.distribution  # Parent data is not blended
         assert result.distribution["on"] == pytest.approx(1.0)
         assert result.support_time == pytest.approx(200.0)
-        assert result.depth == 1
+        assert result.key == specific_key
 
     def test_distribution_skips_insufficient_levels(self) -> None:
         """Test distribution skips hierarchical levels with insufficient support."""
@@ -509,7 +509,7 @@ class TestHierarchicalStateStatsDistribution:
         assert "off" in result.distribution
         assert result.distribution["off"] == pytest.approx(expected_off_prob, rel=0.01)
         # Only parent and GLOBAL levels have sufficient support
-        assert result.depth >= 1
+        assert result.key == parent_key
 
     def test_distribution_with_global_key(self) -> None:
         """Test distribution with global (empty) TimeKey."""
@@ -522,7 +522,7 @@ class TestHierarchicalStateStatsDistribution:
 
         assert result.distribution == {"on": pytest.approx(1.0)}
         assert result.support_time == pytest.approx(300.0)
-        assert result.depth == 1  # only GLOBAL level
+        assert result.key == TimeKey.GLOBAL  # only GLOBAL level
 
     def test_distribution_normalizes_to_one(self) -> None:
         """Test that distribution probabilities always sum to 1.0."""
@@ -537,7 +537,7 @@ class TestHierarchicalStateStatsDistribution:
 
         assert sum(result.distribution.values()) == pytest.approx(1.0)
         assert result.support_time > 0
-        assert result.depth >= 1
+        assert result.key == key
 
     def test_distribution_three_level_hierarchy(self) -> None:
         """Test distribution with three-level hierarchy."""
@@ -562,7 +562,7 @@ class TestHierarchicalStateStatsDistribution:
         assert "off" not in result.distribution
         assert "idle" not in result.distribution
         assert result.support_time == pytest.approx(200.0)
-        assert result.depth == 1
+        assert result.key == specific
 
     def test_distribution_overlapping_states(self) -> None:
         """Test distribution when multiple levels have same states."""
@@ -593,7 +593,7 @@ class TestHierarchicalStateStatsDistribution:
         assert result.distribution["off"] == pytest.approx(0.5)
         assert "idle" not in result.distribution  # Parent data not blended
         assert result.support_time == pytest.approx(200.0)
-        assert result.depth == 1
+        assert result.key == specific
 
     def test_distribution_depth_tracking_single_level(self) -> None:
         """Test that depth correctly tracks single hierarchy level."""
@@ -605,7 +605,7 @@ class TestHierarchicalStateStatsDistribution:
         result = stats.distribution(key, timestamp=1000.0)
 
         # With sufficient data, uses only specific key
-        assert result.depth == 1
+        assert result.key == key
 
     def test_distribution_depth_tracking_multi_level(self) -> None:
         """Test that depth correctly tracks multiple hierarchy levels."""
@@ -620,7 +620,7 @@ class TestHierarchicalStateStatsDistribution:
         result = stats.distribution(specific, timestamp=1000.0)
 
         # With sufficient data, uses only specific key
-        assert result.depth == 1
+        assert result.key == specific
 
     def test_distribution_depth_with_insufficient_levels(self) -> None:
         """Test depth only counts levels with sufficient support."""
@@ -639,8 +639,7 @@ class TestHierarchicalStateStatsDistribution:
 
         # Only parent and GLOBAL have sufficient support
         # (specific has MIN_SUPPORT-1 which is < MIN_SUPPORT)
-        assert result.depth >= 1  # At least parent or GLOBAL
-        assert result.depth < 3  # Not all three levels
+        assert result.key == parent
 
     def test_distribution_support_time_accumulates(self) -> None:
         """Test that support_time accumulates across hierarchy levels."""
@@ -684,7 +683,7 @@ class TestHierarchicalStateStatsDistribution:
 
         result = stats.distribution(key, timestamp=1000.0)
 
-        assert result.depth == 0
+        assert result.key == TimeKey.GLOBAL
         assert result.support_time == 0.0
         assert result.distribution == {}
 
@@ -961,7 +960,7 @@ class TestHierarchicalStateStatsIntegration:
             "off" not in dist.distribution
         )  # Parent data not blended when specific has sufficient data
         assert dist.support_time > 0
-        assert dist.depth >= 1
+        assert dist.key == specific
 
         # Prune
         stats.prune(timestamp=1000.0)
@@ -1054,7 +1053,7 @@ class TestHierarchicalStateStatsIntegration:
         assert dist.distribution == {"on": pytest.approx(1.0)}
         # parent (500) + GLOBAL (500) = 1000 total
         assert dist.support_time == pytest.approx(1000.0)
-        assert dist.depth == 2  # parent + GLOBAL
+        assert dist.key == parent
 
     def test_prune_after_many_updates(self) -> None:
         """Test pruning maintains reasonable size after many updates."""

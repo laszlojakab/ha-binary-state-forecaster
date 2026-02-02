@@ -175,7 +175,7 @@ class TestDistribution:
 
         assert stats.distribution == {}
         assert stats.support_time == 0.0
-        assert stats.depth == 0
+        assert stats.key == TimeKey.GLOBAL
 
     def test_distribution_single_state(self) -> None:
         """Test distribution with single state."""
@@ -222,7 +222,7 @@ class TestDistribution:
         stats = model.distribution(key, timestamp=1000.0)
         assert hasattr(stats, "distribution")
         assert hasattr(stats, "support_time")
-        assert hasattr(stats, "depth")
+        assert hasattr(stats, "key")
 
     def test_distribution_hierarchical_blending(self) -> None:
         """Test hierarchical blending when specific key has insufficient data."""
@@ -241,7 +241,7 @@ class TestDistribution:
         assert "on" in stats.distribution
         assert "off" in stats.distribution
         # Specific key should have higher weight but parent contributes
-        assert stats.depth >= 1
+        assert stats.key == parent_key
 
 
 class TestPredict:
@@ -652,7 +652,7 @@ class TestIntegration:
         # Should blend all three levels
         stats = model.distribution(specific_key, timestamp=1000.0)
         assert len(stats.distribution) >= 1
-        assert stats.depth >= 1
+        assert stats.key == specific_key
 
     def test_temporal_pattern_isolation(self) -> None:
         """Test that different time periods maintain independent patterns."""
