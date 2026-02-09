@@ -14,8 +14,11 @@ by the forecaster framework.
 """
 
 from datetime import datetime
-from typing import Self
+from typing import Final, Self
 
+from custom_components.discrete_state_forecaster.model.temporal.temporal_feature import (
+    TemporalFeature,
+)
 from custom_components.discrete_state_forecaster.model.temporal.time_key import TimeKey
 
 from .time_indexer import (
@@ -24,11 +27,40 @@ from .time_indexer import (
 
 
 class SeasonIndexer(TimeIndexer):
-    name = "season"
+    """
+    Maps timestamps to meteorological seasons (Northern Hemisphere).
+
+    This indexer maps each timestamp to one of four meteorological seasons
+    based on the month. Meteorological seasons are defined by temperature
+    cycles and are more consistent for climate analysis than astronomical
+    seasons.
+
+    Seasons enable the forecaster to learn season-specific patterns where
+    behavior may differ significantly (e.g., heating patterns differ between
+    summer and winter).
+
+    Attributes:
+        name: Always set to "season" - the name of the temporal feature.
+
+    Examples:
+        >>> indexer = SeasonIndexer()
+        >>> # March is spring
+        >>> spring = datetime(2024, 3, 15, 10, 30)
+        >>> key = await indexer.get_key(spring)
+        >>> key.to_tuple()
+        (('season', 'spring'),)
+        >>> # July is summer
+        >>> summer = datetime(2024, 7, 15, 10, 30)
+        >>> key2 = await indexer.get_key(summer)
+        >>> key2.to_tuple()
+        (('season', 'summer'),)
+    """
+
+    name: Final = "season"
 
     async def get_key(self: Self, timestamp: datetime) -> TimeKey:
         """
-        Returns the season name for the given timestamp.
+        Returns a TimeKey with the season name for the given timestamp.
 
         Uses meteorological seasons (Northern Hemisphere):
         - "spring": March 1 — May 31
@@ -40,16 +72,32 @@ class SeasonIndexer(TimeIndexer):
             timestamp: Timestamp to map to a season.
 
         Returns:
-            A string: one of "spring", "summer", "autumn", "winter".
+            A TimeKey with a single feature: ("season", season_name)
+            where season_name is one of "spring", "summer", "autumn", "winter".
+
+        Examples:
+            >>> indexer = SeasonIndexer()
+            >>> # Any date in March is spring
+            >>> ts1 = datetime(2024, 3, 1, 0, 0)
+            >>> key1 = await indexer.get_key(ts1)
+            >>> key1.to_tuple()
+            (('season', 'spring'),)
+            >>> ts2 = datetime(2024, 12, 15, 12, 0)
+            >>> key2 = await indexer.get_key(ts2)
+            >>> key2.to_tuple()
+            (('season', 'winter'),)
         """
         month = timestamp.month
         if 3 <= month <= 5:
-            return "spring"
-        if 6 <= month <= 8:
-            return "summer"
-        if 9 <= month <= 11:
-            return "autumn"
-        return "winter"
+            season = "spring"
+        elif 6 <= month <= 8:
+            season = "summer"
+        elif 9 <= month <= 11:
+            season = "autumn"
+        else:
+            season = "winter"
+
+        return TimeKey.from_temporal_feature(TemporalFeature(name=self.name, value=season))
 
     async def next_boundary(self: Self, timestamp: datetime) -> datetime:
         """
@@ -65,6 +113,19 @@ class SeasonIndexer(TimeIndexer):
         Returns:
             A `datetime` representing the next season start strictly after
             `timestamp`.
+
+        Examples:
+            >>> indexer = SeasonIndexer()
+            >>> # From mid-March, next boundary is June 1 (summer)
+            >>> ts = datetime(2024, 3, 15, 14, 30)
+            >>> boundary = await indexer.next_boundary(ts)
+            >>> boundary
+            datetime(2024, 6, 1, 0, 0, 0)
+            >>> # From December, next boundary is March 1 next year
+            >>> ts2 = datetime(2024, 12, 15, 14, 30)
+            >>> boundary2 = await indexer.next_boundary(ts2)
+            >>> boundary2
+            datetime(2025, 3, 1, 0, 0, 0)
         """
         tz = timestamp.tzinfo
 
