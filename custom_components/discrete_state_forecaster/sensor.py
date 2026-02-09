@@ -78,9 +78,7 @@ class DiscreteStateForecasterSensor(
         # Add predicted state and probability
         if prediction.state is not None:
             attributes["predicted_state"] = str(prediction.state)
-            attributes["probability"] = prediction.distribution.get(
-                prediction.state, 0.0
-            )
+            attributes["probability"] = prediction.distribution.get(prediction.state, 0.0)
 
         # Add current actual state for comparison
         if self.coordinator.data.current_state:
@@ -98,8 +96,7 @@ class DiscreteStateForecasterSensor(
 
         # Add full probability distribution
         attributes["distribution"] = {
-            str(state): round(prob, 3)
-            for state, prob in prediction.distribution.items()
+            str(state): round(prob, 3) for state, prob in prediction.distribution.items()
         }
 
         # Add timestamp of prediction

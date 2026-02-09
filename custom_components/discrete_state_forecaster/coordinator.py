@@ -21,14 +21,14 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 from homeassistant.util.event_type import EventType
 
-from custom_components.discrete_state_forecaster.model.prediction import Prediction
-from custom_components.discrete_state_forecaster.model.time_aware_forecaster import (
+from custom_components.discrete_state_forecaster.old_model.prediction import Prediction
+from custom_components.discrete_state_forecaster.old_model.time_aware_forecaster import (
     TimeAwareForecaster,
 )
-from custom_components.discrete_state_forecaster.model.time_indexers.calendar_indexer import (
+from custom_components.discrete_state_forecaster.old_model.time_indexers.calendar_indexer import (
     CalendarIndexer,
 )
-from custom_components.discrete_state_forecaster.model.time_indexers.season_indexer import (
+from custom_components.discrete_state_forecaster.old_model.time_indexers.season_indexer import (
     SeasonIndexer,
 )
 
@@ -55,8 +55,8 @@ from .const import (
     DEFAULT_USE_SEASON,
     STORING_TIME_PATTERN,
 )
-from .model.state_tracker import StateTracker
-from .model.time_indexers import (
+from .old_model.state_tracker import StateTracker
+from .old_model.time_indexers import (
     CompositeIndexer,
     DayOfWeekIndexer,
     MonthIndexer,
@@ -102,9 +102,7 @@ class DiscreteStateForecasterCoordinator(
         )
 
         # Build indexers based on configuration
-        self._time_indexers = self._build_indexers(
-            time_bucket_minutes, config_entry.options
-        )
+        self._time_indexers = self._build_indexers(time_bucket_minutes, config_entry.options)
         self._composite_indexer = CompositeIndexer(self._time_indexers)
 
         # Get persistence settings from options
@@ -114,9 +112,7 @@ class DiscreteStateForecasterCoordinator(
         adaptive_persistence = config_entry.options.get(
             CONF_ADAPTIVE_PERSISTENCE, DEFAULT_ADAPTIVE_PERSISTENCE
         )
-        half_life_hours = config_entry.options.get(
-            CONF_HALF_LIFE_HOURS, DEFAULT_HALF_LIFE_HOURS
-        )
+        half_life_hours = config_entry.options.get(CONF_HALF_LIFE_HOURS, DEFAULT_HALF_LIFE_HOURS)
 
         self._forecaster = TimeAwareForecaster(
             self._composite_indexer,
@@ -140,12 +136,8 @@ class DiscreteStateForecasterCoordinator(
         self._current_use_month = config_entry.options.get(
             CONF_USE_MONTH_OF_YEAR, DEFAULT_USE_MONTH_OF_YEAR
         )
-        self._current_use_season = config_entry.options.get(
-            CONF_USE_SEASON, DEFAULT_USE_SEASON
-        )
-        self._current_calendar_features = config_entry.options.get(
-            CONF_CALENDAR_FEATURES, []
-        )
+        self._current_use_season = config_entry.options.get(CONF_USE_SEASON, DEFAULT_USE_SEASON)
+        self._current_calendar_features = config_entry.options.get(CONF_CALENDAR_FEATURES, [])
         self._current_time_bucket_size = time_bucket_minutes
 
         # Listen for config entry updates
@@ -169,9 +161,7 @@ class DiscreteStateForecasterCoordinator(
             Event(
                 event_type=EventType("state_changed"),
                 data={
-                    "new_state": self.hass.states.get(
-                        self.config_entry.data[CONF_TARGET_ENTITY_ID]
-                    )
+                    "new_state": self.hass.states.get(self.config_entry.data[CONF_TARGET_ENTITY_ID])
                 },
                 time_fired_timestamp=now.timestamp(),
             )
@@ -228,9 +218,7 @@ class DiscreteStateForecasterCoordinator(
         if data:
             try:
                 # Restore forecaster from saved state
-                self._forecaster = TimeAwareForecaster.from_dict(
-                    data, self._composite_indexer
-                )
+                self._forecaster = TimeAwareForecaster.from_dict(data, self._composite_indexer)
                 # Reconnect state tracker to restored forecaster
                 self._state_tracker = StateTracker(self._forecaster)
 
@@ -277,9 +265,7 @@ class DiscreteStateForecasterCoordinator(
         now = dt_util.now()
 
         # Get current state from Home Assistant
-        target_entity = self.hass.states.get(
-            self._config_entry.data[CONF_TARGET_ENTITY_ID]
-        )
+        target_entity = self.hass.states.get(self._config_entry.data[CONF_TARGET_ENTITY_ID])
         current_state = self._get_state_to_store(target_entity)
 
         # Make prediction for current time
@@ -355,11 +341,7 @@ class DiscreteStateForecasterCoordinator(
         if state is None:
             return None
 
-        return (
-            state.state
-            if state.state not in (STATE_UNKNOWN, STATE_UNAVAILABLE)
-            else None
-        )
+        return state.state if state.state not in (STATE_UNKNOWN, STATE_UNAVAILABLE) else None
 
     def _build_indexers(
         self: Self,
@@ -371,9 +353,7 @@ class DiscreteStateForecasterCoordinator(
 
         # Calendar feature indexers (optional)
         for calendar_feature in options.get(CONF_CALENDAR_FEATURES, []):
-            indexers.append(
-                CalendarIndexer(self.hass, calendar_feature)
-            )  # noqa: PERF401
+            indexers.append(CalendarIndexer(self.hass, calendar_feature))  # noqa: PERF401
 
         # Day of week indexer (optional)
         use_day_of_week = options.get(CONF_USE_DAY_OF_WEEK, DEFAULT_USE_DAY_OF_WEEK)
@@ -409,9 +389,7 @@ class DiscreteStateForecasterCoordinator(
         new_use_day_of_week = config_entry.options.get(
             CONF_USE_DAY_OF_WEEK, DEFAULT_USE_DAY_OF_WEEK
         )
-        new_use_month = config_entry.options.get(
-            CONF_USE_MONTH_OF_YEAR, DEFAULT_USE_MONTH_OF_YEAR
-        )
+        new_use_month = config_entry.options.get(CONF_USE_MONTH_OF_YEAR, DEFAULT_USE_MONTH_OF_YEAR)
         new_use_season = config_entry.options.get(CONF_USE_SEASON, DEFAULT_USE_SEASON)
         new_calendar_features = config_entry.options.get(CONF_CALENDAR_FEATURES, [])
 
@@ -448,9 +426,7 @@ class DiscreteStateForecasterCoordinator(
             self._current_time_bucket_size = new_time_bucket_size
 
             # Rebuild indexers
-            self._time_indexers = self._build_indexers(
-                new_time_bucket_size, config_entry.options
-            )
+            self._time_indexers = self._build_indexers(new_time_bucket_size, config_entry.options)
             self._composite_indexer = CompositeIndexer(self._time_indexers)
 
             # Get persistence settings from options

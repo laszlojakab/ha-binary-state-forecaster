@@ -1,0 +1,311 @@
+import math
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Final, Self
+
+from custom_components.discrete_state_forecaster.model.hyper_parameters import (
+    HyperParameters,
+)
+from custom_components.discrete_state_forecaster.model.learning.drift_monitor import (
+    DriftMonitor,
+    DriftMonitorHyperParameters,
+)
+from custom_components.discrete_state_forecaster.model.learning.hyper_parameter_controller import (
+    HyperParameterController,
+)
+from custom_components.discrete_state_forecaster.model.learning.state_persistence_tracker import (
+    StatePersistenceTracker,
+    StatePersistenceTrackerHyperParameters,
+)
+from custom_components.discrete_state_forecaster.model.metrics.online_error_tracker import (
+    OnlineErrorTracker,
+    OnlineErrorTrackerHyperParameters,
+)
+from custom_components.discrete_state_forecaster.model.statistics.distribution_stats import (
+    DistributionStats,
+)
+from custom_components.discrete_state_forecaster.model.statistics.hierarchical_state_stats import (
+    HierarchicalStateStats,
+)
+from custom_components.discrete_state_forecaster.model.statistics.hierarchical_state_stats_hyper_parameters import (
+    HierarchicalStateStatsHyperParameters,
+)
+from custom_components.discrete_state_forecaster.model.statistics.prediction_result import (
+    PredictionResult,
+)
+from custom_components.discrete_state_forecaster.model.temporal.time_key import (
+    TimeKey,
+)
+
+from .state import State
+
+
+@dataclass(frozen=True)
+class ForecasterEngineParameters:
+    # half_life        ≈ typical_change
+    # fast_half_life   ≈ 1–2 × typical_change
+    # slow_half_life   ≈ 10–30 × typical_change
+    # drift_half_life  ≈ 1.5 × slow_half_life
+    # min_support      ≈ 5–10 × typical_change
+    half_life: float = 3600.0
+    # T = tipikus változási idő
+    # | Tracker          | Half-life       | Miért             |
+    # | ---------------- | --------------- | ----------------- |
+    # | short_term_error | **~ 2–4 × T**   | gyors reakció     |
+    # | long_term_error  | **~ 20–50 × T** | stabil referencia |
+    # 5–10 × base_half_life
+    #######
+    # half_life        ≈ typical_change
+    # fast_half_life   ≈ 1–2 × typical_change
+    # slow_half_life   ≈ 10–30 × typical_change
+    # drift_half_life  ≈ 1.5 × slow_half_life
+    slow_half_life_factor: float = 20
+    slow_epsilon: float = 1e-9
+    slow_prune_threshold: float = 1e-6
+    fast_half_life_factor: float = 1.5
+    fast_epsilon: float = 1e-9
+    fast_prune_threshold: float = 1e-6
+    drift_half_life_factor: float = 30
+    tau_enter: float = 0.1
+    tau_exit: float = 0.05
+    adaptive_tau: bool = True
+    n_enter: int = 3
+    n_exit: int = 5
+    short_term_error_half_life_factor: float = 4
+    long_term_error_half_life_factor: float = 40
+    persistence_half_life_factor: float = 5.0
+    # # min_prune_interval ≈ 5–10 × base_half_life
+    # min_prune_interval: float = 3600.0 * 5,
+    min_prune_interval_factor: float = 5.0
+    persistence_strength: float = 0.5
+    # min_support ≈ 5–10 × typical_change
+    min_support_factor: float = 7.5
+
+
+class ForecasterEngine:
+    def __init__(
+        self: Self,
+        parameters: ForecasterEngineParameters,
+    ) -> None:
+        self._hyper_parameters = HyperParameters(
+            half_life=parameters.half_life,
+            min_prune_interval=parameters.half_life
+            * parameters.min_prune_interval_factor,
+            prune_enabled=True,
+            persistence_strength=parameters.persistence_strength,
+        )
+        self._stats: Final = HierarchicalStateStats(
+            HierarchicalStateStatsHyperParameters(
+                hyper_parameters=self._hyper_parameters,
+                min_support_factor=parameters.min_support_factor,
+            )
+        )
+
+        # Drift monitor changes concept drifts in GLOBAL distribution.
+        self._drift_monitor: Final = DriftMonitor(
+            DriftMonitorHyperParameters(
+                hyper_parameters=self._hyper_parameters,
+                slow_half_life_factor=parameters.slow_half_life_factor,
+                slow_epsilon=parameters.slow_epsilon,
+                slow_prune_threshold=parameters.slow_prune_threshold,
+                fast_half_life_factor=parameters.fast_half_life_factor,
+                fast_epsilon=parameters.fast_epsilon,
+                fast_prune_threshold=parameters.fast_prune_threshold,
+                drift_half_life_factor=parameters.drift_half_life_factor,
+                tau_enter=parameters.tau_enter,
+                tau_exit=parameters.tau_exit,
+                adaptive_tau=parameters.adaptive_tau,
+                n_enter=parameters.n_enter,
+                n_exit=parameters.n_exit,
+            )
+        )
+        self._short_term_error_tracker: Final = OnlineErrorTracker(
+            hyper_parameters=OnlineErrorTrackerHyperParameters(
+                hyper_parameters=self._hyper_parameters,
+                error_half_life_factor=parameters.short_term_error_half_life_factor,
+            )
+        )
+        self._long_term_error_tracker: Final = OnlineErrorTracker(
+            hyper_parameters=OnlineErrorTrackerHyperParameters(
+                hyper_parameters=self._hyper_parameters,
+                error_half_life_factor=parameters.long_term_error_half_life_factor,
+            ),
+        )
+
+        self._state_persistence_tracker: Final = StatePersistenceTracker(
+            StatePersistenceTrackerHyperParameters(
+                hyper_parameters=self._hyper_parameters,
+                persistence_half_life_factor=parameters.persistence_half_life_factor,
+            )
+        )
+
+        self._hyper_parameter_controller: Final = HyperParameterController(
+            hyper_parameters=self._hyper_parameters, base_half_life=parameters.half_life
+        )
+
+        self._last_update_timestamp: float | None = None
+        self._last_prune_timestamp: float | None = None
+
+    def update(
+        self: Self,
+        key: TimeKey,
+        state: State,
+        timestamp: float | None = None,
+    ) -> None:
+        timestamp = (
+            timestamp if timestamp is not None else datetime.now(tz=UTC).timestamp()
+        )
+
+        if self._last_update_timestamp is not None:
+            duration = timestamp - self._last_update_timestamp
+
+            if duration < 0:
+                raise ValueError(
+                    "Timestamp cannot be in the past, "
+                    f"previous update was at {self._last_update_timestamp}, "
+                    f"current timestamp is {timestamp}"
+                )
+
+            self._stats.apply_decay(self._get_decay_factor(duration))
+        else:
+            duration = 0.0
+
+        self._stats.update(key, state, weight=duration)
+
+        global_prediction = self._stats.predict(TimeKey.GLOBAL)
+
+        if global_prediction:
+            # After the first update we may not be able to get a global prediction.
+            self._drift_monitor.update(
+                global_prediction.distribution.distribution(), timestamp
+            )
+
+        self._prune(timestamp)
+
+        prediction = self._stats.predict(key)
+        if prediction is not None:
+            self._short_term_error_tracker.update(
+                prediction.distribution, state, timestamp
+            )
+            self._long_term_error_tracker.update(
+                prediction.distribution, state, timestamp
+            )
+
+        self._hyper_parameter_controller.update(
+            is_drifting=self._drift_monitor.is_drifting,
+            short_term_error=self._short_term_error_tracker.mean,
+            long_term_error=self._long_term_error_tracker.mean,
+        )
+
+        # Update state persistence tracker
+        self._state_persistence_tracker.update(state, timestamp)
+
+        self._last_update_timestamp = timestamp
+
+    def predict(self: Self, key: TimeKey) -> PredictionResult | None:
+        return self._stats.predict(key)
+
+    def predict_with_persistence(
+        self,
+        key: TimeKey,
+        current_state: State | None = None,
+        current_state_duration: float | None = None,
+    ) -> PredictionResult | None:
+        prediction = self._stats.predict(key)
+        if prediction is None:
+            return None
+
+        base_dist = prediction.distribution
+        base_probs = base_dist.distribution()
+        total_support = base_dist.total_support()
+
+        adjusted = DistributionStats()
+
+        # ------------------------------------------------------------------
+        # CASE 1: explicit current state + duration provided
+        # ------------------------------------------------------------------
+        if current_state is not None and current_state_duration is not None:
+
+            expected = self._state_persistence_tracker.expected_duration(current_state)
+
+            # hazard-style decay
+            ratio = current_state_duration / max(expected, 1e-6)
+            persistence_boost = math.exp(-ratio)
+
+            for state, prob in base_probs.items():
+                weight = prob * total_support
+
+                if state == current_state:
+                    weight *= (
+                        1.0
+                        + self._hyper_parameters.persistence_strength
+                        * persistence_boost
+                    )
+
+                adjusted.update(state, weight)
+
+            return PredictionResult(
+                key=prediction.key,
+                distribution=adjusted,
+                contributions=prediction.contributions,
+            )
+
+        # ------------------------------------------------------------------
+        # CASE 2: no explicit current state → use internal tracker
+        # ------------------------------------------------------------------
+        internal_current = self._state_persistence_tracker.current_state()
+
+        if internal_current is not None:
+            timestamp = self._last_update_timestamp
+            if timestamp is not None:
+                expected = self._state_persistence_tracker.expected_duration(
+                    internal_current
+                )
+                current_duration = self._state_persistence_tracker.current_duration(
+                    timestamp
+                )
+
+                ratio = current_duration / max(expected, 1e-6)
+                persistence_boost = math.exp(-ratio)
+
+                for state, prob in base_probs.items():
+                    weight = prob * total_support
+
+                    if state == internal_current:
+                        weight *= (
+                            1.0
+                            + self._hyper_parameters.persistence_strength
+                            * persistence_boost
+                        )
+
+                    adjusted.update(state, weight)
+
+                return PredictionResult(
+                    key=prediction.key,
+                    distribution=adjusted,
+                    contributions=prediction.contributions,
+                )
+
+        # ------------------------------------------------------------------
+        # CASE 3: no persistence information → return base prediction
+        # ------------------------------------------------------------------
+        return prediction
+
+    def _prune(self: Self, timestamp: float) -> None:
+        if not self._hyper_parameters.prune_enabled:
+            return
+
+        if self._last_prune_timestamp is None:
+            self._last_prune_timestamp = timestamp
+            return
+
+        if (
+            self._last_prune_timestamp + self._hyper_parameters.min_prune_interval
+        ) > timestamp:
+            return
+
+        self._stats.prune()
+        self._last_prune_timestamp = timestamp
+
+    def _get_decay_factor(self: Self, duration: float) -> float:
+        return 2 ** (-duration / self._hyper_parameters.half_life)
