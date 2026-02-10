@@ -1,4 +1,5 @@
-"""Unit tests for AggregatedStats.
+"""
+Unit tests for AggregatedStats.
 
 Comprehensive tests for the AggregatedStats class, covering TimeKey association,
 distribution conversion, and inherited functionality.

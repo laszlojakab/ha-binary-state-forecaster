@@ -1,6 +1,6 @@
 """Unit tests for CalendarIndexer."""
 
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from typing import Self
 from unittest.mock import AsyncMock, MagicMock
 
@@ -372,8 +372,7 @@ class TestCalendarIndexerHashability:
                         "events": [{"summary": "Event", "start": "2024-01-15T14:00:00", "end": "2024-01-15T15:00:00"}]
                     }
                 }
-            else:
-                return {"calendar.work_schedule": {"events": []}}
+            return {"calendar.work_schedule": {"events": []}}
 
         hass.services.async_call = AsyncMock(side_effect=side_effect)
         indexer = CalendarIndexer(hass, "calendar.work_schedule")

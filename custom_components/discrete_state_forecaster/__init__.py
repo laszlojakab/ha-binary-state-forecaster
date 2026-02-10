@@ -21,7 +21,7 @@
 # """The config entry for the discrete state forecaster integration."""
 
 
-# async def async_setup(hass: HomeAssistant, config: Config) -> bool:  # noqa: ARG001
+# async def async_setup(hass: HomeAssistant, config: Config) -> bool:
 #     """
 #     Set up the discrete state forecaster integration.
 

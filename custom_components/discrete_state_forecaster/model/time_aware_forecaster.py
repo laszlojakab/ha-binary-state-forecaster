@@ -50,7 +50,6 @@ class TimeAwareForecaster:
         - Frissíti a state duration-t minden step után
         - Opcionálisan szimulálja a jövőbeli state path-et (argmax)
         """
-
         ts = start_ts
         results: list[tuple[float, PredictionResult]] = []
 
@@ -93,11 +92,10 @@ class TimeAwareForecaster:
                 else:
                     sim_state = None
                     sim_duration = 0.0
-            else:
-                # Ha nem szimulálunk state path-et,
-                # csak növeljük a duration-t ha van current state
-                if sim_state is not None:
-                    sim_duration += step_dt
+            # Ha nem szimulálunk state path-et,
+            # csak növeljük a duration-t ha van current state
+            elif sim_state is not None:
+                sim_duration += step_dt
 
             ts = step_end
 

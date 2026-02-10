@@ -1,6 +1,6 @@
 """Unit tests for SeasonIndexer."""
 
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Self
 
 import pytest

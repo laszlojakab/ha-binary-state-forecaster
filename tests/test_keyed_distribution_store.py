@@ -1,10 +1,10 @@
-"""Unit tests for KeyedDistributionStore.
+"""
+Unit tests for KeyedDistributionStore.
 
 Comprehensive tests for the KeyedDistributionStore class, covering key-based
 distribution management, aggregation, and bulk operations.
 """
 from typing import Self
-
 
 from custom_components.discrete_state_forecaster.model.statistics.distribution_stats import (
     DistributionStats,

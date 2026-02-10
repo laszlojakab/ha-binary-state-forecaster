@@ -1,4 +1,5 @@
-"""Unit tests for HierarchicalStateStats.
+"""
+Unit tests for HierarchicalStateStats.
 
 Comprehensive tests for the HierarchicalStateStats class, covering hierarchical
 updates, multi-level predictions with fallback, and temporal decay.

@@ -1,4 +1,5 @@
-"""Unit tests for StateStats.
+"""
+Unit tests for StateStats.
 
 Comprehensive tests for the StateStats class, covering initialization,
 support tracking, decay application, and edge cases.

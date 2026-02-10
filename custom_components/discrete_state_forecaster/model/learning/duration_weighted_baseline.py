@@ -1,5 +1,13 @@
+"""
+Duration-weighted baseline distribution with exponential decay.
+
+This module provides DurationWeightedBaseline, which maintains a probability
+distribution by integrating distribution observations over time. Each update
+represents a distribution that was valid for dt seconds, and older evidence
+decays exponentially.
+"""
 import math
-from typing import Final
+from typing import Final, Self
 
 from custom_components.discrete_state_forecaster.model.state import (
     State,
@@ -15,23 +23,74 @@ class DurationWeightedBaseline:
     Baseline distribution that integrates distributions over time.
 
     Each update represents a distribution that was valid for dt seconds.
-    Older evidence decays exponentially based on half-life.
+    Older evidence decays exponentially based on half-life. This allows
+    the baseline to adapt to changing patterns while giving appropriate
+    weight to how long each distribution persisted.
+
+    Attributes:
+        _hyper_parameters: Configuration controlling decay and smoothing.
+        _mass: Accumulated mass for each state.
+        _last_ts: Timestamp of last update, or None if never updated.
+
+    Example:
+        >>> from custom_components.discrete_state_forecaster.model.hyper_parameters import (
+        ...     HyperParameters,
+        ... )
+        >>> from .drift_monitor_hyper_parameters import DriftMonitorHyperParameters
+        >>> base_hp = HyperParameters(
+        ...     half_life=50.0,
+        ...     min_prune_interval=10.0,
+        ...     prune_enabled=True,
+        ...     persistence_strength=0.95,
+        ... )
+        >>> drift_hp = DriftMonitorHyperParameters(hyper_parameters=base_hp)
+        >>> hp = DurationWeightedBaselineHyperParameters(
+        ...     hyper_parameters=drift_hp,
+        ...     half_life_factor=1.0,
+        ... )
+        >>> baseline = DurationWeightedBaseline(hp)
+        >>> dist = {"on": 0.7, "off": 0.3}
+        >>> baseline.update(dist, 100.0)
+        >>> baseline.update(dist, 105.0)
+        >>> result = baseline.distribution()
+        >>> abs(result["on"] - 0.7) < 0.01
+        True
+
     """
 
     def __init__(
-        self,
+        self: Self,
         hyper_parameters: DurationWeightedBaselineHyperParameters,
-    ):
+    ) -> None:
+        """
+        Initialize duration-weighted baseline tracker.
+
+        Args:
+            hyper_parameters: Configuration controlling decay and smoothing.
+
+        """
         self._hyper_parameters: Final = hyper_parameters
 
         self._mass: dict[State, float] = {}
         self._last_ts: float | None = None
 
     def update(
-        self,
+        self: Self,
         dist: dict[State, float],
         timestamp: float,
     ) -> None:
+        """
+        Update baseline with new distribution observation.
+
+        Applies exponential decay to existing mass, prunes small values,
+        then integrates the new distribution weighted by time elapsed.
+        The first update just sets the timestamp without accumulating mass.
+
+        Args:
+            dist: Probability distribution to integrate (should sum to ~1.0).
+            timestamp: Current timestamp for computing decay.
+
+        """
         if self._last_ts is None:
             self._last_ts = timestamp
             return
@@ -55,18 +114,33 @@ class DurationWeightedBaseline:
 
         self._last_ts = timestamp
 
-    def distribution(self) -> dict[State, float]:
+    def distribution(self: Self) -> dict[State, float]:
+        """
+        Get normalized probability distribution with Laplace smoothing.
+
+        Returns:
+            Dictionary mapping states to probabilities (sums to ~1.0),
+                or empty dict if no mass has been accumulated.
+
+        """
         total = sum(self._mass.values())
         if total <= 0.0:
             return {}
 
-        K = len(self._mass)
-        denom = total + self._hyper_parameters.epsilon * K
+        num_states = len(self._mass)
+        denom = total + self._hyper_parameters.epsilon * num_states
 
         return {
             s: (m + self._hyper_parameters.epsilon) / denom
             for s, m in self._mass.items()
         }
 
-    def total_mass(self) -> float:
+    def total_mass(self: Self) -> float:
+        """
+        Get total accumulated mass across all states.
+
+        Returns:
+            Sum of all state masses before normalization.
+
+        """
         return sum(self._mass.values())

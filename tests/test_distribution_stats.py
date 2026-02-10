@@ -1,4 +1,5 @@
-"""Unit tests for DistributionStats.
+"""
+Unit tests for DistributionStats.
 
 Comprehensive tests for the DistributionStats class, covering distribution
 management, support aggregation, probability calculations, entropy, and decay.

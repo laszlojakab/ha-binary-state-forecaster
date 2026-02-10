@@ -2,12 +2,11 @@
 """Script to replace tuple literals with TimeKey instances in test files."""
 
 import re
-import sys
 
 
 def process_file(filepath):
     """Process a file to replace tuple literals with TimeKey instances."""
-    with open(filepath, "r") as f:
+    with open(filepath) as f:
         content = f.read()
 
     lines = content.split("\n")
