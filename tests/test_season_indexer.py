@@ -1,6 +1,6 @@
 """Unit tests for SeasonIndexer."""
 
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from typing import Self
 
 import pytest
@@ -281,7 +281,7 @@ class TestSeasonIndexerNextBoundary:
     async def test_preserves_timezone(self: Self) -> None:
         """Test that timezone information is preserved."""
         indexer = SeasonIndexer()
-        tz = timezone.utc
+        tz = UTC
         ts = datetime(2024, 3, 15, 14, 30, tzinfo=tz)
         boundary = await indexer.next_boundary(ts)
         assert boundary.tzinfo == tz
@@ -369,7 +369,7 @@ class TestSeasonIndexerValueRange:
             "winter": 12,
         }
 
-        for season, month in months_per_season.items():
+        for _season, month in months_per_season.items():
             ts = datetime(2024, month, 15, 10, 30)
             key = await indexer.get_key(ts)
             found_season = key.to_tuple()[0][1]

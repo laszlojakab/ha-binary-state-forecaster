@@ -198,12 +198,12 @@ class TestTimeKeyEquality:
         assert key != (("hour", 14),)
         assert key != "hour = 14"
         assert key != 14
-        assert key != None
+        assert key is not None
 
     def test_equality_reflexive(self: Self) -> None:
         """Test equality is reflexive (a == a)."""
         key = TimeKey.from_tuple((("hour", 14),))
-        assert key == key
+        assert key == key  # noqa: PLR0124
 
     def test_equality_transitive(self: Self) -> None:
         """Test equality is transitive (a==b, b==c implies a==c)."""

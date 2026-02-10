@@ -1,6 +1,6 @@
 """Unit tests for CalendarIndexer."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from typing import Self
 from unittest.mock import AsyncMock, MagicMock
 
@@ -409,9 +409,9 @@ class TestCalendarIndexerEdgeCases:
             "calendar.work_schedule": {"events": []}
         })
         indexer = CalendarIndexer(hass, "calendar.work_schedule")
-        tz = timezone.utc
+        tz = UTC
         ts = datetime(2024, 1, 15, 10, 30, tzinfo=tz)
-        boundary = await indexer.next_boundary(ts)
+        _boundary = await indexer.next_boundary(ts)
         # Result might not preserve all tzinfo details in 24-hour offset case
 
     @pytest.mark.asyncio

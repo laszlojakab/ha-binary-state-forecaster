@@ -37,7 +37,9 @@ class Contribution:
         1.0
         >>> contrib.support
         50.0
+
     """
+
     key: TimeKey
     weight: float
     support: float

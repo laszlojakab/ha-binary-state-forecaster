@@ -5,8 +5,6 @@ distribution conversion, and inherited functionality.
 """
 from typing import Self
 
-import pytest
-
 from custom_components.discrete_state_forecaster.model.statistics.aggregated_stats import (
     AggregatedStats,
 )

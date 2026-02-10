@@ -18,6 +18,7 @@ class StateStats:
 
     Attributes:
         _support: Cumulative weight/support for this state. Defaults to 0.0.
+
     """
 
     _support: float = 0.0
@@ -30,6 +31,7 @@ class StateStats:
 
         Raises:
             ValueError: If weight is negative.
+
         """
         if weight < 0:
             raise ValueError("weight must be non negative")
@@ -44,6 +46,7 @@ class StateStats:
 
         Raises:
             ValueError: If factor is not in range (0, 1].
+
         """
         if not (0.0 < factor <= 1.0):
             raise ValueError(f"decay factor must be in (0, 1]. Got: {factor}")
@@ -58,6 +61,7 @@ class StateStats:
 
         Returns:
             The accumulated weight/support for this state.
+
         """
         return self._support
 
@@ -69,6 +73,7 @@ class StateStats:
 
         Returns:
             True if state's support >= min_support.
+
         """
         return self._support >= min_support
 

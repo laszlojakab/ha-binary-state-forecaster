@@ -5,8 +5,6 @@ management, support aggregation, probability calculations, entropy, and decay.
 """
 from typing import Self
 
-import pytest
-
 from custom_components.discrete_state_forecaster.model.statistics.distribution_stats import (
     DistributionStats,
 )

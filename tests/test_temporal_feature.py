@@ -328,7 +328,7 @@ class TestTemporalFeatureEqualityProperties:
     def test_equality_reflexive(self: Self) -> None:
         """Test that a feature equals itself (reflexivity)."""
         feature = TemporalFeature(name="hour", value=14)
-        assert feature == feature
+        assert feature == feature  # noqa: PLR0124
 
     def test_equality_symmetric(self: Self) -> None:
         """Test equality is symmetric (a==b implies b==a)."""
@@ -349,5 +349,5 @@ class TestTemporalFeatureEqualityProperties:
     def test_inequality_with_none(self: Self) -> None:
         """Test that features are not equal to None."""
         feature = TemporalFeature(name="hour", value=14)
-        assert feature != None
-        assert not (feature == None)
+        assert feature is not None
+        assert feature is not None

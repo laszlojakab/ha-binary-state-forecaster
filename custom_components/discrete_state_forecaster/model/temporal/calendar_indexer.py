@@ -1,5 +1,4 @@
-"""
-Calendar-based indexer for event-aware pattern analysis.
+"""Calendar-based indexer for event-aware pattern analysis.
 
 This module implements a time indexer that partitions time based on Home Assistant
 calendar events, enabling modeling of patterns that correlate with scheduled events
@@ -22,8 +21,7 @@ from .time_indexer import (
 
 
 class CalendarIndexer(TimeIndexer):
-    """
-    Indexes timestamps by calendar event presence.
+    """Indexes timestamps by calendar event presence.
 
     Maps each timestamp to a binary state based on whether an active calendar
     event is present at that time. This allows the forecaster to learn different
@@ -51,11 +49,11 @@ class CalendarIndexer(TimeIndexer):
     Note:
         This indexer requires the calendar integration to be configured and
         the specified entity_id to exist in Home Assistant.
+
     """
 
     def __init__(self: Self, hass: HomeAssistant, entity_id: str) -> None:
-        """
-        Initialize the calendar-based indexer.
+        """Initialize the calendar-based indexer.
 
         Args:
             hass: Home Assistant instance for accessing calendar services.
@@ -64,6 +62,7 @@ class CalendarIndexer(TimeIndexer):
 
         Raises:
             ValueError: If entity_id is empty or invalid format.
+
         """
         if not entity_id:
             msg = "entity_id cannot be empty"
@@ -78,8 +77,7 @@ class CalendarIndexer(TimeIndexer):
         self.name: str = f"{entity_id}"
 
     async def get_key(self: Self, timestamp: datetime) -> TimeKey:
-        """
-        Returns whether a calendar event is active at the given timestamp.
+        """Returns whether a calendar event is active at the given timestamp.
 
         Queries the Home Assistant calendar service to determine if any event
         is active at the specified time.
@@ -97,6 +95,7 @@ class CalendarIndexer(TimeIndexer):
             >>> # No calendar event
             >>> await indexer.key(datetime(2024, 1, 15, 18, 0))
             0
+
         """
         # Query for events that overlap with this timestamp
         # Using a 1-second window to check if any event is active at timestamp
@@ -131,8 +130,7 @@ class CalendarIndexer(TimeIndexer):
             )
 
     async def next_boundary(self: Self, timestamp: datetime) -> datetime:
-        """
-        Returns the next calendar event boundary after the given timestamp.
+        """Returns the next calendar event boundary after the given timestamp.
 
         Finds the soonest time when the calendar state changes - either when
         an event starts (if currently no event) or when an event ends (if
@@ -152,6 +150,7 @@ class CalendarIndexer(TimeIndexer):
             >>> # Currently in event ending at 5 PM
             >>> await indexer.next_boundary(datetime(2024, 1, 15, 14, 0))
             datetime(2024, 1, 15, 17, 0, 0)
+
         """
         # Query future events (look ahead 30 days)
         start_time = timestamp

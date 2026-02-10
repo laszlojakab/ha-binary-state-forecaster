@@ -5,15 +5,13 @@ updates, multi-level predictions with fallback, and temporal decay.
 """
 from typing import Self
 
-import pytest
-
 from custom_components.discrete_state_forecaster.model.hyper_parameters import (
     HyperParameters,
 )
 from custom_components.discrete_state_forecaster.model.statistics.hierarchical_state_stats import (
     HierarchicalStateStats,
 )
-from custom_components.discrete_state_forecaster.model.statistics.hierarchical_state_stats_hyper_parameters import (
+from custom_components.discrete_state_forecaster.model.statistics.hierarchical_state_stats_hyper_parameters import (  # noqa: E501
     HierarchicalStateStatsHyperParameters,
 )
 from custom_components.discrete_state_forecaster.model.temporal.temporal_feature import (
@@ -63,7 +61,7 @@ class TestHierarchicalStateStatsInitialization:
             persistence_strength=0.95,
         )
         hp = HierarchicalStateStatsHyperParameters(base_hp, min_support_factor=0.5)
-        stats = HierarchicalStateStats(hp)
+        _stats = HierarchicalStateStats(hp)
         assert hp.min_support == 25.0
 
 
@@ -531,7 +529,7 @@ class TestHierarchicalStateStatsIntegration:
         stats_permissive.update(key, "on", weight=40.0)
 
         # Strict might not predict, permissive should
-        result_strict = stats_strict.predict(key)
+        _result_strict = stats_strict.predict(key)
         result_permissive = stats_permissive.predict(key)
 
         # permissive should succeed

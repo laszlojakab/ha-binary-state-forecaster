@@ -33,12 +33,16 @@ class HierarchicalStateStatsHyperParameters:
             directly).
 
     Example:
-        >>> from custom_components.discrete_state_forecaster.model.hyper_parameters import HyperParameters
+        >>> from custom_components.discrete_state_forecaster.model.hyper_parameters import (
+        ...     HyperParameters,
+        ... )
         >>> base_hp = HyperParameters(half_life=50.0)
         >>> hp = HierarchicalStateStatsHyperParameters(base_hp, min_support_factor=0.5)
         >>> hp.min_support
         25.0
+
     """
+
     def __init__(
         self: Self, hyper_parameters: HyperParameters, min_support_factor: float = 1.0
     ):
@@ -52,6 +56,7 @@ class HierarchicalStateStatsHyperParameters:
                 min_support = half_life * min_support_factor.
                 Values < 1.0 make predictions more permissive, while values > 1.0
                 make them more conservative.
+
         """
         self._hyper_parameters: Final = hyper_parameters
         self._min_support_factor: Final = min_support_factor
@@ -66,5 +71,6 @@ class HierarchicalStateStatsHyperParameters:
         Returns:
             The minimum support threshold. Distributions must have total support
                 >= this value to be considered confident for prediction.
+
         """
         return self._hyper_parameters.half_life * self._min_support_factor

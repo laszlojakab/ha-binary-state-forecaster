@@ -74,7 +74,7 @@ class TestStateStatsUpdate:
         stats = StateStats()
         stats.update(10.0)
         # Negative weights are not allowed
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="weight must be non negative"):
             stats.update(-3.0)
 
     def test_update_very_large_weight(self: Self) -> None:
@@ -131,7 +131,7 @@ class TestStateStatsApplyDecay:
         stats = StateStats()
         stats.update(10.0)
         # Factor must be in (0, 1], not including 0
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="decay factor must be in"):
             stats.apply_decay(0.0)
 
     def test_decay_multiple_times(self: Self) -> None:
@@ -286,7 +286,7 @@ class TestStateStatsEdgeCases:
     def test_alternating_update_and_decay(self: Self) -> None:
         """Test alternating updates and decays."""
         stats = StateStats()
-        for i in range(10):
+        for _ in range(10):
             stats.update(10.0)
             stats.apply_decay(0.9)
         # After 10 iterations: roughly converges

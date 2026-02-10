@@ -1,5 +1,4 @@
-"""
-Hierarchical temporal key representation.
+"""Hierarchical temporal key representation.
 
 This module provides `TimeKey`, a data structure that represents a hierarchical
 composition of temporal features. TimeKey instances form parent-child chains,
@@ -10,7 +9,7 @@ A TimeKey can be serialized to/from tuples for storage and transmission, and
 supports hashing and equality comparison for use in dictionaries and sets.
 
 Examples:
-    >>> from custom_components.discrete_state_forecaster.model.temporal.temporal_feature import TemporalFeature
+    >>> from custom_components.discrete_state_forecaster.model.temporal.temporal_feature import TemporalFeature  # noqa: E501
     >>> key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
     >>> key.to_tuple()
     (('hour', 14),)
@@ -19,6 +18,7 @@ Examples:
     2
     >>> list(deeper.hierarchy())  # Root to leaf
     [TimeKey(...), TimeKey(...), TimeKey.GLOBAL]
+
 """
 
 from __future__ import annotations
@@ -32,8 +32,7 @@ if TYPE_CHECKING:
 
 
 class TimeKey:
-    """
-    A hierarchical key representing a path through temporal features.
+    """A hierarchical key representing a path through temporal features.
 
     A TimeKey is an immutable linked-list-like structure where each node
     contains a single TemporalFeature and a reference to its parent TimeKey.
@@ -68,6 +67,7 @@ class TimeKey:
         >>> patterns = {key: "afternoon on Wednesday"}
         >>> patterns[key]
         'afternoon on Wednesday'
+
     """
 
     GLOBAL: TimeKey
@@ -77,8 +77,7 @@ class TimeKey:
         parent: TimeKey | None = None,
         feature: TemporalFeature | None = None,
     ):
-        """
-        Initialize a TimeKey node.
+        """Initialize a TimeKey node.
 
         Args:
             parent: The parent TimeKey (or None for root). Defaults to None.
@@ -92,14 +91,14 @@ class TimeKey:
         Examples:
             >>> # Usually created via TimeKey.GLOBAL + feature
             >>> key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+
         """
         self.parent: Final[TimeKey | None] = parent
         self.feature: Final[TemporalFeature | None] = feature
 
     @property
     def is_root(self) -> bool:
-        """
-        Check if this is the root GLOBAL node.
+        """Check if this is the root GLOBAL node.
 
         Returns:
             True if this is TimeKey.GLOBAL, False otherwise.
@@ -109,12 +108,12 @@ class TimeKey:
             True
             >>> (TimeKey.GLOBAL + TemporalFeature("hour", 14)).is_root
             False
+
         """
         return self == TimeKey.GLOBAL
 
     def ancestors(self) -> Iterator[TimeKey]:
-        """
-        Iterate through ancestor nodes from immediate parent to root.
+        """Iterate through ancestor nodes from immediate parent to root.
 
         Yields nodes starting with the immediate parent and ending at the root
         (but not including the current node).
@@ -126,6 +125,7 @@ class TimeKey:
             >>> key = TimeKey.GLOBAL + TemporalFeature("a", 1) + TemporalFeature("b", 2)
             >>> list(key.ancestors())  # [parent, grandparent]
             [TimeKey(...), TimeKey(...)]
+
         """
         current = self.parent
         while current is not None:
@@ -133,8 +133,7 @@ class TimeKey:
             current = current.parent
 
     def hierarchy(self) -> Iterator[TimeKey]:
-        """
-        Iterate through the complete hierarchy from self to root.
+        """Iterate through the complete hierarchy from self to root.
 
         Yields the current node first, then all ancestors in order from child
         to root.
@@ -147,6 +146,7 @@ class TimeKey:
             >>> hierarchy = list(key.hierarchy())
             >>> len(hierarchy)
             3  # self, parent, GLOBAL
+
         """
         yield self
         yield from self.ancestors()
@@ -154,8 +154,7 @@ class TimeKey:
     def to_tuple(
         self: Self,
     ) -> tuple[tuple[TemporalFeatureName, TemporalFeatureValue], ...]:
-        """
-        Convert the key to a tuple of feature tuples.
+        """Convert the key to a tuple of feature tuples.
 
         Collects all features from the current node up to (but not including)
         the root, then reverses them to produce root-to-leaf order.
@@ -167,6 +166,7 @@ class TimeKey:
             >>> key = TimeKey.GLOBAL + TemporalFeature("hour", 14) + TemporalFeature("day", 3)
             >>> key.to_tuple()
             (('hour', 14), ('day', 3))
+
         """
         items: list[tuple[TemporalFeatureName, TemporalFeatureValue]] = []
         current: TimeKey | None = self
@@ -179,8 +179,7 @@ class TimeKey:
 
     @classmethod
     def from_tuple(cls, data: tuple[tuple[TemporalFeatureName, TemporalFeatureValue], ...]) -> Self:
-        """
-        Construct a TimeKey from a tuple of feature tuples.
+        """Construct a TimeKey from a tuple of feature tuples.
 
         Args:
             data: A tuple of (name, value) pairs ordered from root to leaf.
@@ -195,6 +194,7 @@ class TimeKey:
             2
             >>> key.to_tuple()
             (('hour', 14), ('day', 3))
+
         """
         if not data:
             return cls.GLOBAL
@@ -207,8 +207,7 @@ class TimeKey:
 
     @classmethod
     def from_temporal_feature(cls, feature: TemporalFeature) -> Self:
-        """
-        Construct a single-feature TimeKey from a TemporalFeature.
+        """Construct a single-feature TimeKey from a TemporalFeature.
 
         Args:
             feature: A TemporalFeature to wrap in a TimeKey.
@@ -221,12 +220,12 @@ class TimeKey:
             >>> key = TimeKey.from_temporal_feature(feature)
             >>> key.to_tuple()
             (('hour', 14),)
+
         """
         return cls(cls.GLOBAL, feature)
 
     def __hash__(self: Self) -> int:
-        """
-        Generate a hash based on the complete tuple representation.
+        """Generate a hash based on the complete tuple representation.
 
         Returns:
             An integer hash value.
@@ -234,12 +233,12 @@ class TimeKey:
         Note:
             Equal TimeKeys have equal hashes. The hash is stable across
             multiple calls.
+
         """
         return hash(self.to_tuple())
 
     def __eq__(self: Self, other: object) -> bool:
-        """
-        Check equality based on tuple representation.
+        """Check equality based on tuple representation.
 
         Args:
             other: Another object to compare with.
@@ -254,12 +253,12 @@ class TimeKey:
             True
             >>> k1 is k2
             False
+
         """
         return isinstance(other, TimeKey) and self.to_tuple() == other.to_tuple()
 
     def __len__(self: Self) -> int:
-        """
-        Return the number of features in the hierarchy.
+        """Return the number of features in the hierarchy.
 
         The root GLOBAL node has length 0.
 
@@ -272,6 +271,7 @@ class TimeKey:
             >>> key = TimeKey.from_tuple((("a", 1), ("b", 2)))
             >>> len(key)
             2
+
         """
         count = 0
         current: TimeKey | None = self
@@ -282,8 +282,7 @@ class TimeKey:
         return count
 
     def __repr__(self: Self) -> str:
-        """
-        Return a human-readable string representation.
+        """Return a human-readable string representation.
 
         Shows feature names and values in root-to-leaf order separated by
         commas. The root GLOBAL node is shown as "GLOBAL".
@@ -297,6 +296,7 @@ class TimeKey:
             >>> key = TimeKey.from_tuple((("hour", 14), ("day", 3)))
             >>> repr(key)
             'hour = 14, day = 3'
+
         """
         if self.parent is None and self.feature is None:
             return "GLOBAL"
@@ -311,8 +311,7 @@ class TimeKey:
         return ", ".join(parts)
 
     def __add__(self: Self, other: TemporalFeature | TimeKey) -> Self:
-        """
-        Create a new TimeKey by appending a feature or another TimeKey.
+        """Create a new TimeKey by appending a feature or another TimeKey.
 
         Can append either a single TemporalFeature or the features of another
         TimeKey. The result is a new TimeKey with the added feature(s).
@@ -337,6 +336,7 @@ class TimeKey:
             >>> combined = key + other_key
             >>> combined.to_tuple()
             (('hour', 14), ('season', 'summer'))
+
         """
         if isinstance(other, TemporalFeature):
             return self.__class__(self, other)

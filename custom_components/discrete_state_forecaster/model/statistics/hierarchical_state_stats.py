@@ -6,8 +6,9 @@ a hierarchical fallback mechanism where predictions are first attempted at
 specific temporal contexts, then fall back to broader contexts (ancestors) if
 confidence is insufficient.
 
-The hierarchy allows the model to learn distinct patterns for specific times
-(e.g., "14:30 on Wednesday in spring") while still generalizing when data is
+The hierarchy allows the model to learn distinct patterns for specific
+times (e.g., "14:30 on Wednesday in spring") while still generalizing
+when data is
 sparse by falling back to broader patterns (e.g., "afternoon" or "spring").
 """
 from typing import Self
@@ -16,7 +17,7 @@ from custom_components.discrete_state_forecaster.model.state import State
 from custom_components.discrete_state_forecaster.model.statistics.distribution_stats import (
     DistributionStats,
 )
-from custom_components.discrete_state_forecaster.model.statistics.hierarchical_state_stats_hyper_parameters import (
+from custom_components.discrete_state_forecaster.model.statistics.hierarchical_state_stats_hyper_parameters import (  # noqa: E501
     HierarchicalStateStatsHyperParameters,
 )
 from custom_components.discrete_state_forecaster.model.temporal.time_key import (
@@ -47,8 +48,12 @@ class HierarchicalStateStats:
             thresholds for predictions.
 
     Example:
-        >>> from custom_components.discrete_state_forecaster.model.temporal.time_key import TimeKey
-        >>> from custom_components.discrete_state_forecaster.model.temporal.temporal_feature import TemporalFeature
+        >>> from custom_components.discrete_state_forecaster.model.temporal.time_key import (
+        ...     TimeKey,
+        ... )
+        >>> from custom_components.discrete_state_forecaster.model.temporal.temporal_feature import (  # noqa: E501
+        ...     TemporalFeature,
+        ... )
         >>> hp = HierarchicalStateStatsHyperParameters(min_support=10.0)
         >>> stats = HierarchicalStateStats(hp)
         >>> key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
@@ -56,13 +61,16 @@ class HierarchicalStateStats:
         >>> result = stats.predict(key)
         >>> result is not None
         True
+
     """
+
     def __init__(self: Self, hyper_parameters: HierarchicalStateStatsHyperParameters):
         """Initialize the hierarchical state statistics engine.
 
         Args:
             hyper_parameters: Configuration including minimum support thresholds
                 and other prediction parameters.
+
         """
         self._stats = KeyedDistributionStore()
         self._hyper_parameters = hyper_parameters
@@ -90,6 +98,7 @@ class HierarchicalStateStats:
             key: The specific TimeKey at which the state was observed.
             state: The state that was observed.
             weight: The weight to increment for this observation.
+
         """
         for ancestor in key.hierarchy():
             self._stats.update(ancestor, state, weight)
@@ -114,6 +123,7 @@ class HierarchicalStateStats:
             A PredictionResult containing the probability distribution and
                 contribution sources if confident enough, or None if no level
                 reaches the minimum support threshold.
+
         """
         specific = self._stats.get_distribution(key)
 
@@ -170,6 +180,7 @@ class HierarchicalStateStats:
         Args:
             factor: Decay factor in range (0, 1]. Values closer to 0 produce
                 stronger decay. For example, 0.95 retains 95% of previous support.
+
         """
         self._stats.apply_decay(factor)
 
@@ -186,5 +197,6 @@ class HierarchicalStateStats:
             absolute_min: Absolute minimum support (default 20.0). Ensures
                 frequently observed states are not removed even if total
                 support is very high.
+
         """
         self._stats.prune(epsilon, absolute_min)

@@ -1,5 +1,4 @@
-"""
-Season time indexer.
+"""Season time indexer.
 
 This module provides `SeasonIndexer`, a `TimeIndexer` implementation that
 maps timestamps to meteorological seasons and computes the next season
@@ -27,8 +26,7 @@ from .time_indexer import (
 
 
 class SeasonIndexer(TimeIndexer):
-    """
-    Maps timestamps to meteorological seasons (Northern Hemisphere).
+    """Maps timestamps to meteorological seasons (Northern Hemisphere).
 
     This indexer maps each timestamp to one of four meteorological seasons
     based on the month. Meteorological seasons are defined by temperature
@@ -54,13 +52,13 @@ class SeasonIndexer(TimeIndexer):
         >>> key2 = await indexer.get_key(summer)
         >>> key2.to_tuple()
         (('season', 'summer'),)
+
     """
 
     name: Final = "season"
 
     async def get_key(self: Self, timestamp: datetime) -> TimeKey:
-        """
-        Returns a TimeKey with the season name for the given timestamp.
+        """Returns a TimeKey with the season name for the given timestamp.
 
         Uses meteorological seasons (Northern Hemisphere):
         - "spring": March 1 — May 31
@@ -86,6 +84,7 @@ class SeasonIndexer(TimeIndexer):
             >>> key2 = await indexer.get_key(ts2)
             >>> key2.to_tuple()
             (('season', 'winter'),)
+
         """
         month = timestamp.month
         if 3 <= month <= 5:
@@ -100,8 +99,7 @@ class SeasonIndexer(TimeIndexer):
         return TimeKey.from_temporal_feature(TemporalFeature(name=self.name, value=season))
 
     async def next_boundary(self: Self, timestamp: datetime) -> datetime:
-        """
-        Returns the next season boundary strictly after `timestamp`.
+        """Returns the next season boundary strictly after `timestamp`.
 
         The next boundary is the start of the next meteorological season at
         00:00:00 local time. This function preserves tzinfo from `timestamp` when
@@ -126,6 +124,7 @@ class SeasonIndexer(TimeIndexer):
             >>> boundary2 = await indexer.next_boundary(ts2)
             >>> boundary2
             datetime(2025, 3, 1, 0, 0, 0)
+
         """
         tz = timestamp.tzinfo
 

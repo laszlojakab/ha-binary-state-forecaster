@@ -1,5 +1,4 @@
-"""
-Time-of-day indexer implementation.
+"""Time-of-day indexer implementation.
 
 This module provides `TimeOfDayIndexer`, a TimeIndexer implementation that
 buckets timestamps by the number of seconds elapsed since midnight (local time).
@@ -23,8 +22,7 @@ from .time_key import TimeKey
 
 
 class TimeOfDayIndexer(TimeIndexer):
-    """
-    Maps timestamps to time-of-day buckets based on seconds since midnight.
+    """Maps timestamps to time-of-day buckets based on seconds since midnight.
 
     This indexer divides each day into discrete time buckets of configurable
     size. For example, with 1-hour buckets, all times between 2:00 PM and
@@ -50,13 +48,13 @@ class TimeOfDayIndexer(TimeIndexer):
         >>> key2 = await indexer.get_key(early)
         >>> key2.to_tuple()
         (('time_bucket', 2),)
+
     """
 
     name: Final = "time_bucket"
 
     def __init__(self: Self, bucket_size: int):
-        """
-        Initialize the time-of-day indexer.
+        """Initialize the time-of-day indexer.
 
         Args:
             bucket_size: The number of seconds per bucket. Common values:
@@ -71,6 +69,7 @@ class TimeOfDayIndexer(TimeIndexer):
             >>> indexer = TimeOfDayIndexer(bucket_size=3600)
             >>> indexer.bucket_size
             3600
+
         """
         if bucket_size <= 0:
             msg = f"bucket_size must be positive, got {bucket_size}"
@@ -78,8 +77,7 @@ class TimeOfDayIndexer(TimeIndexer):
         self.bucket_size: Final = bucket_size
 
     async def get_key(self: Self, timestamp: datetime) -> TimeKey:
-        """
-        Map a timestamp to its time-of-day bucket.
+        """Map a timestamp to its time-of-day bucket.
 
         Calculates the number of seconds since midnight and divides by
         bucket_size to determine the bucket index.
@@ -102,6 +100,7 @@ class TimeOfDayIndexer(TimeIndexer):
             >>> key2 = await indexer.get_key(ts2)
             >>> key2.to_tuple()
             (('time_bucket', 0),)
+
         """
         total_seconds = timestamp.hour * 3600 + timestamp.minute * 60 + timestamp.second
         bucket_index = total_seconds // self.bucket_size

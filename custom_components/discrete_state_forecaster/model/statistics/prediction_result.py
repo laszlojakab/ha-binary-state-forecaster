@@ -33,9 +33,15 @@ class PredictionResult:
             the source key, weight applied, and support available at that level.
 
     Example:
-        >>> from custom_components.discrete_state_forecaster.model.statistics.distribution_stats import DistributionStats
-        >>> from custom_components.discrete_state_forecaster.model.temporal.time_key import TimeKey
-        >>> from custom_components.discrete_state_forecaster.model.statistics.contribution import Contribution
+        >>> from custom_components.discrete_state_forecaster.model.statistics.distribution_stats import (  # noqa: E501
+        ...     DistributionStats,
+        ... )
+        >>> from custom_components.discrete_state_forecaster.model.temporal.time_key import (
+        ...     TimeKey,
+        ... )
+        >>> from custom_components.discrete_state_forecaster.model.statistics.contribution import (
+        ...     Contribution,
+        ... )
         >>> dist = DistributionStats()
         >>> dist.update("on", 2.0)
         >>> dist.update("off", 1.0)
@@ -46,7 +52,9 @@ class PredictionResult:
         True
         >>> result.distribution.max_probability()  # doctest: +SKIP
         0.6667
+
     """
+
     key: TimeKey
     distribution: DistributionStats
     contributions: tuple[Contribution, ...]

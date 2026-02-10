@@ -34,7 +34,9 @@ class KeyedDistributionStore:
         >>> dist = store.get_distribution("breakfast")
         >>> dist.distribution()
         {'on': 0.6667, 'off': 0.3333}
+
     """
+
     def __init__(self: Self) -> None:
         """Initialize an empty distribution store."""
         self._store: dict[Hashable, DistributionStats] = {}
@@ -54,6 +56,7 @@ class KeyedDistributionStore:
             key: The hashable key identifying which distribution to update.
             state: The state to update.
             weight: The weight to add to the state. Defaults to 1.0.
+
         """
         stats = self._store.get(key)
         if stats is None:
@@ -71,6 +74,7 @@ class KeyedDistributionStore:
         Args:
             factor: Decay factor in range (0, 1]. Values closer to 0 produce
                 stronger decay.
+
         """
         for stats in self._store.values():
             stats.apply_decay(factor)
@@ -92,6 +96,7 @@ class KeyedDistributionStore:
             absolute_min: Absolute minimum support (default 20.0). Ensures
                 infrequently observed states are removed even if total support
                 is high.
+
         """
         for dist in list(self._store.values()):
             dist.prune_adaptive(epsilon, absolute_min)
@@ -107,6 +112,7 @@ class KeyedDistributionStore:
         Returns:
             The DistributionStats for the key, or None if the key doesn't
                 exist or was removed by pruning.
+
         """
         return self._store.get(key)
 
@@ -147,6 +153,7 @@ class KeyedDistributionStore:
             ('14:00', 'afternoon')
             >>> agg.total_support()  # doctest: +SKIP
             27.0
+
         """
         aggregated = DistributionStats()
 

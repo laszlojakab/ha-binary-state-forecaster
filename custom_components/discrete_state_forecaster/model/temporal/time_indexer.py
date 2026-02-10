@@ -1,5 +1,4 @@
-"""
-Protocol definition for time indexers.
+"""Protocol definition for time indexers.
 
 This module defines `TimeIndexer`, a protocol (interface) that all time indexers
 must implement. TimeIndexers convert timestamps into hierarchical temporal keys,
@@ -17,8 +16,7 @@ from .time_key import TimeKey
 
 
 class TimeIndexer(Protocol):
-    """
-    Protocol for converting timestamps into temporal keys.
+    """Protocol for converting timestamps into temporal keys.
 
     A TimeIndexer maps a given timestamp to a TimeKey, effectively bucketing
     or classifying the timestamp into a temporal context. Different indexers
@@ -44,13 +42,13 @@ class TimeIndexer(Protocol):
         >>> key = await indexer.get_key(timestamp)
         >>> key.to_tuple()
         (('time_bucket', 14),)
+
     """
 
     name: str
 
     async def get_key(self: Self, timestamp: datetime) -> TimeKey:
-        """
-        Map a timestamp to a temporal key.
+        """Map a timestamp to a temporal key.
 
         Args:
             timestamp: The datetime to map to a temporal context.
@@ -66,5 +64,6 @@ class TimeIndexer(Protocol):
             >>> key = await indexer.get_key(timestamp)
             >>> key.to_tuple()
             (('time_bucket', 14),)  # Hour 14
+
         """
         ...

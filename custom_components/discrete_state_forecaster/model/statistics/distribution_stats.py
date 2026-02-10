@@ -40,7 +40,9 @@ class DistributionStats:
         {'on': 0.6667, 'off': 0.3333}
         >>> dist.entropy()  # doctest: +SKIP
         0.637
+
     """
+
     def __init__(self: Self) -> None:
         """Initialize an empty distribution."""
         self._states: dict[State, StateStats] = {}
@@ -56,6 +58,7 @@ class DistributionStats:
             state: The state to update.
             weight: The weight (support) to add. Defaults to 1.0. Must be
                 positive or zero.
+
         """
         if state not in self._states:
             self._states[state] = StateStats()
@@ -68,6 +71,7 @@ class DistributionStats:
         Returns:
             The sum of support values for all states in the distribution.
                 Returns 0.0 if no states have been observed.
+
         """
         return sum(stats.support() for stats in self._states.values())
 
@@ -80,6 +84,7 @@ class DistributionStats:
         Returns:
             The support value for the state. Returns 0.0 if the state has
                 not been observed.
+
         """
         stats = self._states.get(state)
         return 0.0 if stats is None else stats.support()
@@ -94,6 +99,7 @@ class DistributionStats:
             Dictionary mapping each observed state to its probability in the
                 range [0.0, 1.0]. Returns empty dict if no observations exist
                 or total support is zero or negative.
+
         """
         total = self.total_support()
         if total <= 0.0:
@@ -109,6 +115,7 @@ class DistributionStats:
 
         Returns:
             True if total_support() >= min_support, False otherwise.
+
         """
         return self.total_support() >= min_support
 
@@ -122,6 +129,7 @@ class DistributionStats:
         Returns:
             Set of states where individual support >= min_support. Returns
                 empty set if no states meet the threshold.
+
         """
         return {
             state
@@ -139,6 +147,7 @@ class DistributionStats:
         Returns:
             Non-negative entropy value in nats. Returns 0.0 if distribution is
                 empty or only one state has non-zero probability.
+
         """
         dist = self.distribution()
         if not dist:
@@ -152,6 +161,7 @@ class DistributionStats:
         Returns:
             The highest probability value across all states. Returns 0.0 if
                 no states have been observed.
+
         """
         dist = self.distribution()
         return max(dist.values(), default=0.0)
@@ -166,6 +176,7 @@ class DistributionStats:
             factor: Decay factor in range (0, 1]. Values closer to 0 produce
                 stronger decay. For example, 0.95 retains 95% of previous
                 support.
+
         """
         for stats in self._states.values():
             stats.apply_decay(factor)
@@ -175,6 +186,7 @@ class DistributionStats:
 
         Returns:
             Set of all states that have been updated at least once.
+
         """
         return set(self._states.keys())
 
@@ -183,6 +195,7 @@ class DistributionStats:
 
         Returns:
             True if no states have been updated yet, False otherwise.
+
         """
         return not self._states
 
@@ -198,6 +211,7 @@ class DistributionStats:
         Args:
             min_state_duration: The minimum support threshold. States with
                 support < min_state_duration are removed.
+
         """
         self._states = {
             s: d for s, d in self._states.items() if d.is_active(min_state_duration)
@@ -223,6 +237,7 @@ class DistributionStats:
             absolute_min: Absolute minimum support (default 20.0). Ensures
                 pruning doesn't remove frequently observed states even if total
                 support is very high.
+
         """
         threshold = max(self.total_support() * epsilon, absolute_min)
         self.prune(threshold)

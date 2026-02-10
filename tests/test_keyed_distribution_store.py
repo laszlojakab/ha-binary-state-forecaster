@@ -5,7 +5,6 @@ distribution management, aggregation, and bulk operations.
 """
 from typing import Self
 
-import pytest
 
 from custom_components.discrete_state_forecaster.model.statistics.distribution_stats import (
     DistributionStats,

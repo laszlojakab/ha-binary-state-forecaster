@@ -1,5 +1,4 @@
-"""
-Immutable temporal feature representation.
+"""Immutable temporal feature representation.
 
 This module provides `TemporalFeature`, an immutable data structure representing
 a single temporal feature as a name-value pair. Temporal features are the atomic
@@ -15,6 +14,7 @@ Examples:
     'hour = 14'
     >>> feature.to_tuple()
     ('hour', 14)
+
 """
 
 from collections.abc import Hashable
@@ -27,8 +27,7 @@ TemporalFeatureValue = Hashable
 
 @dataclass(frozen=True)
 class TemporalFeature:
-    """
-    An immutable name-value pair representing a single temporal feature.
+    """An immutable name-value pair representing a single temporal feature.
 
     TemporalFeature instances are frozen (immutable) and hashable, making them
     suitable for use as dictionary keys and in sets. They serve as the atomic
@@ -45,6 +44,7 @@ class TemporalFeature:
         True
         >>> {feature: "weekday"}[feature]  # Can be used as dict key
         'weekday'
+
     """
 
     name: TemporalFeatureName
@@ -55,8 +55,7 @@ class TemporalFeature:
         return f"{self.name} = {self.value}"
 
     def to_tuple(self: Self) -> tuple[TemporalFeatureName, TemporalFeatureValue]:
-        """
-        Convert the feature to a tuple for serialization.
+        """Convert the feature to a tuple for serialization.
 
         Returns:
             A 2-tuple of (name, value).
@@ -64,13 +63,13 @@ class TemporalFeature:
         Examples:
             >>> TemporalFeature("hour", 14).to_tuple()
             ('hour', 14)
+
         """
         return (self.name, self.value)
 
     @classmethod
     def from_tuple(cls, data: tuple[TemporalFeatureName, TemporalFeatureValue]) -> Self:
-        """
-        Construct a TemporalFeature from a tuple.
+        """Construct a TemporalFeature from a tuple.
 
         Args:
             data: A 2-tuple of (name, value) to reconstruct the feature.
@@ -88,6 +87,7 @@ class TemporalFeature:
             'hour'
             >>> feature.value
             14
+
         """
         if not isinstance(data, tuple):
             msg = f"Expected tuple, got {type(data).__name__}"

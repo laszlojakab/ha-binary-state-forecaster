@@ -1,5 +1,4 @@
-"""
-Composite time indexer for hierarchical temporal contexts.
+"""Composite time indexer for hierarchical temporal contexts.
 
 This module provides `CompositeIndexer`, which combines multiple TimeIndexer
 instances into a single hierarchical indexer. It applies each indexer in
@@ -20,8 +19,7 @@ from .time_key import TimeKey
 
 
 class CompositeIndexer(TimeIndexer):
-    """
-    Combines multiple time indexers into a single hierarchical indexer.
+    """Combines multiple time indexers into a single hierarchical indexer.
 
     A CompositeIndexer applies a sequence of TimeIndexer instances to a given
     timestamp, composing their individual TimeKeys into a single hierarchical
@@ -48,11 +46,11 @@ class CompositeIndexer(TimeIndexer):
         >>> # key will have 3 features: hour, day_of_week, and season
         >>> len(key)
         3
+
     """
 
     def __init__(self: Self, indexers: Iterable[TimeIndexer]) -> None:
-        """
-        Initialize the composite indexer.
+        """Initialize the composite indexer.
 
         Args:
             indexers: An iterable of TimeIndexer instances to apply in sequence.
@@ -65,13 +63,13 @@ class CompositeIndexer(TimeIndexer):
             ...     DayOfWeekIndexer(),
             ... ]
             >>> composite = CompositeIndexer(indexers)
+
         """
         self.indexers: Final = list(indexers)
         self.name: str = ", ".join(idx.name for idx in self.indexers)
 
     async def get_key(self: Self, timestamp: datetime) -> TimeKey:
-        """
-        Map a timestamp to a hierarchical temporal key.
+        """Map a timestamp to a hierarchical temporal key.
 
         Applies each indexer in sequence, composing their results into a
         single hierarchical TimeKey. The first indexer's result becomes the
@@ -93,6 +91,7 @@ class CompositeIndexer(TimeIndexer):
             >>> key = await composite.get_key(timestamp)
             >>> key.to_tuple()
             (('time_bucket', 14), ('day_of_week', 0))
+
         """
         current: TimeKey = TimeKey.GLOBAL
         for indexer in self.indexers:

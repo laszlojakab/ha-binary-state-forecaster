@@ -33,13 +33,18 @@ class AggregatedStats(DistributionStats):
             to their individual statistics.
 
     Example:
-        >>> from custom_components.discrete_state_forecaster.model.temporal.time_key import TimeKey
-        >>> from custom_components.discrete_state_forecaster.model.temporal.temporal_feature import TemporalFeature
+        >>> from custom_components.discrete_state_forecaster.model.temporal.time_key import (
+        ...     TimeKey,
+        ... )
+        >>> from custom_components.discrete_state_forecaster.model.temporal.temporal_feature import (  # noqa: E501
+        ...     TemporalFeature,
+        ... )
         >>> key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
         >>> stats = AggregatedStats(key)
         >>> stats.update("on", weight=1.0)
         >>> stats.key == key
         True
+
     """
 
     def __init__(self, key: TimeKey) -> None:
@@ -48,6 +53,7 @@ class AggregatedStats(DistributionStats):
         Args:
             key: The TimeKey identifying the temporal location for these
                 statistics.
+
         """
         super().__init__()
         self.key: Final[TimeKey] = key
@@ -77,13 +83,16 @@ class AggregatedStats(DistributionStats):
             >>> dist = DistributionStats()
             >>> dist.update("on", 2.0)
             >>> dist.update("off", 1.0)
-            >>> from custom_components.discrete_state_forecaster.model.temporal.time_key import TimeKey
+            >>> from custom_components.discrete_state_forecaster.model.temporal.time_key import (
+            ...     TimeKey,
+            ... )
             >>> key = TimeKey.from_tuple((("hour", 14),))
             >>> agg = AggregatedStats.from_distribution(dist, key)
             >>> agg.key == key
             True
             >>> agg.states() == {"on", "off"}
             True
+
         """
         agg = cls(key)
 
