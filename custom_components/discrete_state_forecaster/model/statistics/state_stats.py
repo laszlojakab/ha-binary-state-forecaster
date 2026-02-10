@@ -1,18 +1,50 @@
+"""Individual state statistics tracking.
+
+This module provides `StateStats`, a data class that tracks support (weight)
+for a single state observation. Support is accumulated over time and can be
+decayed to weight recent observations more heavily than older ones.
+"""
+
 from dataclasses import dataclass
 from typing import Self
 
 
 @dataclass
 class StateStats:
+    """Tracks cumulative support (weight) for a single state.
+
+    Support is accumulated as observations are made and can be decayed
+    over time to emphasize recent observations.
+
+    Attributes:
+        _support: Cumulative weight/support for this state. Defaults to 0.0.
+    """
+
     _support: float = 0.0
 
     def update(self: Self, weight: float = 1.0) -> None:
+        """Add weighted observation to state support.
+
+        Args:
+            weight: Weight to add. Must be non-negative. Defaults to 1.0.
+
+        Raises:
+            ValueError: If weight is negative.
+        """
         if weight < 0:
             raise ValueError("weight must be non negative")
 
         self._support += weight
 
     def apply_decay(self: Self, factor: float) -> None:
+        """Apply exponential decay to state support.
+
+        Args:
+            factor: Decay multiplier in range (0, 1].
+
+        Raises:
+            ValueError: If factor is not in range (0, 1].
+        """
         if not (0.0 < factor <= 1.0):
             raise ValueError(f"decay factor must be in (0, 1]. Got: {factor}")
 
@@ -22,7 +54,21 @@ class StateStats:
             self._support = 0.0
 
     def support(self: Self) -> float:
+        """Get the current support value.
+
+        Returns:
+            The accumulated weight/support for this state.
+        """
         return self._support
 
     def is_active(self: Self, min_support: float) -> bool:
+        """Check if state support meets minimum threshold.
+
+        Args:
+            min_support: Minimum support threshold to check against.
+
+        Returns:
+            True if state's support >= min_support.
+        """
         return self._support >= min_support
+
