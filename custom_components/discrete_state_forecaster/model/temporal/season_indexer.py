@@ -1,4 +1,5 @@
-"""Season time indexer.
+"""
+Season time indexer.
 
 This module provides `SeasonIndexer`, a `TimeIndexer` implementation that
 maps timestamps to meteorological seasons and computes the next season
@@ -26,7 +27,8 @@ from .time_indexer import (
 
 
 class SeasonIndexer(TimeIndexer):
-    """Maps timestamps to meteorological seasons (Northern Hemisphere).
+    """
+    Maps timestamps to meteorological seasons (Northern Hemisphere).
 
     This indexer maps each timestamp to one of four meteorological seasons
     based on the month. Meteorological seasons are defined by temperature
@@ -58,7 +60,8 @@ class SeasonIndexer(TimeIndexer):
     name: Final = "season"
 
     async def get_key(self: Self, timestamp: datetime) -> TimeKey:
-        """Returns a TimeKey with the season name for the given timestamp.
+        """
+        Returns a TimeKey with the season name for the given timestamp.
 
         Uses meteorological seasons (Northern Hemisphere):
         - "spring": March 1 — May 31
@@ -87,11 +90,11 @@ class SeasonIndexer(TimeIndexer):
 
         """
         month = timestamp.month
-        if 3 <= month <= 5:
+        if 3 <= month <= 5:  # noqa: PLR2004
             season = "spring"
-        elif 6 <= month <= 8:
+        elif 6 <= month <= 8:  # noqa: PLR2004
             season = "summer"
-        elif 9 <= month <= 11:
+        elif 9 <= month <= 11:  # noqa: PLR2004
             season = "autumn"
         else:
             season = "winter"
@@ -99,7 +102,8 @@ class SeasonIndexer(TimeIndexer):
         return TimeKey.from_temporal_feature(TemporalFeature(name=self.name, value=season))
 
     async def next_boundary(self: Self, timestamp: datetime) -> datetime:
-        """Returns the next season boundary strictly after `timestamp`.
+        """
+        Returns the next season boundary strictly after `timestamp`.
 
         The next boundary is the start of the next meteorological season at
         00:00:00 local time. This function preserves tzinfo from `timestamp` when
@@ -132,31 +136,31 @@ class SeasonIndexer(TimeIndexer):
         month = timestamp.month
         year = timestamp.year
 
-        if 3 <= month <= 5:  # spring -> next is summer starting June 1
+        if 3 <= month <= 5:  # spring -> next is summer starting June 1  # noqa: PLR2004
             next_month = 6
             next_year = year
-        elif 6 <= month <= 8:  # summer -> autumn starting Sep 1
+        elif 6 <= month <= 8:  # summer -> autumn starting Sep 1  # noqa: PLR2004
             next_month = 9
             next_year = year
-        elif 9 <= month <= 11:  # autumn -> winter starting Dec 1
+        elif 9 <= month <= 11:  # autumn -> winter starting Dec 1  # noqa: PLR2004
             next_month = 12
             next_year = year
         else:  # winter -> spring starting Mar 1
             next_month = 3
             # if we're in December, next spring is next year; if Jan/Feb, same year
-            next_year = year + 1 if month == 12 else year
+            next_year = year + 1 if month == 12 else year  # noqa: PLR2004
 
         candidate = datetime(next_year, next_month, 1, 0, 0, 0, tzinfo=tz)
 
         # If candidate is not strictly after timestamp (edge cases), advance one season
         if candidate <= timestamp:
             # advance by 3 months
-            if next_month == 12:
+            if next_month == 12:  # noqa: PLR2004
                 next_month = 3
                 next_year = next_year + 1
             else:
                 next_month = next_month + 3
-                if next_month > 12:
+                if next_month > 12:  # noqa: PLR2004
                     next_month -= 12
                     next_year += 1
             candidate = datetime(next_year, next_month, 1, 0, 0, 0, tzinfo=tz)

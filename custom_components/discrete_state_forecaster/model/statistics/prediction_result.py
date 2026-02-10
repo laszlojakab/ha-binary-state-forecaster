@@ -1,4 +1,5 @@
-"""Immutable prediction result from hierarchical state statistics.
+"""
+Immutable prediction result from hierarchical state statistics.
 
 This module provides `PredictionResult`, a dataclass that encapsulates the
 complete result of a prediction, including the predicted distribution and
@@ -18,7 +19,8 @@ from .contribution import Contribution
 
 @dataclass(frozen=True)
 class PredictionResult:
-    """Immutable result of hierarchical state prediction.
+    """
+    Immutable result of hierarchical state prediction.
 
     Contains the predicted probability distribution and information about which
     temporal hierarchy levels contributed to the prediction. The contributions
@@ -53,7 +55,7 @@ class PredictionResult:
         >>> result.distribution.max_probability()  # doctest: +SKIP
         0.6667
 
-    """
+    """  # noqa: E501
 
     key: TimeKey
     distribution: DistributionStats

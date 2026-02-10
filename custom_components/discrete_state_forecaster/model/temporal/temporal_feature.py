@@ -1,4 +1,5 @@
-"""Immutable temporal feature representation.
+"""
+Immutable temporal feature representation.
 
 This module provides `TemporalFeature`, an immutable data structure representing
 a single temporal feature as a name-value pair. Temporal features are the atomic
@@ -27,7 +28,8 @@ TemporalFeatureValue = Hashable
 
 @dataclass(frozen=True)
 class TemporalFeature:
-    """An immutable name-value pair representing a single temporal feature.
+    """
+    An immutable name-value pair representing a single temporal feature.
 
     TemporalFeature instances are frozen (immutable) and hashable, making them
     suitable for use as dictionary keys and in sets. They serve as the atomic
@@ -51,11 +53,12 @@ class TemporalFeature:
     value: TemporalFeatureValue
 
     def __repr__(self: Self) -> str:
-        """Return a readable string representation of the feature."""
+        """Returns a readable string representation of the feature."""
         return f"{self.name} = {self.value}"
 
     def to_tuple(self: Self) -> tuple[TemporalFeatureName, TemporalFeatureValue]:
-        """Convert the feature to a tuple for serialization.
+        """
+        Converts the feature to a tuple for serialization.
 
         Returns:
             A 2-tuple of (name, value).
@@ -69,7 +72,8 @@ class TemporalFeature:
 
     @classmethod
     def from_tuple(cls, data: tuple[TemporalFeatureName, TemporalFeatureValue]) -> Self:
-        """Construct a TemporalFeature from a tuple.
+        """
+        Constructs a TemporalFeature from a tuple.
 
         Args:
             data: A 2-tuple of (name, value) to reconstruct the feature.
@@ -92,7 +96,7 @@ class TemporalFeature:
         if not isinstance(data, tuple):
             msg = f"Expected tuple, got {type(data).__name__}"
             raise TypeError(msg)
-        if len(data) != 2:
+        if len(data) != 2:  # noqa: PLR2004
             msg = f"Expected 2-tuple, got {len(data)}-tuple"
             raise ValueError(msg)
         return cls(name=data[0], value=data[1])

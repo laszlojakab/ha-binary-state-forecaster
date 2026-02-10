@@ -1,4 +1,5 @@
-"""Distribution statistics aggregated at specific temporal locations.
+"""
+Distribution statistics aggregated at specific temporal locations.
 
 This module provides `AggregatedStats`, which extends `DistributionStats` by
 associating it with a specific temporal context represented by a `TimeKey`.
@@ -19,7 +20,8 @@ if TYPE_CHECKING:
 
 
 class AggregatedStats(DistributionStats):
-    """Distribution statistics for a specific temporal context.
+    """
+    Distribution statistics for a specific temporal context.
 
     Extends DistributionStats with an immutable TimeKey that identifies the
     temporal context for which these statistics are aggregated. Enables
@@ -45,10 +47,11 @@ class AggregatedStats(DistributionStats):
         >>> stats.key == key
         True
 
-    """
+    """  # noqa: E501
 
     def __init__(self, key: TimeKey) -> None:
-        """Initialize aggregated statistics for a specific temporal context.
+        """
+        Initializes aggregated statistics for a specific temporal context.
 
         Args:
             key: The TimeKey identifying the temporal location for these
@@ -64,7 +67,8 @@ class AggregatedStats(DistributionStats):
         distribution: DistributionStats,
         key: TimeKey,
     ) -> AggregatedStats:
-        """Create AggregatedStats from an existing DistributionStats.
+        """
+        Creates AggregatedStats from an existing DistributionStats.
 
         Converts support-based statistics into aggregated statistics by copying
         the normalized distribution. This is useful for extracting a snapshot

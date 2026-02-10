@@ -1,4 +1,5 @@
-"""Statistical distributions over discrete states with support-based weighting.
+"""
+Statistical distributions over discrete states with support-based weighting.
 
 This module provides `DistributionStats`, a class that manages a distribution
 of states and their associated statistics. It aggregates support (weight) across
@@ -8,6 +9,7 @@ supports temporal decay and pruning operations.
 The class uses `StateStats` internally to track support for individual states,
 enabling features like decay weighting and minimum support thresholds.
 """
+
 from __future__ import annotations
 
 import math
@@ -22,7 +24,8 @@ if TYPE_CHECKING:
 
 
 class DistributionStats:
-    """Distribution statistics over discrete states with support aggregation.
+    """
+    Distribution statistics over discrete states with support aggregation.
 
     Manages a collection of states and their individual statistics, providing
     aggregated views like probability distributions and entropy. Supports temporal
@@ -48,7 +51,8 @@ class DistributionStats:
         self._states: dict[State, StateStats] = {}
 
     def update(self: Self, state: State, weight: float = 1.0) -> None:
-        """Update support for a state by adding the given weight.
+        """
+        Updates support for a state by adding the given weight.
 
         Creates a new StateStats entry if this state has not been observed
         before. If the state already exists, adds the weight to its existing
@@ -66,7 +70,8 @@ class DistributionStats:
         self._states[state].update(weight)
 
     def total_support(self: Self) -> float:
-        """Calculate the total support across all states.
+        """
+        Calculates the total support across all states.
 
         Returns:
             The sum of support values for all states in the distribution.
@@ -76,7 +81,8 @@ class DistributionStats:
         return sum(stats.support() for stats in self._states.values())
 
     def support(self, state: State) -> float:
-        """Get the support for a specific state.
+        """
+        Gets the support for a specific state.
 
         Args:
             state: The state to query.
@@ -90,7 +96,8 @@ class DistributionStats:
         return 0.0 if stats is None else stats.support()
 
     def distribution(self: Self) -> dict[State, float]:
-        """Calculate probability distribution by normalizing support values.
+        """
+        Calculates probability distribution by normalizing support values.
 
         The probability for each state is its support divided by the total
         support across all states.
@@ -108,7 +115,8 @@ class DistributionStats:
         return {state: stats.support() / total for state, stats in self._states.items()}
 
     def is_confident(self: Self, min_support: float) -> bool:
-        """Check if distribution has sufficient total support.
+        """
+        Checks if distribution has sufficient total support.
 
         Args:
             min_support: The minimum total support threshold.
@@ -120,7 +128,8 @@ class DistributionStats:
         return self.total_support() >= min_support
 
     def active_states(self: Self, min_support: float) -> set[State]:
-        """Get states that meet or exceed the minimum support threshold.
+        """
+        Gets states that meet or exceed the minimum support threshold.
 
         Args:
             min_support: The minimum support threshold for a state to be
@@ -138,7 +147,8 @@ class DistributionStats:
         }
 
     def entropy(self: Self) -> float:
-        """Calculate Shannon entropy of the probability distribution.
+        """
+        Calculates Shannon entropy of the probability distribution.
 
         Entropy measures the uncertainty in the distribution. Higher entropy
         indicates more uniform distribution (less predictability), while lower
@@ -156,7 +166,8 @@ class DistributionStats:
         return -sum(p * math.log(p) for p in dist.values() if p > 0.0)
 
     def max_probability(self: Self) -> float:
-        """Get the maximum probability in the distribution.
+        """
+        Gets the maximum probability in the distribution.
 
         Returns:
             The highest probability value across all states. Returns 0.0 if
@@ -167,7 +178,8 @@ class DistributionStats:
         return max(dist.values(), default=0.0)
 
     def apply_decay(self: Self, factor: float) -> None:
-        """Apply exponential decay to all state support values.
+        """
+        Applies exponential decay to all state support values.
 
         Multiplies the support of each state by the decay factor, giving
         recent observations more weight than older ones.
@@ -182,7 +194,8 @@ class DistributionStats:
             stats.apply_decay(factor)
 
     def states(self: Self) -> set[State]:
-        """Get all observed states in the distribution.
+        """
+        Gets all observed states in the distribution.
 
         Returns:
             Set of all states that have been updated at least once.
@@ -191,7 +204,8 @@ class DistributionStats:
         return set(self._states.keys())
 
     def is_empty(self: Self) -> bool:
-        """Check if the distribution has no observed states.
+        """
+        Checks if the distribution has no observed states.
 
         Returns:
             True if no states have been updated yet, False otherwise.
@@ -203,7 +217,8 @@ class DistributionStats:
         self: Self,
         min_state_duration: float,
     ) -> None:
-        """Remove states with support below the minimum threshold.
+        """
+        Removes states with support below the minimum threshold.
 
         Uses is_active() check on each state to determine which to keep,
         allowing removal of infrequently observed states.
@@ -222,7 +237,8 @@ class DistributionStats:
         epsilon: float = 0.003,
         absolute_min: float = 20.0,
     ) -> None:
-        """Adaptively prune states using relative and absolute thresholds.
+        """
+        Adaptively prunes states using relative and absolute thresholds.
 
         Removes states using a dynamic threshold that is the maximum of:
         - Relative threshold: epsilon * total_support()

@@ -1,4 +1,5 @@
-"""Day-of-week indexer implementation.
+"""
+Day-of-week indexer implementation.
 
 This module provides `DayOfWeekIndexer`, a TimeIndexer implementation that
 maps timestamps to their corresponding day of the week. This enables the
@@ -26,7 +27,8 @@ from .time_key import TimeKey
 
 
 class DayOfWeekIndexer(TimeIndexer):
-    """Maps timestamps to their day of the week.
+    """
+    Maps timestamps to their day of the week.
 
     This indexer extracts the day of the week from a timestamp and creates
     a temporal feature. Days are represented as integers 0-6 where 0 is
@@ -56,7 +58,8 @@ class DayOfWeekIndexer(TimeIndexer):
     name: Final = "day_of_week"
 
     async def get_key(self: Self, timestamp: datetime) -> TimeKey:
-        """Map a timestamp to its day of the week.
+        """
+        Map a timestamp to its day of the week.
 
         Args:
             timestamp: The datetime to map to a day-of-week value.

@@ -1,4 +1,5 @@
-"""Contribution of a temporal level to a prediction.
+"""
+Contribution of a temporal level to a prediction.
 
 This module provides `Contribution`, a dataclass that tracks how a specific
 temporal level (ancestor in the hierarchy) contributed to a prediction,
@@ -13,7 +14,8 @@ from custom_components.discrete_state_forecaster.model.temporal.time_key import 
 
 @dataclass(frozen=True)
 class Contribution:
-    """Contribution of a single temporal level to a hierarchical prediction.
+    """
+    Contribution of a single temporal level to a hierarchical prediction.
 
     Records information about how a specific temporal hierarchy level was used
     in forming a prediction, including the TimeKey, confidence weight applied,

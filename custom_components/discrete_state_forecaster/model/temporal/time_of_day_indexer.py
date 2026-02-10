@@ -1,4 +1,5 @@
-"""Time-of-day indexer implementation.
+"""
+Time-of-day indexer implementation.
 
 This module provides `TimeOfDayIndexer`, a TimeIndexer implementation that
 buckets timestamps by the number of seconds elapsed since midnight (local time).
@@ -22,7 +23,8 @@ from .time_key import TimeKey
 
 
 class TimeOfDayIndexer(TimeIndexer):
-    """Maps timestamps to time-of-day buckets based on seconds since midnight.
+    """
+    Maps timestamps to time-of-day buckets based on seconds since midnight.
 
     This indexer divides each day into discrete time buckets of configurable
     size. For example, with 1-hour buckets, all times between 2:00 PM and
@@ -54,7 +56,8 @@ class TimeOfDayIndexer(TimeIndexer):
     name: Final = "time_bucket"
 
     def __init__(self: Self, bucket_size: int):
-        """Initialize the time-of-day indexer.
+        """
+        Initializes the time-of-day indexer.
 
         Args:
             bucket_size: The number of seconds per bucket. Common values:
@@ -77,7 +80,8 @@ class TimeOfDayIndexer(TimeIndexer):
         self.bucket_size: Final = bucket_size
 
     async def get_key(self: Self, timestamp: datetime) -> TimeKey:
-        """Map a timestamp to its time-of-day bucket.
+        """
+        Maps a timestamp to its time-of-day bucket.
 
         Calculates the number of seconds since midnight and divides by
         bucket_size to determine the bucket index.

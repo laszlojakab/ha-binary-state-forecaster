@@ -1,4 +1,5 @@
-"""Individual state statistics tracking.
+"""
+Individual state statistics tracking.
 
 This module provides `StateStats`, a data class that tracks support (weight)
 for a single state observation. Support is accumulated over time and can be
@@ -11,7 +12,8 @@ from typing import Self
 
 @dataclass
 class StateStats:
-    """Tracks cumulative support (weight) for a single state.
+    """
+    Tracks cumulative support (weight) for a single state.
 
     Support is accumulated as observations are made and can be decayed
     over time to emphasize recent observations.
@@ -24,7 +26,8 @@ class StateStats:
     _support: float = 0.0
 
     def update(self: Self, weight: float = 1.0) -> None:
-        """Add weighted observation to state support.
+        """
+        Adds weighted observation to state support.
 
         Args:
             weight: Weight to add. Must be non-negative. Defaults to 1.0.
@@ -39,7 +42,8 @@ class StateStats:
         self._support += weight
 
     def apply_decay(self: Self, factor: float) -> None:
-        """Apply exponential decay to state support.
+        """
+        Applies exponential decay to state support.
 
         Args:
             factor: Decay multiplier in range (0, 1].
@@ -57,7 +61,8 @@ class StateStats:
             self._support = 0.0
 
     def support(self: Self) -> float:
-        """Get the current support value.
+        """
+        Gets the current support value.
 
         Returns:
             The accumulated weight/support for this state.
@@ -66,7 +71,8 @@ class StateStats:
         return self._support
 
     def is_active(self: Self, min_support: float) -> bool:
-        """Check if state support meets minimum threshold.
+        """
+        Checks if state support meets minimum threshold.
 
         Args:
             min_support: Minimum support threshold to check against.

@@ -1,4 +1,5 @@
-"""Configuration parameters for hierarchical state statistics.
+"""
+Configuration parameters for hierarchical state statistics.
 
 This module provides `HierarchicalStateStatsHyperParameters`, a configuration
 class that encapsulates parameters controlling the behavior of the hierarchical
@@ -13,7 +14,8 @@ from custom_components.discrete_state_forecaster.model.hyper_parameters import (
 
 
 class HierarchicalStateStatsHyperParameters:
-    """Configuration for hierarchical state statistics prediction engine.
+    """
+    Configuration for hierarchical state statistics prediction engine.
 
     Manages parameters that control how predictions are made, particularly the
     minimum support thresholds. The actual threshold is computed from a base
@@ -46,7 +48,8 @@ class HierarchicalStateStatsHyperParameters:
     def __init__(
         self: Self, hyper_parameters: HyperParameters, min_support_factor: float = 1.0
     ):
-        """Initialize hierarchical state statistics configuration.
+        """
+        Initializes hierarchical state statistics configuration.
 
         Args:
             hyper_parameters: Base hyper parameters containing global settings
@@ -63,7 +66,8 @@ class HierarchicalStateStatsHyperParameters:
 
     @property
     def min_support(self: Self) -> float:
-        """Compute the minimum support threshold for predictions.
+        """
+        Computes the minimum support threshold for predictions.
 
         Multiplies the base half_life parameter by the adjustment factor to
         allow flexible control of prediction confidence requirements.

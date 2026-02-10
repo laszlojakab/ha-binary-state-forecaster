@@ -1,4 +1,5 @@
-"""Indexed storage of multiple distribution statistics.
+"""
+Indexed storage of multiple distribution statistics.
 
 This module provides `KeyedDistributionStore`, a container that manages multiple
 `DistributionStats` instances indexed by arbitrary hashable keys. It enables
@@ -16,7 +17,8 @@ from .distribution_stats import DistributionStats
 
 
 class KeyedDistributionStore:
-    """Storage and management of multiple indexed distribution statistics.
+    """
+    Storage and management of multiple indexed distribution statistics.
 
     Maintains a dictionary mapping arbitrary hashable keys to DistributionStats
     objects. Supports bulk operations across all stored distributions and
@@ -38,7 +40,7 @@ class KeyedDistributionStore:
     """
 
     def __init__(self: Self) -> None:
-        """Initialize an empty distribution store."""
+        """Initializes an empty distribution store."""
         self._store: dict[Hashable, DistributionStats] = {}
 
     def update(
@@ -47,7 +49,8 @@ class KeyedDistributionStore:
         state: Hashable,
         weight: float = 1.0,
     ) -> None:
-        """Update state support in the distribution for a given key.
+        """
+        Updates state support in the distribution for a given key.
 
         Creates a new DistributionStats for the key if it doesn't exist yet.
         Then updates the specified state with the given weight.
@@ -66,7 +69,8 @@ class KeyedDistributionStore:
         stats.update(state, weight)
 
     def apply_decay(self: Self, factor: float) -> None:
-        """Apply exponential decay to all distributions in the store.
+        """
+        Applies exponential decay to all distributions in the store.
 
         Multiplies all state support values in all distributions by the decay
         factor, giving recent observations more weight than older ones.
@@ -84,7 +88,8 @@ class KeyedDistributionStore:
         epsilon: float = 0.003,
         absolute_min: float = 20.0,
     ) -> None:
-        """Remove infrequent states from all distributions and empty entries.
+        """
+        Removes infrequent states from all distributions and empty entries.
 
         First applies adaptive pruning to each distribution using the given
         thresholds, then removes distributions that have become empty after
@@ -104,7 +109,8 @@ class KeyedDistributionStore:
         self._store = {k: d for k, d in self._store.items() if not d.is_empty()}
 
     def get_distribution(self, key: Hashable) -> DistributionStats | None:
-        """Get the distribution for a specific key.
+        """
+        Gets the distribution for a specific key.
 
         Args:
             key: The hashable key identifying the distribution.
@@ -121,7 +127,8 @@ class KeyedDistributionStore:
         keys: Iterable[Hashable],
         min_support: float,
     ) -> tuple[DistributionStats, Hashable] | None:
-        """Aggregate statistics across multiple distributions until confident.
+        """
+        Aggregates statistics across multiple distributions until confident.
 
         Iterates through the provided keys in order, combining their
         distributions until the aggregated total support meets or exceeds

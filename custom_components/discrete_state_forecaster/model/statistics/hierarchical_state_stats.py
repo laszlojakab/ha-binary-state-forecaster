@@ -1,4 +1,5 @@
-"""Hierarchical temporal state statistics and prediction engine.
+"""
+Hierarchical temporal state statistics and prediction engine.
 
 This module provides `HierarchicalStateStats`, the core prediction engine that
 combines statistics from multiple temporal levels to make predictions. It uses
@@ -30,7 +31,8 @@ from .prediction_result import PredictionResult
 
 
 class HierarchicalStateStats:
-    """Hierarchical temporal state statistics with multi-level prediction fallback.
+    """
+    Hierarchical temporal state statistics with multi-level prediction fallback.
 
     Maintains state statistics at multiple temporal hierarchy levels and makes
     predictions using a confidence-aware fallback strategy. When making a
@@ -62,10 +64,11 @@ class HierarchicalStateStats:
         >>> result is not None
         True
 
-    """
+    """  # noqa: E501
 
     def __init__(self: Self, hyper_parameters: HierarchicalStateStatsHyperParameters):
-        """Initialize the hierarchical state statistics engine.
+        """
+        Initializes the hierarchical state statistics engine.
 
         Args:
             hyper_parameters: Configuration including minimum support thresholds
@@ -81,7 +84,8 @@ class HierarchicalStateStats:
         state: State,
         weight: float,
     ) -> None:
-        """Update state statistics at all levels of the temporal hierarchy.
+        """
+        Updates state statistics at all levels of the temporal hierarchy.
 
         For a given specific TimeKey, this updates the statistics for that key
         and all of its ancestors in the hierarchy. For example, if the key is
@@ -104,7 +108,8 @@ class HierarchicalStateStats:
             self._stats.update(ancestor, state, weight)
 
     def predict(self: Self, key: TimeKey) -> PredictionResult | None:
-        """Predict state distribution at a given temporal location.
+        """
+        Predicts state distribution at a given temporal location.
 
         Uses a confidence-aware hierarchical fallback strategy:
         1. First tries the specific key with min_support threshold
@@ -171,7 +176,8 @@ class HierarchicalStateStats:
         )
 
     def apply_decay(self: Self, factor: float) -> None:
-        """Apply exponential decay to all statistics in the hierarchy.
+        """
+        Applies exponential decay to all statistics in the hierarchy.
 
         Multiplies all state support values by the decay factor, giving recent
         observations more weight than older ones. This is typically called
@@ -185,7 +191,8 @@ class HierarchicalStateStats:
         self._stats.apply_decay(factor)
 
     def prune(self: Self, epsilon: float = 0.003, absolute_min: float = 20.0) -> None:
-        """Remove infrequent states and empty distributions from the hierarchy.
+        """
+        Removes infrequent states and empty distributions from the hierarchy.
 
         Uses adaptive pruning to remove states that fall below dynamic thresholds,
         then removes any distributions that become empty. This reduces memory
