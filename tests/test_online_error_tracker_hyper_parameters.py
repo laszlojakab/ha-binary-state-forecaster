@@ -4,6 +4,7 @@ Unit tests for OnlineErrorTrackerHyperParameters.
 Comprehensive tests for the OnlineErrorTrackerHyperParameters class, covering
 initialization and error half-life calculations.
 """
+
 from typing import Self
 
 from custom_components.discrete_state_forecaster.model.hyper_parameters import (

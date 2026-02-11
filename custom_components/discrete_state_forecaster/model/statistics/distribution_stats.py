@@ -140,11 +140,7 @@ class DistributionStats:
                 empty set if no states meet the threshold.
 
         """
-        return {
-            state
-            for state, stats in self._states.items()
-            if stats.is_active(min_support)
-        }
+        return {state for state, stats in self._states.items() if stats.is_active(min_support)}
 
     def entropy(self: Self) -> float:
         """
@@ -228,9 +224,7 @@ class DistributionStats:
                 support < min_state_duration are removed.
 
         """
-        self._states = {
-            s: d for s, d in self._states.items() if d.is_active(min_state_duration)
-        }
+        self._states = {s: d for s, d in self._states.items() if d.is_active(min_state_duration)}
 
     def prune_adaptive(
         self: Self,

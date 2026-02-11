@@ -6,6 +6,7 @@ class that encapsulates parameters controlling the behavior of the hierarchical
 prediction engine, particularly the minimum support thresholds that determine
 prediction confidence.
 """
+
 from typing import Final, Self
 
 from custom_components.discrete_state_forecaster.model.hyper_parameters import (
@@ -45,9 +46,7 @@ class HierarchicalStateStatsHyperParameters:
 
     """
 
-    def __init__(
-        self: Self, hyper_parameters: HyperParameters, min_support_factor: float = 1.0
-    ):
+    def __init__(self: Self, hyper_parameters: HyperParameters, min_support_factor: float = 1.0):
         """
         Initializes hierarchical state statistics configuration.
 

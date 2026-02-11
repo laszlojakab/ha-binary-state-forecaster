@@ -4,6 +4,7 @@ Unit tests for BaselineDistribution.
 Comprehensive tests covering initialization, updating, decay, and distribution
 computation for the BaselineDistribution class.
 """
+
 from typing import Self
 
 from custom_components.discrete_state_forecaster.model.learning.baseline_distribution import (

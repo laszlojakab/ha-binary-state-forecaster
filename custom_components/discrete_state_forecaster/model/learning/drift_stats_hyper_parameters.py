@@ -4,6 +4,7 @@ Hyper-parameters for drift statistics tracking.
 This module provides configuration for DriftStats, controlling the decay rate
 used when computing exponentially weighted drift statistics.
 """
+
 from typing import Final, Self
 
 from .drift_monitor_hyper_parameters import DriftMonitorHyperParameters

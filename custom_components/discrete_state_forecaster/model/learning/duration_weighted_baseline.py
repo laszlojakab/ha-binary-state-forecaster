@@ -6,6 +6,7 @@ distribution by integrating distribution observations over time. Each update
 represents a distribution that was valid for dt seconds, and older evidence
 decays exponentially.
 """
+
 import math
 from typing import Final, Self
 
@@ -130,10 +131,7 @@ class DurationWeightedBaseline:
         num_states = len(self._mass)
         denom = total + self._hyper_parameters.epsilon * num_states
 
-        return {
-            s: (m + self._hyper_parameters.epsilon) / denom
-            for s, m in self._mass.items()
-        }
+        return {s: (m + self._hyper_parameters.epsilon) / denom for s, m in self._mass.items()}
 
     def total_mass(self: Self) -> float:
         """

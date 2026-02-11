@@ -10,6 +10,7 @@ The store is useful in hierarchical temporal models where different temporal
 contexts (e.g., different times of day) need independent statistics that can
 still be aggregated when making predictions.
 """
+
 from collections.abc import Hashable, Iterable
 from typing import Self
 

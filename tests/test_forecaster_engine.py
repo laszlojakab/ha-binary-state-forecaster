@@ -346,9 +346,7 @@ class TestForecasterEnginePruning:
 
     def test_pruning_respects_min_interval(self: Self) -> None:
         """Test that pruning only occurs after min interval."""
-        params = ForecasterEngineParameters(
-            half_life=100.0, min_prune_interval_factor=5.0
-        )
+        params = ForecasterEngineParameters(half_life=100.0, min_prune_interval_factor=5.0)
         engine = ForecasterEngine(params)
         key = TimeKey.GLOBAL
 

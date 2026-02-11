@@ -56,9 +56,9 @@ class TestCalendarIndexerGetKey:
     async def test_returns_timekey(self: Self) -> None:
         """Test that get_key returns a TimeKey."""
         hass = MagicMock()
-        hass.services.async_call = AsyncMock(return_value={
-            "calendar.work_schedule": {"events": []}
-        })
+        hass.services.async_call = AsyncMock(
+            return_value={"calendar.work_schedule": {"events": []}}
+        )
         indexer = CalendarIndexer(hass, "calendar.work_schedule")
         key = await indexer.get_key(datetime(2024, 1, 15, 10, 30))
         assert isinstance(key, TimeKey)
@@ -67,9 +67,9 @@ class TestCalendarIndexerGetKey:
     async def test_timekey_has_one_feature(self: Self) -> None:
         """Test that returned TimeKey has exactly one feature."""
         hass = MagicMock()
-        hass.services.async_call = AsyncMock(return_value={
-            "calendar.work_schedule": {"events": []}
-        })
+        hass.services.async_call = AsyncMock(
+            return_value={"calendar.work_schedule": {"events": []}}
+        )
         indexer = CalendarIndexer(hass, "calendar.work_schedule")
         key = await indexer.get_key(datetime(2024, 1, 15, 10, 30))
         assert len(key) == 1
@@ -78,9 +78,9 @@ class TestCalendarIndexerGetKey:
     async def test_no_event_returns_zero(self: Self) -> None:
         """Test that no calendar events return value 0."""
         hass = MagicMock()
-        hass.services.async_call = AsyncMock(return_value={
-            "calendar.work_schedule": {"events": []}
-        })
+        hass.services.async_call = AsyncMock(
+            return_value={"calendar.work_schedule": {"events": []}}
+        )
         indexer = CalendarIndexer(hass, "calendar.work_schedule")
         key = await indexer.get_key(datetime(2024, 1, 15, 10, 30))
         assert key.to_tuple() == (("calendar.work_schedule", 0),)
@@ -89,15 +89,19 @@ class TestCalendarIndexerGetKey:
     async def test_event_active_returns_one(self: Self) -> None:
         """Test that active calendar events return value 1."""
         hass = MagicMock()
-        hass.services.async_call = AsyncMock(return_value={
-            "calendar.work_schedule": {
-                "events": [{
-                    "summary": "Work",
-                    "start": "2024-01-15T09:00:00",
-                    "end": "2024-01-15T17:00:00",
-                }]
+        hass.services.async_call = AsyncMock(
+            return_value={
+                "calendar.work_schedule": {
+                    "events": [
+                        {
+                            "summary": "Work",
+                            "start": "2024-01-15T09:00:00",
+                            "end": "2024-01-15T17:00:00",
+                        }
+                    ]
+                }
             }
-        })
+        )
         indexer = CalendarIndexer(hass, "calendar.work_schedule")
         # 10:30 is during the work event
         key = await indexer.get_key(datetime(2024, 1, 15, 10, 30))
@@ -107,22 +111,24 @@ class TestCalendarIndexerGetKey:
     async def test_multiple_events_returns_one(self: Self) -> None:
         """Test that multiple events returns value 1."""
         hass = MagicMock()
-        hass.services.async_call = AsyncMock(return_value={
-            "calendar.work_schedule": {
-                "events": [
-                    {
-                        "summary": "Meeting",
-                        "start": "2024-01-15T09:00:00",
-                        "end": "2024-01-15T10:00:00",
-                    },
-                    {
-                        "summary": "Lunch",
-                        "start": "2024-01-15T12:00:00",
-                        "end": "2024-01-15T13:00:00",
-                    },
-                ]
+        hass.services.async_call = AsyncMock(
+            return_value={
+                "calendar.work_schedule": {
+                    "events": [
+                        {
+                            "summary": "Meeting",
+                            "start": "2024-01-15T09:00:00",
+                            "end": "2024-01-15T10:00:00",
+                        },
+                        {
+                            "summary": "Lunch",
+                            "start": "2024-01-15T12:00:00",
+                            "end": "2024-01-15T13:00:00",
+                        },
+                    ]
+                }
             }
-        })
+        )
         indexer = CalendarIndexer(hass, "calendar.work_schedule")
         # At 10:30, at least one event is active (not in the specific examples, but service says there are events)
         key = await indexer.get_key(datetime(2024, 1, 15, 10, 30))
@@ -142,9 +148,9 @@ class TestCalendarIndexerGetKey:
     async def test_service_called_with_correct_params(self: Self) -> None:
         """Test that service is called with correct parameters."""
         hass = MagicMock()
-        hass.services.async_call = AsyncMock(return_value={
-            "calendar.work_schedule": {"events": []}
-        })
+        hass.services.async_call = AsyncMock(
+            return_value={"calendar.work_schedule": {"events": []}}
+        )
         indexer = CalendarIndexer(hass, "calendar.work_schedule")
         ts = datetime(2024, 1, 15, 10, 30, 45)
         await indexer.get_key(ts)
@@ -161,15 +167,19 @@ class TestCalendarIndexerGetKey:
     async def test_all_day_event(self: Self) -> None:
         """Test with all-day events (date only, no time)."""
         hass = MagicMock()
-        hass.services.async_call = AsyncMock(return_value={
-            "calendar.work_schedule": {
-                "events": [{
-                    "summary": "Holiday",
-                    "start": "2024-01-15",
-                    "end": "2024-01-15",
-                }]
+        hass.services.async_call = AsyncMock(
+            return_value={
+                "calendar.work_schedule": {
+                    "events": [
+                        {
+                            "summary": "Holiday",
+                            "start": "2024-01-15",
+                            "end": "2024-01-15",
+                        }
+                    ]
+                }
             }
-        })
+        )
         indexer = CalendarIndexer(hass, "calendar.work_schedule")
         key = await indexer.get_key(datetime(2024, 1, 15, 10, 30))
         assert key.to_tuple() == (("calendar.work_schedule", 1),)
@@ -182,9 +192,9 @@ class TestCalendarIndexerNextBoundary:
     async def test_returns_datetime(self: Self) -> None:
         """Test that next_boundary returns a datetime."""
         hass = MagicMock()
-        hass.services.async_call = AsyncMock(return_value={
-            "calendar.work_schedule": {"events": []}
-        })
+        hass.services.async_call = AsyncMock(
+            return_value={"calendar.work_schedule": {"events": []}}
+        )
         indexer = CalendarIndexer(hass, "calendar.work_schedule")
         result = await indexer.next_boundary(datetime(2024, 1, 15, 10, 30))
         assert isinstance(result, datetime)
@@ -193,9 +203,9 @@ class TestCalendarIndexerNextBoundary:
     async def test_no_events_returns_24_hours_later(self: Self) -> None:
         """Test that with no events, returns 24 hours later."""
         hass = MagicMock()
-        hass.services.async_call = AsyncMock(return_value={
-            "calendar.work_schedule": {"events": []}
-        })
+        hass.services.async_call = AsyncMock(
+            return_value={"calendar.work_schedule": {"events": []}}
+        )
         indexer = CalendarIndexer(hass, "calendar.work_schedule")
         ts = datetime(2024, 1, 15, 10, 30)
         boundary = await indexer.next_boundary(ts)
@@ -205,15 +215,19 @@ class TestCalendarIndexerNextBoundary:
     async def test_event_start_boundary(self: Self) -> None:
         """Test boundary at event start."""
         hass = MagicMock()
-        hass.services.async_call = AsyncMock(return_value={
-            "calendar.work_schedule": {
-                "events": [{
-                    "summary": "Work",
-                    "start": "2024-01-15T14:00:00",
-                    "end": "2024-01-15T18:00:00",
-                }]
+        hass.services.async_call = AsyncMock(
+            return_value={
+                "calendar.work_schedule": {
+                    "events": [
+                        {
+                            "summary": "Work",
+                            "start": "2024-01-15T14:00:00",
+                            "end": "2024-01-15T18:00:00",
+                        }
+                    ]
+                }
             }
-        })
+        )
         indexer = CalendarIndexer(hass, "calendar.work_schedule")
         ts = datetime(2024, 1, 15, 10, 30)
         boundary = await indexer.next_boundary(ts)
@@ -223,15 +237,19 @@ class TestCalendarIndexerNextBoundary:
     async def test_event_end_boundary(self: Self) -> None:
         """Test boundary at event end."""
         hass = MagicMock()
-        hass.services.async_call = AsyncMock(return_value={
-            "calendar.work_schedule": {
-                "events": [{
-                    "summary": "Work",
-                    "start": "2024-01-15T09:00:00",
-                    "end": "2024-01-15T17:00:00",
-                }]
+        hass.services.async_call = AsyncMock(
+            return_value={
+                "calendar.work_schedule": {
+                    "events": [
+                        {
+                            "summary": "Work",
+                            "start": "2024-01-15T09:00:00",
+                            "end": "2024-01-15T17:00:00",
+                        }
+                    ]
+                }
             }
-        })
+        )
         indexer = CalendarIndexer(hass, "calendar.work_schedule")
         ts = datetime(2024, 1, 15, 10, 30)
         boundary = await indexer.next_boundary(ts)
@@ -241,22 +259,24 @@ class TestCalendarIndexerNextBoundary:
     async def test_nearest_boundary_is_returned(self: Self) -> None:
         """Test that nearest boundary is returned with multiple events."""
         hass = MagicMock()
-        hass.services.async_call = AsyncMock(return_value={
-            "calendar.work_schedule": {
-                "events": [
-                    {
-                        "summary": "Meeting 1",
-                        "start": "2024-01-15T14:00:00",
-                        "end": "2024-01-15T15:00:00",
-                    },
-                    {
-                        "summary": "Meeting 2",
-                        "start": "2024-01-15T16:00:00",
-                        "end": "2024-01-15T17:00:00",
-                    },
-                ]
+        hass.services.async_call = AsyncMock(
+            return_value={
+                "calendar.work_schedule": {
+                    "events": [
+                        {
+                            "summary": "Meeting 1",
+                            "start": "2024-01-15T14:00:00",
+                            "end": "2024-01-15T15:00:00",
+                        },
+                        {
+                            "summary": "Meeting 2",
+                            "start": "2024-01-15T16:00:00",
+                            "end": "2024-01-15T17:00:00",
+                        },
+                    ]
+                }
             }
-        })
+        )
         indexer = CalendarIndexer(hass, "calendar.work_schedule")
         ts = datetime(2024, 1, 15, 10, 30)
         boundary = await indexer.next_boundary(ts)
@@ -277,15 +297,19 @@ class TestCalendarIndexerNextBoundary:
     async def test_simple_event_boundary_parsing(self: Self) -> None:
         """Test parsing of simple ISO format datetime strings."""
         hass = MagicMock()
-        hass.services.async_call = AsyncMock(return_value={
-            "calendar.work_schedule": {
-                "events": [{
-                    "summary": "Meeting",
-                    "start": "2024-01-20T14:00:00",
-                    "end": "2024-01-20T15:00:00",
-                }]
+        hass.services.async_call = AsyncMock(
+            return_value={
+                "calendar.work_schedule": {
+                    "events": [
+                        {
+                            "summary": "Meeting",
+                            "start": "2024-01-20T14:00:00",
+                            "end": "2024-01-20T15:00:00",
+                        }
+                    ]
+                }
             }
-        })
+        )
         indexer = CalendarIndexer(hass, "calendar.work_schedule")
         # Query before the event
         ts = datetime(2024, 1, 15, 10, 30)
@@ -299,15 +323,19 @@ class TestCalendarIndexerNextBoundary:
     async def test_date_only_event_handling(self: Self) -> None:
         """Test handling of date-only (all-day) events."""
         hass = MagicMock()
-        hass.services.async_call = AsyncMock(return_value={
-            "calendar.work_schedule": {
-                "events": [{
-                    "summary": "Holiday",
-                    "start": "2024-01-20",
-                    "end": "2024-01-20",
-                }]
+        hass.services.async_call = AsyncMock(
+            return_value={
+                "calendar.work_schedule": {
+                    "events": [
+                        {
+                            "summary": "Holiday",
+                            "start": "2024-01-20",
+                            "end": "2024-01-20",
+                        }
+                    ]
+                }
             }
-        })
+        )
         indexer = CalendarIndexer(hass, "calendar.work_schedule")
         ts = datetime(2024, 1, 15, 10, 30)
         boundary = await indexer.next_boundary(ts)
@@ -318,9 +346,9 @@ class TestCalendarIndexerNextBoundary:
     async def test_looks_ahead_30_days(self: Self) -> None:
         """Test that next_boundary looks ahead 30 days."""
         hass = MagicMock()
-        hass.services.async_call = AsyncMock(return_value={
-            "calendar.work_schedule": {"events": []}
-        })
+        hass.services.async_call = AsyncMock(
+            return_value={"calendar.work_schedule": {"events": []}}
+        )
         indexer = CalendarIndexer(hass, "calendar.work_schedule")
         ts = datetime(2024, 1, 15, 10, 30)
         await indexer.next_boundary(ts)
@@ -336,9 +364,9 @@ class TestCalendarIndexerHashability:
     async def test_keys_are_hashable(self: Self) -> None:
         """Test that returned keys are hashable."""
         hass = MagicMock()
-        hass.services.async_call = AsyncMock(return_value={
-            "calendar.work_schedule": {"events": []}
-        })
+        hass.services.async_call = AsyncMock(
+            return_value={"calendar.work_schedule": {"events": []}}
+        )
         indexer = CalendarIndexer(hass, "calendar.work_schedule")
         key = await indexer.get_key(datetime(2024, 1, 15, 10, 30))
         hash_value = hash(key)
@@ -348,9 +376,9 @@ class TestCalendarIndexerHashability:
     async def test_same_value_same_hash(self: Self) -> None:
         """Test that same values have same hash."""
         hass = MagicMock()
-        hass.services.async_call = AsyncMock(return_value={
-            "calendar.work_schedule": {"events": []}
-        })
+        hass.services.async_call = AsyncMock(
+            return_value={"calendar.work_schedule": {"events": []}}
+        )
         indexer = CalendarIndexer(hass, "calendar.work_schedule")
         key1 = await indexer.get_key(datetime(2024, 1, 15, 10, 30))
         key2 = await indexer.get_key(datetime(2024, 1, 15, 14, 30))
@@ -364,12 +392,19 @@ class TestCalendarIndexerHashability:
 
         # Setup two different responses
         call_count = [0]
+
         async def side_effect(*args, **kwargs):
             call_count[0] += 1
             if call_count[0] % 2 == 1:
                 return {
                     "calendar.work_schedule": {
-                        "events": [{"summary": "Event", "start": "2024-01-15T14:00:00", "end": "2024-01-15T15:00:00"}]
+                        "events": [
+                            {
+                                "summary": "Event",
+                                "start": "2024-01-15T14:00:00",
+                                "end": "2024-01-15T15:00:00",
+                            }
+                        ]
                     }
                 }
             return {"calendar.work_schedule": {"events": []}}
@@ -404,9 +439,9 @@ class TestCalendarIndexerEdgeCases:
     async def test_timezone_preservation(self: Self) -> None:
         """Test that timezone is preserved in next_boundary."""
         hass = MagicMock()
-        hass.services.async_call = AsyncMock(return_value={
-            "calendar.work_schedule": {"events": []}
-        })
+        hass.services.async_call = AsyncMock(
+            return_value={"calendar.work_schedule": {"events": []}}
+        )
         indexer = CalendarIndexer(hass, "calendar.work_schedule")
         tz = UTC
         ts = datetime(2024, 1, 15, 10, 30, tzinfo=tz)
@@ -417,15 +452,19 @@ class TestCalendarIndexerEdgeCases:
     async def test_distant_future_event(self: Self) -> None:
         """Test with event far in the future."""
         hass = MagicMock()
-        hass.services.async_call = AsyncMock(return_value={
-            "calendar.work_schedule": {
-                "events": [{
-                    "summary": "Future Event",
-                    "start": "2024-12-31T14:00:00",
-                    "end": "2024-12-31T15:00:00",
-                }]
+        hass.services.async_call = AsyncMock(
+            return_value={
+                "calendar.work_schedule": {
+                    "events": [
+                        {
+                            "summary": "Future Event",
+                            "start": "2024-12-31T14:00:00",
+                            "end": "2024-12-31T15:00:00",
+                        }
+                    ]
+                }
             }
-        })
+        )
         indexer = CalendarIndexer(hass, "calendar.work_schedule")
         ts = datetime(2024, 1, 15, 10, 30)
         boundary = await indexer.next_boundary(ts)

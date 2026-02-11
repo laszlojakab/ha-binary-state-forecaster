@@ -5,6 +5,7 @@ This module provides DriftMonitor, which detects concept drift by comparing
 fast and slow exponentially weighted baseline distributions. When the distributions
 diverge significantly, it indicates that the underlying data patterns are changing.
 """
+
 import math
 from typing import Final, Self
 

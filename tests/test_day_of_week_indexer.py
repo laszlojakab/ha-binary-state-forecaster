@@ -143,7 +143,7 @@ class TestDayOfWeekIndexerConsistency:
         """Test that same weekday in different weeks produce same key."""
         indexer = DayOfWeekIndexer()
         mondays = [
-            datetime(2024, 1, 8, 10, 30),   # Monday
+            datetime(2024, 1, 8, 10, 30),  # Monday
             datetime(2024, 1, 15, 10, 30),  # Monday
             datetime(2024, 1, 22, 10, 30),  # Monday
             datetime(2024, 1, 29, 10, 30),  # Monday
@@ -156,7 +156,7 @@ class TestDayOfWeekIndexerConsistency:
         """Test that same weekday in different years produce same key."""
         indexer = DayOfWeekIndexer()
         fridays = [
-            datetime(2023, 1, 6, 10, 30),   # Friday
+            datetime(2023, 1, 6, 10, 30),  # Friday
             datetime(2024, 1, 12, 10, 30),  # Friday
             datetime(2025, 1, 10, 10, 30),  # Friday
         ]
@@ -219,9 +219,9 @@ class TestDayOfWeekIndexerHashability:
     async def test_usable_as_dict_key(self: Self) -> None:
         """Test that keys can be used as dictionary keys."""
         indexer = DayOfWeekIndexer()
-        key_mon = await indexer.get_key(datetime(2024, 1, 8, 10, 30))    # Monday
-        key_wed = await indexer.get_key(datetime(2024, 1, 10, 10, 30))   # Wednesday
-        key_fri = await indexer.get_key(datetime(2024, 1, 12, 10, 30))   # Friday
+        key_mon = await indexer.get_key(datetime(2024, 1, 8, 10, 30))  # Monday
+        key_wed = await indexer.get_key(datetime(2024, 1, 10, 10, 30))  # Wednesday
+        key_fri = await indexer.get_key(datetime(2024, 1, 12, 10, 30))  # Friday
 
         patterns = {
             key_mon: "Monday pattern",

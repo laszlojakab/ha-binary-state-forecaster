@@ -4,6 +4,7 @@ Unit tests for DriftStats.
 Comprehensive tests for exponentially weighted statistics tracking used
 for adaptive drift thresholds.
 """
+
 import math
 from typing import Self
 

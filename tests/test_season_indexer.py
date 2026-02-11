@@ -86,10 +86,10 @@ class TestSeasonIndexerMappings:
         """Test first day of each season."""
         indexer = SeasonIndexer()
         boundaries = [
-            (1, "winter"),   # January 1
-            (3, "spring"),   # March 1
-            (6, "summer"),   # June 1
-            (9, "autumn"),   # September 1
+            (1, "winter"),  # January 1
+            (3, "spring"),  # March 1
+            (6, "summer"),  # June 1
+            (9, "autumn"),  # September 1
             (12, "winter"),  # December 1
         ]
         for month, expected_season in boundaries:
@@ -105,7 +105,7 @@ class TestSeasonIndexerMappings:
             (2, 28, "winter"),  # February 28 (2024 is leap year, so 29)
             (5, 31, "spring"),  # May 31
             (8, 31, "summer"),  # August 31
-            (11, 30, "autumn"), # November 30
+            (11, 30, "autumn"),  # November 30
         ]
         for month, day, expected_season in boundaries:
             ts = datetime(2024, month, day, 23, 59, 59)
@@ -202,7 +202,7 @@ class TestSeasonIndexerHashability:
         indexer = SeasonIndexer()
         key1 = await indexer.get_key(datetime(2024, 3, 1, 10, 30))  # Spring
         key2 = await indexer.get_key(datetime(2024, 3, 31, 20, 30))  # Spring
-        key3 = await indexer.get_key(datetime(2024, 7, 1, 10, 30))   # Summer
+        key3 = await indexer.get_key(datetime(2024, 7, 1, 10, 30))  # Summer
 
         s = {key1, key2, key3}
         assert len(s) == 2  # key1 and key2 are the same (spring)

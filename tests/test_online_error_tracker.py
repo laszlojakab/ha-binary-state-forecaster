@@ -4,6 +4,7 @@ Unit tests for OnlineErrorTracker.
 Comprehensive tests for the OnlineErrorTracker class, covering initialization,
 error tracking, exponential decay, and statistical calculations.
 """
+
 import math
 from typing import Self
 

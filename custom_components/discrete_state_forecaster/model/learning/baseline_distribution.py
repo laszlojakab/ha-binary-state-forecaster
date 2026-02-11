@@ -5,6 +5,7 @@ This module provides BaselineDistribution, which maintains a probability distrib
 over states that adapts to changes using exponential decay. Old observations are
 gradually forgotten, allowing the baseline to track shifting patterns over time.
 """
+
 import math
 from typing import Final
 

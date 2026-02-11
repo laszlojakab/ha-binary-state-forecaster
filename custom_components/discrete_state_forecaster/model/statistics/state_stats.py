@@ -82,4 +82,3 @@ class StateStats:
 
         """
         return self._support >= min_support
-

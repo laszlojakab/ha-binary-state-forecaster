@@ -129,9 +129,7 @@ class CalendarIndexer(TimeIndexer):
 
         except Exception:  # noqa: BLE001
             # If calendar service fails, assume no event
-            return TimeKey.from_temporal_feature(
-                TemporalFeature(name=self.name, value=0)
-            )
+            return TimeKey.from_temporal_feature(TemporalFeature(name=self.name, value=0))
 
     async def next_boundary(self: Self, timestamp: datetime) -> datetime:
         """
@@ -191,9 +189,7 @@ class CalendarIndexer(TimeIndexer):
                 if start_str:
                     # Handle both datetime strings and date-only strings
                     if "T" in start_str:
-                        event_start = datetime.fromisoformat(
-                            start_str.replace("Z", "+00:00")
-                        )
+                        event_start = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
                     else:
                         # Date-only event (all-day)
                         event_start = datetime.fromisoformat(start_str + "T00:00:00")
@@ -204,9 +200,7 @@ class CalendarIndexer(TimeIndexer):
                 if end_str:
                     # Handle both datetime strings and date-only strings
                     if "T" in end_str:
-                        event_end = datetime.fromisoformat(
-                            end_str.replace("Z", "+00:00")
-                        )
+                        event_end = datetime.fromisoformat(end_str.replace("Z", "+00:00"))
                     else:
                         # Date-only event (all-day)
                         event_end = datetime.fromisoformat(end_str + "T00:00:00")

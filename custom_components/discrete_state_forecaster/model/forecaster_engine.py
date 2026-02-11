@@ -152,8 +152,7 @@ class ForecasterEngine:
         """
         self._hyper_parameters = HyperParameters(
             half_life=parameters.half_life,
-            min_prune_interval=parameters.half_life
-            * parameters.min_prune_interval_factor,
+            min_prune_interval=parameters.half_life * parameters.min_prune_interval_factor,
             prune_enabled=True,
             persistence_strength=parameters.persistence_strength,
         )
@@ -230,9 +229,7 @@ class ForecasterEngine:
         Raises:
             ValueError: If timestamp is earlier than the last update timestamp.
         """
-        timestamp = (
-            timestamp if timestamp is not None else datetime.now(tz=UTC).timestamp()
-        )
+        timestamp = timestamp if timestamp is not None else datetime.now(tz=UTC).timestamp()
 
         if self._last_update_timestamp is not None:
             duration = timestamp - self._last_update_timestamp
@@ -254,20 +251,14 @@ class ForecasterEngine:
 
         if global_prediction:
             # After the first update we may not be able to get a global prediction.
-            self._drift_monitor.update(
-                global_prediction.distribution.distribution(), timestamp
-            )
+            self._drift_monitor.update(global_prediction.distribution.distribution(), timestamp)
 
         self._prune(timestamp)
 
         prediction = self._stats.predict(key)
         if prediction is not None:
-            self._short_term_error_tracker.update(
-                prediction.distribution, state, timestamp
-            )
-            self._long_term_error_tracker.update(
-                prediction.distribution, state, timestamp
-            )
+            self._short_term_error_tracker.update(prediction.distribution, state, timestamp)
+            self._long_term_error_tracker.update(prediction.distribution, state, timestamp)
 
         self._hyper_parameter_controller.update(
             is_drifting=self._drift_monitor.is_drifting,
@@ -337,7 +328,6 @@ class ForecasterEngine:
         # CASE 1: explicit current state + duration provided
         # ------------------------------------------------------------------
         if current_state is not None and current_state_duration is not None:
-
             expected = self._state_persistence_tracker.expected_duration(current_state)
 
             # hazard-style decay
@@ -348,11 +338,7 @@ class ForecasterEngine:
                 weight = prob * total_support
 
                 if state == current_state:
-                    weight *= (
-                        1.0
-                        + self._hyper_parameters.persistence_strength
-                        * persistence_boost
-                    )
+                    weight *= 1.0 + self._hyper_parameters.persistence_strength * persistence_boost
 
                 adjusted.update(state, weight)
 
@@ -370,12 +356,8 @@ class ForecasterEngine:
         if internal_current is not None:
             timestamp = self._last_update_timestamp
             if timestamp is not None:
-                expected = self._state_persistence_tracker.expected_duration(
-                    internal_current
-                )
-                current_duration = self._state_persistence_tracker.current_duration(
-                    timestamp
-                )
+                expected = self._state_persistence_tracker.expected_duration(internal_current)
+                current_duration = self._state_persistence_tracker.current_duration(timestamp)
 
                 ratio = current_duration / max(expected, 1e-6)
                 persistence_boost = math.exp(-ratio)
@@ -385,9 +367,7 @@ class ForecasterEngine:
 
                     if state == internal_current:
                         weight *= (
-                            1.0
-                            + self._hyper_parameters.persistence_strength
-                            * persistence_boost
+                            1.0 + self._hyper_parameters.persistence_strength * persistence_boost
                         )
 
                     adjusted.update(state, weight)
@@ -420,9 +400,7 @@ class ForecasterEngine:
             self._last_prune_timestamp = timestamp
             return
 
-        if (
-            self._last_prune_timestamp + self._hyper_parameters.min_prune_interval
-        ) > timestamp:
+        if (self._last_prune_timestamp + self._hyper_parameters.min_prune_interval) > timestamp:
             return
 
         self._stats.prune()

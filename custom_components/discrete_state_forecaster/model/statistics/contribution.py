@@ -5,6 +5,7 @@ This module provides `Contribution`, a dataclass that tracks how a specific
 temporal level (ancestor in the hierarchy) contributed to a prediction,
 including the weight applied and the data available at that level.
 """
+
 from dataclasses import dataclass
 
 from custom_components.discrete_state_forecaster.model.temporal.time_key import (

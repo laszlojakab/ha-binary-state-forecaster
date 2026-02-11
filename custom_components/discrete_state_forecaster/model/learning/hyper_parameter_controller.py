@@ -6,6 +6,7 @@ model hyper-parameters (particularly half-life) in response to concept drift
 and prediction error trends. This allows the model to adapt its learning rate
 to changing data patterns.
 """
+
 import math
 from enum import Enum, auto
 from typing import Final, Self
@@ -175,6 +176,7 @@ class HyperParameterController:
         )
 
         self._update_params()
+
     def _update_params(self: Self) -> None:
         """
         Update hyper-parameters based on current mode and half-life.
@@ -189,9 +191,7 @@ class HyperParameterController:
         half_life = math.exp(self._log_half_life)
 
         # ---- persistence derived from half-life ----
-        ratio = (half_life - self._min_half_life) / (
-            self._max_half_life - self._min_half_life
-        )
+        ratio = (half_life - self._min_half_life) / (self._max_half_life - self._min_half_life)
         ratio = max(0.0, min(1.0, ratio))
 
         persistence_strength = 0.2 + 0.8 * ratio

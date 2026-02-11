@@ -5,6 +5,7 @@ This module provides OnlineErrorTracker, which maintains running statistics of
 prediction errors using negative log-likelihood as the error metric. Statistics
 are updated with exponential decay to give more weight to recent errors.
 """
+
 import math
 from typing import Final, Self
 

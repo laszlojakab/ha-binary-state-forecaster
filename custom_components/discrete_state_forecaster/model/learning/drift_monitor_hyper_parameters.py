@@ -4,6 +4,7 @@ Hyper-parameters for drift monitoring.
 This module provides configuration for the DriftMonitor, controlling how concept
 drift is detected through comparison of fast and slow baseline distributions.
 """
+
 from typing import Final, Self
 
 from custom_components.discrete_state_forecaster.model.hyper_parameters import (

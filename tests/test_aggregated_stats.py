@@ -4,6 +4,7 @@ Unit tests for AggregatedStats.
 Comprehensive tests for the AggregatedStats class, covering TimeKey association,
 distribution conversion, and inherited functionality.
 """
+
 from typing import Self
 
 from custom_components.discrete_state_forecaster.model.statistics.aggregated_stats import (
@@ -36,11 +37,7 @@ class TestAggregatedStatsInitialization:
 
     def test_create_with_multi_feature_key(self: Self) -> None:
         """Test creating AggregatedStats with multi-feature key."""
-        key = (
-            TimeKey.GLOBAL
-            + TemporalFeature("hour", 14)
-            + TemporalFeature("day_of_week", 3)
-        )
+        key = TimeKey.GLOBAL + TemporalFeature("hour", 14) + TemporalFeature("day_of_week", 3)
         stats = AggregatedStats(key)
         assert stats.key == key
         assert len(stats.key) == 2
@@ -81,8 +78,8 @@ class TestAggregatedStatsInheritedMethods:
         stats.update("on", 2.0)
         stats.update("off", 1.0)
         dist = stats.distribution()
-        assert abs(dist["on"] - 2/3) < 1e-9
-        assert abs(dist["off"] - 1/3) < 1e-9
+        assert abs(dist["on"] - 2 / 3) < 1e-9
+        assert abs(dist["off"] - 1 / 3) < 1e-9
 
     def test_entropy_works(self: Self) -> None:
         """Test that inherited entropy method works."""
@@ -210,8 +207,8 @@ class TestAggregatedStatsFromDistribution:
 
         # Probabilities should be 2/3 and 1/3
         dist_dict = agg.distribution()
-        assert abs(dist_dict["a"] - 2/3) < 1e-9
-        assert abs(dist_dict["b"] - 1/3) < 1e-9
+        assert abs(dist_dict["a"] - 2 / 3) < 1e-9
+        assert abs(dist_dict["b"] - 1 / 3) < 1e-9
 
 
 class TestAggregatedStatsKeyAssociation:

@@ -5,6 +5,7 @@ This module provides `PredictionResult`, a dataclass that encapsulates the
 complete result of a prediction, including the predicted distribution and
 information about which temporal levels contributed to the prediction.
 """
+
 from dataclasses import dataclass
 
 from custom_components.discrete_state_forecaster.model.statistics.distribution_stats import (

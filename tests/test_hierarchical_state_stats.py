@@ -4,6 +4,7 @@ Unit tests for HierarchicalStateStats.
 Comprehensive tests for the HierarchicalStateStats class, covering hierarchical
 updates, multi-level predictions with fallback, and temporal decay.
 """
+
 from typing import Self
 
 from custom_components.discrete_state_forecaster.model.hyper_parameters import (
@@ -94,11 +95,7 @@ class TestHierarchicalStateStatsUpdate:
         stats = HierarchicalStateStats(hp)
 
         # Create multi-level key
-        key = (
-            TimeKey.GLOBAL
-            + TemporalFeature("hour", 14)
-            + TemporalFeature("day_of_week", 3)
-        )
+        key = TimeKey.GLOBAL + TemporalFeature("hour", 14) + TemporalFeature("day_of_week", 3)
         stats.update(key, "on", weight=10.0)
 
         # Check that we can predict at different levels

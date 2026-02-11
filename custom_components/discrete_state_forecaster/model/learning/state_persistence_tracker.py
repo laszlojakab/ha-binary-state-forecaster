@@ -5,6 +5,7 @@ This module provides StatePersistenceTracker, which tracks how long states
 typically persist and computes persistence boosts based on hazard-style decay.
 This helps predictions favor the current state when it's expected to persist.
 """
+
 import math
 from typing import Final, Self
 
@@ -54,9 +55,7 @@ class StatePersistenceTracker:
 
     """
 
-    def __init__(
-        self: Self, hyper_parameters: StatePersistenceTrackerHyperParameters
-    ) -> None:
+    def __init__(self: Self, hyper_parameters: StatePersistenceTrackerHyperParameters) -> None:
         """
         Initialize state persistence tracker.
 
@@ -97,9 +96,7 @@ class StatePersistenceTracker:
             _lambda = math.log(2.0) / self._hyper_parameters.persistence_half_life
             decay = math.exp(-_lambda * dt)
 
-            self._mean_duration[self._current_state] = (
-                decay * prev + (1 - decay) * duration
-            )
+            self._mean_duration[self._current_state] = decay * prev + (1 - decay) * duration
 
             self._current_state = state
             self._current_state_start = timestamp

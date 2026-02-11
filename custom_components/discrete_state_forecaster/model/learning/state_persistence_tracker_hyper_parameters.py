@@ -4,6 +4,7 @@ Hyper-parameters for state persistence tracking.
 This module provides configuration for StatePersistenceTracker, controlling
 the decay rate used when computing exponentially weighted mean durations.
 """
+
 from typing import Final, Self
 
 from custom_components.discrete_state_forecaster.model.hyper_parameters import (

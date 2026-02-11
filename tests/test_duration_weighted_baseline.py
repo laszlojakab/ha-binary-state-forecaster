@@ -3,6 +3,7 @@ Unit tests for DurationWeightedBaseline.
 
 Comprehensive tests for duration-weighted baseline distribution tracking.
 """
+
 from typing import Self
 
 from custom_components.discrete_state_forecaster.model.hyper_parameters import (

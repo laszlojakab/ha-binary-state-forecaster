@@ -12,6 +12,7 @@ times (e.g., "14:30 on Wednesday in spring") while still generalizing
 when data is
 sparse by falling back to broader patterns (e.g., "afternoon" or "spring").
 """
+
 from typing import Self
 
 from custom_components.discrete_state_forecaster.model.state import State
@@ -159,9 +160,7 @@ class HierarchicalStateStats:
             for state, prob in stats.distribution().items():
                 aggregated.update(state, prob * stats.total_support() * weight)
 
-            contributions.append(
-                Contribution(source_key, weight, stats.total_support())
-            )
+            contributions.append(Contribution(source_key, weight, stats.total_support()))
 
             if aggregated.is_confident(self._hyper_parameters.min_support):
                 break

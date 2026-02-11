@@ -4,6 +4,7 @@ Hyper-parameters for online error tracking.
 This module provides configuration for the OnlineErrorTracker, controlling how
 prediction errors are tracked over time with exponential decay.
 """
+
 from typing import Final, Self
 
 from custom_components.discrete_state_forecaster.model.hyper_parameters import (

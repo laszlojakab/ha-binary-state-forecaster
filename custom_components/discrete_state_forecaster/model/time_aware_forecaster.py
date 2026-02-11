@@ -43,9 +43,7 @@ class TimeAwareForecasterParameters:
     """
 
     indexer: TimeIndexer
-    forecaster_engine_parameters: ForecasterEngineParameters = (
-        ForecasterEngineParameters()
-    )
+    forecaster_engine_parameters: ForecasterEngineParameters = ForecasterEngineParameters()
 
 
 class TimeAwareForecaster:
@@ -196,7 +194,7 @@ class TimeAwareForecaster:
             )
 
             if prediction is None:
-                ts = datetime.fromtimestamp(step_end_ts, tz=UTC)
+                ts = datetime.fromtimestamp(step_end_ts, tz=start_ts.tzinfo)
                 continue
 
             results.append((ts, prediction))
@@ -224,6 +222,6 @@ class TimeAwareForecaster:
             elif sim_state is not None:
                 sim_duration += step_dt
 
-            ts = datetime.fromtimestamp(step_end_ts, tz=UTC)
+            ts = datetime.fromtimestamp(step_end_ts, tz=start_ts.tzinfo)
 
         return results

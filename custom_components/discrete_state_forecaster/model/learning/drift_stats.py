@@ -5,6 +5,7 @@ This module provides DriftStats, which maintains running mean and variance
 of drift measurements using exponential decay. This is used to compute
 adaptive thresholds for drift detection.
 """
+
 import math
 from typing import Final, Self
 

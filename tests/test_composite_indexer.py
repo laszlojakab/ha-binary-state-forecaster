@@ -113,19 +113,23 @@ class TestCompositeIndexerGetKey:
         ts = datetime(2024, 1, 15, 14, 30)
 
         # Order 1: time, day, season
-        comp1 = CompositeIndexer([
-            TimeOfDayIndexer(bucket_size=3600),
-            DayOfWeekIndexer(),
-            SeasonIndexer(),
-        ])
+        comp1 = CompositeIndexer(
+            [
+                TimeOfDayIndexer(bucket_size=3600),
+                DayOfWeekIndexer(),
+                SeasonIndexer(),
+            ]
+        )
         key1 = await comp1.get_key(ts)
 
         # Order 2: season, day, time
-        comp2 = CompositeIndexer([
-            SeasonIndexer(),
-            DayOfWeekIndexer(),
-            TimeOfDayIndexer(bucket_size=3600),
-        ])
+        comp2 = CompositeIndexer(
+            [
+                SeasonIndexer(),
+                DayOfWeekIndexer(),
+                TimeOfDayIndexer(bucket_size=3600),
+            ]
+        )
         key2 = await comp2.get_key(ts)
 
         assert key1 != key2
@@ -166,10 +170,12 @@ class TestCompositeIndexerReturnType:
     @pytest.mark.asyncio
     async def test_key_is_hashable(self: Self) -> None:
         """Test that returned keys are hashable."""
-        composite = CompositeIndexer([
-            TimeOfDayIndexer(bucket_size=3600),
-            DayOfWeekIndexer(),
-        ])
+        composite = CompositeIndexer(
+            [
+                TimeOfDayIndexer(bucket_size=3600),
+                DayOfWeekIndexer(),
+            ]
+        )
         key = await composite.get_key(datetime(2024, 1, 15, 14, 30))
         hash_value = hash(key)
         assert isinstance(hash_value, int)
@@ -177,10 +183,12 @@ class TestCompositeIndexerReturnType:
     @pytest.mark.asyncio
     async def test_equal_keys_have_equal_hash(self: Self) -> None:
         """Test that equal keys have equal hashes."""
-        composite = CompositeIndexer([
-            TimeOfDayIndexer(bucket_size=3600),
-            DayOfWeekIndexer(),
-        ])
+        composite = CompositeIndexer(
+            [
+                TimeOfDayIndexer(bucket_size=3600),
+                DayOfWeekIndexer(),
+            ]
+        )
         # Same time and day
         key1 = await composite.get_key(datetime(2024, 1, 15, 14, 0))
         key2 = await composite.get_key(datetime(2024, 1, 15, 14, 30))
@@ -190,10 +198,12 @@ class TestCompositeIndexerReturnType:
     @pytest.mark.asyncio
     async def test_different_keys_have_different_hash(self: Self) -> None:
         """Test that different keys have different hashes."""
-        composite = CompositeIndexer([
-            TimeOfDayIndexer(bucket_size=3600),
-            DayOfWeekIndexer(),
-        ])
+        composite = CompositeIndexer(
+            [
+                TimeOfDayIndexer(bucket_size=3600),
+                DayOfWeekIndexer(),
+            ]
+        )
         key1 = await composite.get_key(datetime(2024, 1, 15, 14, 30))  # Monday
         key2 = await composite.get_key(datetime(2024, 1, 16, 14, 30))  # Tuesday
         assert key1 != key2
@@ -206,10 +216,12 @@ class TestCompositeIndexerUsability:
     @pytest.mark.asyncio
     async def test_usable_as_dict_key(self: Self) -> None:
         """Test that keys can be used as dictionary keys."""
-        composite = CompositeIndexer([
-            TimeOfDayIndexer(bucket_size=3600),
-            DayOfWeekIndexer(),
-        ])
+        composite = CompositeIndexer(
+            [
+                TimeOfDayIndexer(bucket_size=3600),
+                DayOfWeekIndexer(),
+            ]
+        )
 
         # Monday 2 PM
         key_mon_day = await composite.get_key(datetime(2024, 1, 8, 14, 30))
@@ -231,10 +243,12 @@ class TestCompositeIndexerUsability:
     @pytest.mark.asyncio
     async def test_usable_in_set(self: Self) -> None:
         """Test that keys can be used in sets."""
-        composite = CompositeIndexer([
-            TimeOfDayIndexer(bucket_size=3600),
-            DayOfWeekIndexer(),
-        ])
+        composite = CompositeIndexer(
+            [
+                TimeOfDayIndexer(bucket_size=3600),
+                DayOfWeekIndexer(),
+            ]
+        )
 
         key1 = await composite.get_key(datetime(2024, 1, 8, 14, 30))  # Monday 2 PM
         key2 = await composite.get_key(datetime(2024, 1, 8, 14, 45))  # Monday 2:45 PM
@@ -250,11 +264,13 @@ class TestCompositeIndexerConsistency:
     @pytest.mark.asyncio
     async def test_same_timestamp_produces_same_key(self: Self) -> None:
         """Test that same timestamp produces same key on repeated calls."""
-        composite = CompositeIndexer([
-            TimeOfDayIndexer(bucket_size=3600),
-            DayOfWeekIndexer(),
-            SeasonIndexer(),
-        ])
+        composite = CompositeIndexer(
+            [
+                TimeOfDayIndexer(bucket_size=3600),
+                DayOfWeekIndexer(),
+                SeasonIndexer(),
+            ]
+        )
         ts = datetime(2024, 1, 15, 14, 30)
         key1 = await composite.get_key(ts)
         key2 = await composite.get_key(ts)
@@ -263,10 +279,12 @@ class TestCompositeIndexerConsistency:
     @pytest.mark.asyncio
     async def test_consistency_across_years(self: Self) -> None:
         """Test consistency of same time pattern across years."""
-        composite = CompositeIndexer([
-            TimeOfDayIndexer(bucket_size=3600),
-            SeasonIndexer(),
-        ])
+        composite = CompositeIndexer(
+            [
+                TimeOfDayIndexer(bucket_size=3600),
+                SeasonIndexer(),
+            ]
+        )
 
         # Both January 15 of different years
         key1 = await composite.get_key(datetime(2023, 1, 15, 14, 30))
@@ -309,10 +327,12 @@ class TestCompositeIndexerEdgeCases:
     @pytest.mark.asyncio
     async def test_indexer_with_different_bucket_sizes(self: Self) -> None:
         """Test composition with indexers using different bucket sizes."""
-        composite = CompositeIndexer([
-            TimeOfDayIndexer(bucket_size=300),    # 5-minute buckets
-            TimeOfDayIndexer(bucket_size=3600),   # 1-hour buckets
-        ])
+        composite = CompositeIndexer(
+            [
+                TimeOfDayIndexer(bucket_size=300),  # 5-minute buckets
+                TimeOfDayIndexer(bucket_size=3600),  # 1-hour buckets
+            ]
+        )
 
         # 2:30 PM = 52200 seconds
         # 5-min: 52200/300 = 174

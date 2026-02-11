@@ -4,6 +4,7 @@ Unit tests for DistributionStats.
 Comprehensive tests for the DistributionStats class, covering distribution
 management, support aggregation, probability calculations, entropy, and decay.
 """
+
 from typing import Self
 
 from custom_components.discrete_state_forecaster.model.statistics.distribution_stats import (
@@ -478,7 +479,7 @@ class TestDistributionStatsIntegration:
 
         # Check distribution before pruning
         dist_before = dist.distribution()
-        assert abs(dist_before["on"] - 50/75) < 1e-9
+        assert abs(dist_before["on"] - 50 / 75) < 1e-9
 
         # Prune and check
         dist.prune(10.0)

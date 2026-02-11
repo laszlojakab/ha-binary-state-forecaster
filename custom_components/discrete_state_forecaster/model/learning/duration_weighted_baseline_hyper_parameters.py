@@ -4,6 +4,7 @@ Hyper-parameters for duration-weighted baseline distribution.
 This module provides configuration for DurationWeightedBaseline, controlling
 the decay rate, pruning threshold, and Laplace smoothing parameter.
 """
+
 from typing import Final, Self
 
 from .drift_monitor_hyper_parameters import DriftMonitorHyperParameters
