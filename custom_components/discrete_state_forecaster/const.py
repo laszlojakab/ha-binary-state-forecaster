@@ -21,18 +21,18 @@ CONF_USE_MONTH_OF_YEAR: Final = "use_month_of_year"
 CONF_USE_SEASON: Final = "use_season"
 
 # Prediction configuration
-CONF_STATE_PERSISTENCE_FACTOR: Final = "state_persistence_factor"
-CONF_ADAPTIVE_PERSISTENCE: Final = "adaptive_persistence"
-CONF_HALF_LIFE_HOURS: Final = "half_life_hours"
+# CONF_STATE_PERSISTENCE_FACTOR: Final = "state_persistence_factor"
+# CONF_ADAPTIVE_PERSISTENCE: Final = "adaptive_persistence"
+# CONF_HALF_LIFE_HOURS: Final = "half_life_hours"
 
 # Default configuration values
 DEFAULT_TIME_BUCKET_SIZE_IN_MINUTES: Final = "60"
 DEFAULT_USE_DAY_OF_WEEK: Final = True
 DEFAULT_USE_MONTH_OF_YEAR: Final = False
 DEFAULT_USE_SEASON: Final = False
-DEFAULT_STATE_PERSISTENCE_FACTOR: Final = 0.3
-DEFAULT_ADAPTIVE_PERSISTENCE: Final = True
-DEFAULT_HALF_LIFE_HOURS: Final = 0.0
+# DEFAULT_STATE_PERSISTENCE_FACTOR: Final = 0.3
+# DEFAULT_ADAPTIVE_PERSISTENCE: Final = True
+# DEFAULT_HALF_LIFE_HOURS: Final = 0.0
 
 SUPPORTED_TARGET_DOMAINS: Final = [
     "alarm_control_panel",

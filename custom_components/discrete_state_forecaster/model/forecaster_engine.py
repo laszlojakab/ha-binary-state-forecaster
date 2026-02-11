@@ -109,8 +109,7 @@ class ForecasterEngineParameters:
     short_term_error_half_life_factor: float = 4
     long_term_error_half_life_factor: float = 40
     persistence_half_life_factor: float = 5.0
-    # # min_prune_interval ≈ 5-10 x base_half_life
-    # min_prune_interval: float = 3600.0 * 5,
+    # min_prune_interval ≈ 5-10 x base_half_life
     min_prune_interval_factor: float = 5.0
     persistence_strength: float = 0.5
     # min_support ≈ 5-10 x typical_change
