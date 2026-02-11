@@ -12,6 +12,10 @@ from typing import Final
 from custom_components.discrete_state_forecaster.model.state import (
     State,
 )
+from custom_components.discrete_state_forecaster.model.utils import (
+    deserialize_state,
+    serialize_state,
+)
 
 
 class BaselineDistribution:
@@ -58,7 +62,54 @@ class BaselineDistribution:
         self._epsilon: Final = epsilon
         self._prune_threshold: Final = prune_threshold
         self._last_ts: float | None = None
+        self._half_life: Final = half_life
         self._lambda = math.log(2.0) / half_life
+
+    # State serialization/deserialization delegated to model.utils
+
+    def to_dict(self) -> dict:
+        """
+        Returns a JSON-serializable representation of this BaselineDistribution.
+
+        The representation includes half-life, epsilon, prune_threshold, last
+        timestamp, and a list of serialized (state, weight) pairs.
+        """
+        states_list = []
+        for s, w in self._states.items():
+            states_list.append({"state": serialize_state(s), "weight": w})
+
+        return {
+            "half_life": self._half_life,
+            "epsilon": float(self._epsilon),
+            "prune_threshold": float(self._prune_threshold),
+            "last_ts": self._last_ts,
+            "states": states_list,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "BaselineDistribution":
+        """
+        Reconstructs a BaselineDistribution from its JSON-serializable dict.
+
+        Note: states serialized with unknown types (repr fallback) may not be
+        reconstructed to their original Python objects.
+        """
+        half_life = float(data.get("half_life"))
+        epsilon = float(data.get("epsilon", 1e-9))
+        prune_threshold = float(data.get("prune_threshold", 1e-12))
+
+        inst = cls(half_life=half_life, epsilon=epsilon, prune_threshold=prune_threshold)
+
+        inst._last_ts = data.get("last_ts")
+
+        states = data.get("states", []) or []
+        for item in states:
+            s = deserialize_state(item["state"]) if isinstance(item, dict) else None
+            w = float(item.get("weight", 0.0)) if isinstance(item, dict) else 0.0
+            if s is not None:
+                inst._states[s] = w
+
+        return inst
 
     def update(
         self,

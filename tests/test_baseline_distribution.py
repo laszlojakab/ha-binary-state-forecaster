@@ -5,6 +5,7 @@ Comprehensive tests covering initialization, updating, decay, and distribution
 computation for the BaselineDistribution class.
 """
 
+import json
 from typing import Self
 
 from custom_components.discrete_state_forecaster.model.learning.baseline_distribution import (
@@ -177,3 +178,40 @@ class TestBaselineDistributionEdgeCases:
         result = baseline.distribution()
         # Should have shifted towards off
         assert result["off"] > 0.4
+
+
+class TestBaselineDistributionSerialization:
+    """Tests for BaselineDistribution.to_dict and from_dict."""
+
+    def test_to_dict_json_serializable(self: Self) -> None:
+        
+
+        baseline = BaselineDistribution(half_life=50.0)
+        baseline.update({"on": 0.7, "off": 0.3}, 100.0)
+
+        data = baseline.to_dict()
+
+        # Should be JSON serializable
+        dumped = json.dumps(data)
+        assert isinstance(dumped, str)
+
+    def test_from_dict_roundtrip(self: Self) -> None:
+        baseline = BaselineDistribution(half_life=20.0, epsilon=1e-6, prune_threshold=1e-8)
+        baseline.update({"on": 1.0}, 50.0)
+        baseline.update({"off": 1.0}, 70.0)
+
+        data = baseline.to_dict()
+        new = BaselineDistribution.from_dict(data)
+
+        # Check attributes
+        assert abs(new._half_life - baseline._half_life) < 1e-12
+        assert abs(new._epsilon - baseline._epsilon) < 1e-12
+        assert abs(new._prune_threshold - baseline._prune_threshold) < 1e-12
+        assert new._last_ts == baseline._last_ts
+
+        # Check distributions are similar
+        old_dist = baseline.distribution()
+        new_dist = new.distribution()
+
+        for k in set(old_dist.keys()).union(new_dist.keys()):
+            assert abs(old_dist.get(k, 0.0) - new_dist.get(k, 0.0)) < 1e-6
