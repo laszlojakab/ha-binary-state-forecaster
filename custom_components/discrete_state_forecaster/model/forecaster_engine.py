@@ -42,23 +42,58 @@ from .state import State
 
 @dataclass(frozen=True)
 class ForecasterEngineParameters:
-    # half_life        ≈ typical_change
-    # fast_half_life   ≈ 1–2 × typical_change
-    # slow_half_life   ≈ 10–30 × typical_change
-    # drift_half_life  ≈ 1.5 × slow_half_life
-    # min_support      ≈ 5–10 × typical_change
+    """
+    Parameters for configuring the ForecasterEngine.
+
+    This dataclass contains all hyperparameters used to configure the behavior
+    of the forecasting engine, including decay rates, drift detection thresholds,
+    and persistence modeling.
+
+    Typical relationships:
+        half_life        ≈ typical_change
+        fast_half_life   ≈ 1-2  typical_change
+        slow_half_life   ≈ 10-30 x typical_change
+        drift_half_life  ≈ 1.5 x slow_half_life
+        min_support      ≈ 5-10 x typical_change
+
+    Attributes:
+        half_life: Base half-life for exponential decay (in seconds). Controls how
+            quickly historical observations lose influence.
+        slow_half_life_factor: Multiplier for slow baseline tracking (typically 20).
+        slow_epsilon: Small value to prevent numerical issues in slow tracker.
+        slow_prune_threshold: Threshold below which slow tracker entries are pruned.
+        fast_half_life_factor: Multiplier for fast baseline tracking (typically 1.5).
+        fast_epsilon: Small value to prevent numerical issues in fast tracker.
+        fast_prune_threshold: Threshold below which fast tracker entries are pruned.
+        drift_half_life_factor: Multiplier for drift detection baseline (typically 30).
+        tau_enter: Threshold for entering drift state.
+        tau_exit: Threshold for exiting drift state.
+        adaptive_tau: Whether to use adaptive thresholds for drift detection.
+        n_enter: Number of consecutive detections needed to enter drift state.
+        n_exit: Number of consecutive stable readings needed to exit drift state.
+        short_term_error_half_life_factor: Multiplier for short-term error tracking
+            (typically 4, for 2-4 x base_half_life, enables quick reaction).
+        long_term_error_half_life_factor: Multiplier for long-term error tracking
+            (typically 40, for 20-50 x base_half_life, provides stable reference).
+        persistence_half_life_factor: Multiplier for state persistence tracking.
+        min_prune_interval_factor: Multiplier for minimum interval between prune
+            operations (typically 5-10 x base_half_life).
+        persistence_strength: Weight for persistence boost (0.0 to 1.0).
+        min_support_factor: Multiplier for minimum support threshold.
+    """
+
     half_life: float = 3600.0
     # T = tipikus változási idő
     # | Tracker          | Half-life       | Miért             |
     # | ---------------- | --------------- | ----------------- |
-    # | short_term_error | **~ 2–4 × T**   | gyors reakció     |
-    # | long_term_error  | **~ 20–50 × T** | stabil referencia |
-    # 5–10 × base_half_life
+    # | short_term_error | **~ 2-4 x T**   | gyors reakció     |
+    # | long_term_error  | **~ 20-50 x T** | stabil referencia |
+    # 5-10 x base_half_life
     #######
     # half_life        ≈ typical_change
-    # fast_half_life   ≈ 1–2 × typical_change
-    # slow_half_life   ≈ 10–30 × typical_change
-    # drift_half_life  ≈ 1.5 × slow_half_life
+    # fast_half_life   ≈ 1-2 x typical_change
+    # slow_half_life   ≈ 10-30 x typical_change
+    # drift_half_life  ≈ 1.5 x slow_half_life
     slow_half_life_factor: float = 20
     slow_epsilon: float = 1e-9
     slow_prune_threshold: float = 1e-6
@@ -74,19 +109,47 @@ class ForecasterEngineParameters:
     short_term_error_half_life_factor: float = 4
     long_term_error_half_life_factor: float = 40
     persistence_half_life_factor: float = 5.0
-    # # min_prune_interval ≈ 5–10 × base_half_life
+    # # min_prune_interval ≈ 5-10 x base_half_life
     # min_prune_interval: float = 3600.0 * 5,
     min_prune_interval_factor: float = 5.0
     persistence_strength: float = 0.5
-    # min_support ≈ 5–10 × typical_change
+    # min_support ≈ 5-10 x typical_change
     min_support_factor: float = 7.5
 
 
 class ForecasterEngine:
+    """
+    Time-aware forecasting engine for discrete state prediction.
+
+    This engine combines hierarchical temporal statistics, drift detection,
+    error tracking, and state persistence modeling to provide robust
+    state predictions over time. It uses exponential decay to weight
+    recent observations more heavily than older ones.
+
+    The engine maintains:
+        - Hierarchical state statistics with temporal context
+        - Global drift monitoring for concept drift detection
+        - Short-term and long-term error tracking
+        - State persistence modeling
+        - Adaptive hyperparameter control
+
+    Example:
+        >>> params = ForecasterEngineParameters(half_life=3600.0)
+        >>> engine = ForecasterEngine(params)
+        >>> engine.update(time_key, State.ON)
+        >>> prediction = engine.predict(time_key)
+    """
+
     def __init__(
         self: Self,
         parameters: ForecasterEngineParameters,
     ) -> None:
+        """
+        Initializes the forecaster engine.
+
+        Args:
+            parameters: Configuration parameters for the forecaster.
+        """
         self._hyper_parameters = HyperParameters(
             half_life=parameters.half_life,
             min_prune_interval=parameters.half_life
@@ -101,7 +164,7 @@ class ForecasterEngine:
             )
         )
 
-        # Drift monitor changes concept drifts in GLOBAL distribution.
+        # Drift monitor detects concept drifts in GLOBAL distribution.
         self._drift_monitor: Final = DriftMonitor(
             DriftMonitorHyperParameters(
                 hyper_parameters=self._hyper_parameters,
@@ -152,6 +215,21 @@ class ForecasterEngine:
         state: State,
         timestamp: float | None = None,
     ) -> None:
+        """
+        Updates the forecaster with a new state observation.
+
+        This method applies exponential decay to existing statistics, incorporates
+        the new observation, updates drift detection, tracks prediction errors,
+        and adjusts hyperparameters based on current conditions.
+
+        Args:
+            key: Temporal context key for the observation.
+            state: The observed state value.
+            timestamp: Unix timestamp of the observation. If None, uses current time.
+
+        Raises:
+            ValueError: If timestamp is earlier than the last update timestamp.
+        """
         timestamp = (
             timestamp if timestamp is not None else datetime.now(tz=UTC).timestamp()
         )
@@ -203,6 +281,18 @@ class ForecasterEngine:
         self._last_update_timestamp = timestamp
 
     def predict(self: Self, key: TimeKey) -> PredictionResult | None:
+        """
+        Generates a state prediction for the given temporal context.
+
+        Returns the base prediction without persistence adjustments.
+
+        Args:
+            key: Temporal context key for the prediction.
+
+        Returns:
+            PredictionResult containing the predicted distribution and contributions,
+            or None if insufficient data is available.
+        """
         return self._stats.predict(key)
 
     def predict_with_persistence(
@@ -211,6 +301,28 @@ class ForecasterEngine:
         current_state: State | None = None,
         current_state_duration: float | None = None,
     ) -> PredictionResult | None:
+        """
+        Generates a state prediction with persistence adjustments.
+
+        This method enhances the base prediction by applying a persistence boost
+        to the current state based on how long it has persisted relative to its
+        expected duration. The persistence effect follows a hazard-style decay.
+
+        Three cases are handled:
+        1. Explicit current state and duration provided → use those values
+        2. No explicit state → use internal tracker's current state
+        3. No persistence info available → return base prediction
+
+        Args:
+            key: Temporal context key for the prediction.
+            current_state: Optional current state to apply persistence to.
+            current_state_duration: Optional duration (seconds) the current state
+                has been active.
+
+        Returns:
+            PredictionResult with persistence-adjusted distribution and contributions,
+            or None if insufficient data is available.
+        """
         prediction = self._stats.predict(key)
         if prediction is None:
             return None
@@ -292,6 +404,15 @@ class ForecasterEngine:
         return prediction
 
     def _prune(self: Self, timestamp: float) -> None:
+        """
+        Prunes low-weight statistics to prevent memory bloat.
+
+        Pruning only occurs if enabled and if the minimum interval has elapsed
+        since the last prune operation.
+
+        Args:
+            timestamp: Current timestamp for checking prune interval.
+        """
         if not self._hyper_parameters.prune_enabled:
             return
 
@@ -308,4 +429,15 @@ class ForecasterEngine:
         self._last_prune_timestamp = timestamp
 
     def _get_decay_factor(self: Self, duration: float) -> float:
+        """
+        Calculates exponential decay factor for a given time duration.
+
+        Uses the formula: decay = 2^(-duration / half_life)
+
+        Args:
+            duration: Time duration in seconds.
+
+        Returns:
+            Decay factor between 0 and 1.
+        """
         return 2 ** (-duration / self._hyper_parameters.half_life)

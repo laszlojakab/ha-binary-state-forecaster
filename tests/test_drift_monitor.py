@@ -3,6 +3,7 @@ Unit tests for DriftMonitor.
 
 Comprehensive tests for concept drift detection using dual-baseline comparison.
 """
+
 from typing import Self
 
 from custom_components.discrete_state_forecaster.model.hyper_parameters import (
@@ -11,7 +12,7 @@ from custom_components.discrete_state_forecaster.model.hyper_parameters import (
 from custom_components.discrete_state_forecaster.model.learning.drift_monitor import (
     DriftMonitor,
 )
-from custom_components.discrete_state_forecaster.model.learning.drift_monitor_hyper_parameters import (
+from custom_components.discrete_state_forecaster.model.learning.drift_monitor_hyper_parameters import (  # noqa: E501
     DriftMonitorHyperParameters,
 )
 
@@ -90,7 +91,7 @@ class TestDriftMonitorUpdate:
 
         # Sudden change
         dist2 = {"on": 0.1, "off": 0.9}
-        for i in range  (10):
+        for i in range(10):
             monitor.update(dist2, 200.0 + i * 10.0)
             if monitor.is_drifting:
                 break
@@ -206,7 +207,7 @@ class TestDriftMonitorEdgeCases:
         monitor = DriftMonitor(hp)
 
         # First update does not compute drift
-        monitor.update({"on": 0.5 , "off": 0.5}, 100.0)
+        monitor.update({"on": 0.5, "off": 0.5}, 100.0)
 
         # Should handle gracefully
         assert monitor.last_drift >= 0.0
