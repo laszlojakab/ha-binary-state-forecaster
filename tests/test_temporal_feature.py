@@ -1,5 +1,6 @@
 """Unit tests for TemporalFeature."""
 
+from dataclasses import asdict
 from typing import Self
 
 import pytest
@@ -125,109 +126,6 @@ class TestTemporalFeatureRepr:
         assert repr(feature) == "range = (0, 6)"
 
 
-class TestTemporalFeatureToTuple:
-    """Tests for TemporalFeature.to_tuple() serialization."""
-
-    def test_to_tuple_basic(self: Self) -> None:
-        """Test to_tuple produces correct 2-tuple."""
-        feature = TemporalFeature(name="hour", value=14)
-        result = feature.to_tuple()
-        assert result == ("hour", 14)
-        assert isinstance(result, tuple)
-        assert len(result) == 2
-
-    def test_to_tuple_with_string_value(self: Self) -> None:
-        """Test to_tuple with string value."""
-        feature = TemporalFeature(name="day", value="Monday")
-        assert feature.to_tuple() == ("day", "Monday")
-
-    def test_to_tuple_with_tuple_value(self: Self) -> None:
-        """Test to_tuple with tuple value."""
-        feature = TemporalFeature(name="range", value=(0, 6))
-        assert feature.to_tuple() == ("range", (0, 6))
-
-    def test_to_tuple_with_none_value(self: Self) -> None:
-        """Test to_tuple with None value."""
-        feature = TemporalFeature(name="special", value=None)
-        assert feature.to_tuple() == ("special", None)
-
-
-class TestTemporalFeatureFromTuple:
-    """Tests for TemporalFeature.from_tuple() deserialization."""
-
-    def test_from_tuple_basic(self: Self) -> None:
-        """Test from_tuple creates feature from 2-tuple."""
-        feature = TemporalFeature.from_tuple(("hour", 14))
-        assert feature.name == "hour"
-        assert feature.value == 14
-
-    def test_from_tuple_with_string_value(self: Self) -> None:
-        """Test from_tuple with string value."""
-        feature = TemporalFeature.from_tuple(("day", "Monday"))
-        assert feature.name == "day"
-        assert feature.value == "Monday"
-
-    def test_from_tuple_with_tuple_value(self: Self) -> None:
-        """Test from_tuple with tuple value."""
-        feature = TemporalFeature.from_tuple(("range", (0, 6)))
-        assert feature.name == "range"
-        assert feature.value == (0, 6)
-
-    def test_from_tuple_with_none_value(self: Self) -> None:
-        """Test from_tuple with None value."""
-        feature = TemporalFeature.from_tuple(("special", None))
-        assert feature.name == "special"
-        assert feature.value is None
-
-    def test_from_tuple_not_tuple(self: Self) -> None:
-        """Test from_tuple raises TypeError for non-tuple input."""
-        with pytest.raises(TypeError, match="Expected tuple, got list"):
-            TemporalFeature.from_tuple(["hour", 14])  # type: ignore[arg-type]
-
-    def test_from_tuple_wrong_length_empty(self: Self) -> None:
-        """Test from_tuple raises ValueError for empty tuple."""
-        with pytest.raises(ValueError, match="Expected 2-tuple, got 0-tuple"):
-            TemporalFeature.from_tuple(())  # type: ignore[arg-type]
-
-    def test_from_tuple_wrong_length_one(self: Self) -> None:
-        """Test from_tuple raises ValueError for 1-tuple."""
-        with pytest.raises(ValueError, match="Expected 2-tuple, got 1-tuple"):
-            TemporalFeature.from_tuple(("hour",))  # type: ignore[arg-type]
-
-    def test_from_tuple_wrong_length_three(self: Self) -> None:
-        """Test from_tuple raises ValueError for 3-tuple."""
-        with pytest.raises(ValueError, match="Expected 2-tuple, got 3-tuple"):
-            TemporalFeature.from_tuple(("hour", 14, "extra"))  # type: ignore[arg-type]
-
-
-class TestTemporalFeatureRoundTrip:
-    """Tests for round-trip serialization/deserialization."""
-
-    def test_round_trip_basic(self: Self) -> None:
-        """Test feature -> tuple -> feature preserves data."""
-        original = TemporalFeature(name="hour", value=14)
-        tuple_form = original.to_tuple()
-        restored = TemporalFeature.from_tuple(tuple_form)
-        assert restored == original
-        assert restored.name == original.name
-        assert restored.value == original.value
-
-    def test_round_trip_multiple_types(self: Self) -> None:
-        """Test round-trip with various value types."""
-        test_cases = [
-            ("hour", 14),
-            ("day", "Monday"),
-            ("range", (0, 6)),
-            ("special", None),
-            ("bool_flag", True),
-            ("float_val", 3.14),
-        ]
-        for name, value in test_cases:
-            original = TemporalFeature(name=name, value=value)
-            restored = TemporalFeature.from_tuple(original.to_tuple())
-            assert restored == original
-
-
 class TestTemporalFeatureEdgeCases:
     """Tests for edge cases and special values."""
 
@@ -235,7 +133,7 @@ class TestTemporalFeatureEdgeCases:
         """Test feature with empty string name."""
         feature = TemporalFeature(name="", value=14)
         assert feature.name == ""
-        assert feature.to_tuple() == ("", 14)
+        assert asdict(feature) == {"name": "", "value": 14}
 
     def test_complex_nested_tuple_value(self: Self) -> None:
         """Test feature with nested tuple value."""

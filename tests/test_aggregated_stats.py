@@ -156,7 +156,7 @@ class TestAggregatedStatsFromDistribution:
         dist.update("b", 20.0)
         dist.update("c", 30.0)
 
-        key = TimeKey.from_tuple((("hour", 10),))
+        key = TimeKey.from_temporal_feature(TemporalFeature("hour", 10))
         agg = AggregatedStats.from_distribution(dist, key)
 
         # Check that probabilities (not absolute support) are preserved

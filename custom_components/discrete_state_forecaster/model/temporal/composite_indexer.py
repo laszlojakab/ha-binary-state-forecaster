@@ -69,7 +69,7 @@ class CompositeIndexer(TimeIndexer):
 
         """
         self.indexers: Final = list(indexers)
-        self.name: str = ", ".join(idx.name for idx in self.indexers)
+        self.name: Final = ", ".join(idx.name for idx in self.indexers)
 
     async def get_key(self: Self, timestamp: datetime) -> TimeKey:
         """
