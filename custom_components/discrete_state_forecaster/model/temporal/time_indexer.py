@@ -70,3 +70,19 @@ class TimeIndexer(Protocol):
 
         """
         ...
+
+    async def next_boundary(self: Self, timestamp: datetime) -> datetime:
+        """
+        Returns the next timestamp at which the temporal key would change.
+
+        This method allows the forecaster to know when the current temporal context
+        will end, which can be useful for scheduling updates or predictions.
+
+        Args:
+            timestamp: The datetime to find the next boundary after.
+
+        Returns:
+            A datetime representing the next point in time when the temporal key
+            would change. This should be strictly greater than the input timestamp.
+        """
+        ...
