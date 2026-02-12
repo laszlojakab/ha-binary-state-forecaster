@@ -23,13 +23,6 @@ class TestCalendarIndexerInitialization:
         assert indexer.entity_id == "calendar.work_schedule"
         assert indexer.name == "calendar.work_schedule"
 
-    def test_name_attribute(self: Self) -> None:
-        """Test that name is set to entity_id."""
-        hass = MagicMock()
-        entity_id = "calendar.vacation"
-        indexer = CalendarIndexer(hass, entity_id)
-        assert indexer.name == entity_id
-
     def test_empty_entity_id_raises_error(self: Self) -> None:
         """Test that empty entity_id raises ValueError."""
         hass = MagicMock()

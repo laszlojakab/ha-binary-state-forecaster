@@ -3,7 +3,6 @@
 from typing import Self
 
 from custom_components.discrete_state_forecaster.model.temporal.time_key import TimeKey
-from tests.test_season_indexer import tuple_to_temporal_features
 
 
 class TestTimeKeyBasic:
@@ -220,39 +219,34 @@ class TestTimeKeyEdgeCases:
     def test_deep_hierarchy(self: Self) -> None:
         """Test very deep hierarchy (20 levels)."""
         data = tuple((f"dim{i}", i) for i in range(20))
-        parts = tuple_to_temporal_features(*data)
-        key = TimeKey(*parts)
+        key = TimeKey(*data)
         assert len(key) == 20
-        assert key.parts == parts
+        assert key.parts == data
 
     def test_unicode_names_and_values(self: Self) -> None:
         """Test with Unicode characters in names and values."""
         data = (("时间", "下午"), ("日期", "星期一"))
-        parts = tuple_to_temporal_features(*data)
-        key = TimeKey(parts=parts)
-        assert key.parts == parts
+        key = TimeKey(*data)
+        assert key.parts == data
         assert "时间" in repr(key)
 
     def test_special_characters_in_names(self: Self) -> None:
         """Test with special characters in feature names."""
         data = (("key-with-dash", 1), ("key_with_underscore", 2), ("key.with.dot", 3))
-        parts = tuple_to_temporal_features(*data)
-        key = TimeKey(parts=parts)
-        assert key.parts == parts
+        key = TimeKey(*data)
+        assert key.parts == data
 
     def test_numeric_string_values(self: Self) -> None:
         """Test with numeric strings (distinct from integers)."""
         data = (("hour", "14"), ("minute", "30"))
-        parts = tuple_to_temporal_features(*data)
-        key = TimeKey(parts=parts)
-        assert key.parts == parts
+        key = TimeKey(*data)
+        assert key.parts == data
 
     def test_mixed_value_types_in_same_key(self: Self) -> None:
         """Test key with mixed value types."""
         data = (("a", 1), ("b", "two"), ("c", 3.0), ("d", (4, 5)), ("e", True))
-        parts = tuple_to_temporal_features(*data)
-        key = TimeKey(parts=parts)
-        assert key.parts == parts
+        key = TimeKey(*data)
+        assert key.parts == data
 
 
 class TestTimeKeyHashConsistency:
@@ -260,22 +254,22 @@ class TestTimeKeyHashConsistency:
 
     def test_hash_equals_implies_equal_hash(self: Self) -> None:
         """Test that equal keys have equal hashes."""
-        k1 = TimeKey(parts=tuple_to_temporal_features(("hour", 14), ("day", "Mon")))
-        k2 = TimeKey(parts=tuple_to_temporal_features(("hour", 14), ("day", "Mon")))
+        k1 = TimeKey(("hour", 14), ("day", "Mon"))
+        k2 = TimeKey(("hour", 14), ("day", "Mon"))
         assert k1 == k2
         assert hash(k1) == hash(k2)
 
     def test_hash_stable_across_calls(self: Self) -> None:
         """Test hash is stable across multiple calls."""
-        key = TimeKey(parts=tuple_to_temporal_features(("hour", 14)))
+        key = TimeKey(("hour", 14))
         h1 = hash(key)
         h2 = hash(key)
         assert h1 == h2
 
     def test_hash_different_for_different_order(self: Self) -> None:
         """Test different order produces different hash."""
-        k1 = TimeKey(parts=tuple_to_temporal_features(("a", 1), ("b", 2)))
-        k2 = TimeKey(parts=tuple_to_temporal_features(("b", 2), ("a", 1)))
+        k1 = TimeKey(("a", 1), ("b", 2))
+        k2 = TimeKey(("b", 2), ("a", 1))
         assert hash(k1) != hash(k2)
 
 
@@ -284,19 +278,19 @@ class TestTimeKeyHierarchy:
 
     def test_hierarchy_includes_self(self: Self) -> None:
         """Test that hierarchy includes self as first element."""
-        key = TimeKey(parts=tuple_to_temporal_features(("a", 1), ("b", 2)))
+        key = TimeKey(("a", 1), ("b", 2))
         hierarchy = list(key.hierarchy())
         assert hierarchy[0] == key
 
     def test_hierarchy_ends_at_global(self: Self) -> None:
         """Test that hierarchy chain ends with GLOBAL."""
-        key = TimeKey(parts=tuple_to_temporal_features(("a", 1), ("b", 2)))
+        key = TimeKey(("a", 1), ("b", 2))
         hierarchy = list(key.hierarchy())
         assert hierarchy[-1] == TimeKey.GLOBAL
 
     def test_hierarchy_count(self: Self) -> None:
         """Test hierarchy has correct number of elements."""
-        key = TimeKey(parts=tuple_to_temporal_features(("a", 1), ("b", 2), ("c", 3)))
+        key = TimeKey(("a", 1), ("b", 2), ("c", 3))
         hierarchy = list(key.hierarchy())
         # Contains self + 2 parents + GLOBAL = 4 items
         assert len(hierarchy) == 4
