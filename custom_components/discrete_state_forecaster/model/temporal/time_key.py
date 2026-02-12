@@ -24,7 +24,8 @@ Examples:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Final, Self
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, ClassVar, Final, Self
 
 from .temporal_feature import TemporalFeature, TemporalFeatureName, TemporalFeatureValue
 
@@ -32,6 +33,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
 
+@dataclass(frozen=True)
 class TimeKey:
     """
     A hierarchical key representing a path through temporal features.
@@ -72,32 +74,9 @@ class TimeKey:
 
     """
 
-    GLOBAL: TimeKey
-
-    def __init__(
-        self: Self,
-        parent: TimeKey | None = None,
-        feature: TemporalFeature | None = None,
-    ):
-        """
-        Initializes a TimeKey node.
-
-        Args:
-            parent: The parent TimeKey (or None for root). Defaults to None.
-            feature: The TemporalFeature at this node (or None for root).
-                Defaults to None.
-
-        Note:
-            Use `TimeKey.GLOBAL` to access the root node, or use the `+`
-            operator to create new keys by adding features.
-
-        Examples:
-            >>> # Usually created via TimeKey.GLOBAL + feature
-            >>> key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
-
-        """
-        self.parent: Final[TimeKey | None] = parent
-        self.feature: Final[TemporalFeature | None] = feature
+    GLOBAL: ClassVar[TimeKey]
+    parent: TimeKey | None = None
+    feature: TemporalFeature | None = None
 
     @property
     def is_root(self) -> bool:
@@ -185,7 +164,9 @@ class TimeKey:
         return tuple(items)
 
     @classmethod
-    def from_tuple(cls, data: tuple[tuple[TemporalFeatureName, TemporalFeatureValue], ...]) -> Self:
+    def from_tuple(
+        cls, data: tuple[tuple[TemporalFeatureName, TemporalFeatureValue], ...]
+    ) -> Self:
         """
         Constructs a TimeKey from a tuple of feature tuples.
 
@@ -209,29 +190,14 @@ class TimeKey:
 
         current: TimeKey = cls.GLOBAL
         for feature in data:
-            current = cls(current, TemporalFeature.from_tuple(feature))
+            current = cls(
+                current,
+                TemporalFeature.from_tuple(
+                    feature,
+                ),
+            )
 
         return current
-
-    @classmethod
-    def from_temporal_feature(cls, feature: TemporalFeature) -> Self:
-        """
-        Constructs a single-feature TimeKey from a TemporalFeature.
-
-        Args:
-            feature: A TemporalFeature to wrap in a TimeKey.
-
-        Returns:
-            A TimeKey with the given feature as the only non-root element.
-
-        Examples:
-            >>> feature = TemporalFeature("hour", 14)
-            >>> key = TimeKey.from_temporal_feature(feature)
-            >>> key.to_tuple()
-            (('hour', 14),)
-
-        """
-        return cls(cls.GLOBAL, feature)
 
     def __hash__(self: Self) -> int:
         """

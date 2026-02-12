@@ -314,26 +314,3 @@ class TestTimeKeyHierarchy:
         # Contains self + 2 parents + GLOBAL = 4 items
         assert len(hierarchy) == 4
 
-
-class TestTimeKeyFromTemporalFeature:
-    """Tests for from_temporal_feature() helper method."""
-
-    def test_from_temporal_feature_creates_single_node(self: Self) -> None:
-        """Test that from_temporal_feature creates single-feature key."""
-        feature = TemporalFeature("hour", 14)
-        key = TimeKey.from_temporal_feature(feature)
-        assert len(key) == 1
-        assert key.to_tuple() == (("hour", 14),)
-
-    def test_from_temporal_feature_with_various_types(self: Self) -> None:
-        """Test from_temporal_feature with various value types."""
-        test_cases = [
-            TemporalFeature("int_val", 42),
-            TemporalFeature("str_val", "test"),
-            TemporalFeature("bool_val", True),
-            TemporalFeature("tuple_val", (1, 2, 3)),
-        ]
-        for feature in test_cases:
-            key = TimeKey.from_temporal_feature(feature)
-            assert len(key) == 1
-            assert key.to_tuple() == (feature.to_tuple(),)

@@ -37,7 +37,11 @@ class TestAggregatedStatsInitialization:
 
     def test_create_with_multi_feature_key(self: Self) -> None:
         """Test creating AggregatedStats with multi-feature key."""
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14) + TemporalFeature("day_of_week", 3)
+        key = (
+            TimeKey.GLOBAL
+            + TemporalFeature("hour", 14)
+            + TemporalFeature("day_of_week", 3)
+        )
         stats = AggregatedStats(key)
         assert stats.key == key
         assert len(stats.key) == 2
@@ -156,7 +160,7 @@ class TestAggregatedStatsFromDistribution:
         dist.update("b", 20.0)
         dist.update("c", 30.0)
 
-        key = TimeKey.from_temporal_feature(TemporalFeature("hour", 10))
+        key = TimeKey.from_tuple((("hour", 10),))
         agg = AggregatedStats.from_distribution(dist, key)
 
         # Check that probabilities (not absolute support) are preserved
@@ -244,7 +248,9 @@ class TestAggregatedStatsKeyAssociation:
 class TestAggregatedStatsComparison:
     """Tests for comparing aggregated stats."""
 
-    def test_aggregated_stats_with_different_keys_have_same_support_count(self: Self) -> None:
+    def test_aggregated_stats_with_different_keys_have_same_support_count(
+        self: Self,
+    ) -> None:
         """Test that different keys can store same states."""
         key1 = TimeKey.GLOBAL + TemporalFeature("hour", 14)
         key2 = TimeKey.GLOBAL + TemporalFeature("hour", 15)

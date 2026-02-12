@@ -19,7 +19,6 @@ Days are represented as integers following Python's datetime convention:
 from datetime import datetime
 from typing import Final, Self
 
-from .temporal_feature import TemporalFeature
 from .time_indexer import (
     TimeIndexer,
 )
@@ -88,4 +87,4 @@ class DayOfWeekIndexer(TimeIndexer):
         """
         weekday = timestamp.weekday()  # Monday=0, Sunday=6
 
-        return TimeKey.from_temporal_feature(TemporalFeature(name=self.name, value=weekday))
+        return TimeKey.from_tuple(((self.name, weekday),))

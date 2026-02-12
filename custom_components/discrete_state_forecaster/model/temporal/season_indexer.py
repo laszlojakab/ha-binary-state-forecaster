@@ -99,7 +99,7 @@ class SeasonIndexer(TimeIndexer):
         else:
             season = "winter"
 
-        return TimeKey.from_temporal_feature(TemporalFeature(name=self.name, value=season))
+        return TimeKey.from_tuple(((self.name, season),))
 
     async def next_boundary(self: Self, timestamp: datetime) -> datetime:
         """

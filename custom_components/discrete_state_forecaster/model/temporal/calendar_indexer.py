@@ -7,13 +7,10 @@ calendar events, enabling modeling of patterns that correlate with scheduled eve
 """
 
 from datetime import datetime, timedelta
-from typing import Self
+from typing import Final, Self
 
 from homeassistant.core import HomeAssistant
 
-from custom_components.discrete_state_forecaster.model.temporal.temporal_feature import (
-    TemporalFeature,
-)
 from custom_components.discrete_state_forecaster.model.temporal.time_key import TimeKey
 
 from .time_indexer import (
@@ -75,9 +72,9 @@ class CalendarIndexer(TimeIndexer):
             msg = f"entity_id must start with 'calendar.', got: {entity_id}"
             raise ValueError(msg)
 
-        self.hass: HomeAssistant = hass
-        self.entity_id: str = entity_id
-        self.name: str = f"{entity_id}"
+        self.hass: Final[HomeAssistant] = hass
+        self.entity_id: Final[str] = entity_id
+        self.name: Final[str] = f"{entity_id}"
 
     async def get_key(self: Self, timestamp: datetime) -> TimeKey:
         """
@@ -123,13 +120,11 @@ class CalendarIndexer(TimeIndexer):
             events = response.get(self.entity_id, {}).get("events", [])
 
             # Return 1 if any events are active, 0 otherwise
-            return TimeKey.from_temporal_feature(
-                TemporalFeature(name=self.name, value=1 if events else 0)
-            )
+            return TimeKey.from_tuple(((self.name, 1 if events else 0),))
 
         except Exception:  # noqa: BLE001
             # If calendar service fails, assume no event
-            return TimeKey.from_temporal_feature(TemporalFeature(name=self.name, value=0))
+            return TimeKey.from_tuple(((self.name, 0),))
 
     async def next_boundary(self: Self, timestamp: datetime) -> datetime:
         """
@@ -189,7 +184,9 @@ class CalendarIndexer(TimeIndexer):
                 if start_str:
                     # Handle both datetime strings and date-only strings
                     if "T" in start_str:
-                        event_start = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
+                        event_start = datetime.fromisoformat(
+                            start_str.replace("Z", "+00:00")
+                        )
                     else:
                         # Date-only event (all-day)
                         event_start = datetime.fromisoformat(start_str + "T00:00:00")
@@ -200,7 +197,9 @@ class CalendarIndexer(TimeIndexer):
                 if end_str:
                     # Handle both datetime strings and date-only strings
                     if "T" in end_str:
-                        event_end = datetime.fromisoformat(end_str.replace("Z", "+00:00"))
+                        event_end = datetime.fromisoformat(
+                            end_str.replace("Z", "+00:00")
+                        )
                     else:
                         # Date-only event (all-day)
                         event_end = datetime.fromisoformat(end_str + "T00:00:00")

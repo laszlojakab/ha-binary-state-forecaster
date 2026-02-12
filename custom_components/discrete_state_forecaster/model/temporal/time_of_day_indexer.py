@@ -109,4 +109,4 @@ class TimeOfDayIndexer(TimeIndexer):
         total_seconds = timestamp.hour * 3600 + timestamp.minute * 60 + timestamp.second
         bucket_index = total_seconds // self.bucket_size
 
-        return TimeKey.from_temporal_feature(TemporalFeature(name=self.name, value=bucket_index))
+        return TimeKey.from_tuple(((self.name, bucket_index),))

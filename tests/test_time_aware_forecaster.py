@@ -27,12 +27,14 @@ class MockTimeIndexer:
 
     async def get_key(self, timestamp: datetime) -> TimeKey:
         """Return hour of day as time key."""
-        return TimeKey.from_temporal_feature(TemporalFeature("hour", timestamp.hour))
+        return TimeKey.from_tuple((("hour", timestamp.hour),))
 
     async def next_boundary(self, timestamp: datetime) -> datetime:
         """Return start of next hour."""
         # Round up to next hour
-        return (timestamp + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
+        return (timestamp + timedelta(hours=1)).replace(
+            minute=0, second=0, microsecond=0
+        )
 
 
 @pytest.fixture
@@ -249,7 +251,9 @@ async def test_predict_interval_basic(forecaster: TimeAwareForecaster) -> None:
     """Test predict_interval with basic parameters."""
     base_time = datetime(2024, 1, 15, 14, 0, 0, tzinfo=UTC)
     for i in range(30):
-        await forecaster.update("on" if i % 2 == 0 else "off", base_time + timedelta(minutes=i * 2))
+        await forecaster.update(
+            "on" if i % 2 == 0 else "off", base_time + timedelta(minutes=i * 2)
+        )
 
     start = datetime(2024, 1, 15, 15, 0, 0, tzinfo=UTC)
     end = datetime(2024, 1, 15, 16, 0, 0, tzinfo=UTC)
@@ -271,7 +275,9 @@ async def test_predict_interval_multiple_steps(forecaster: TimeAwareForecaster) 
     """Test predict_interval creates multiple prediction steps."""
     base_time = datetime(2024, 1, 15, 14, 0, 0, tzinfo=UTC)
     for i in range(30):
-        await forecaster.update("on" if i % 2 == 0 else "off", base_time + timedelta(minutes=i * 2))
+        await forecaster.update(
+            "on" if i % 2 == 0 else "off", base_time + timedelta(minutes=i * 2)
+        )
 
     start = datetime(2024, 1, 15, 15, 0, 0, tzinfo=UTC)
     end = datetime(2024, 1, 15, 18, 0, 0, tzinfo=UTC)
@@ -289,7 +295,9 @@ async def test_predict_interval_with_state_simulation(
     """Test predict_interval with state simulation enabled."""
     base_time = datetime(2024, 1, 15, 14, 0, 0, tzinfo=UTC)
     for i in range(30):
-        await forecaster.update("on" if i % 2 == 0 else "off", base_time + timedelta(minutes=i * 2))
+        await forecaster.update(
+            "on" if i % 2 == 0 else "off", base_time + timedelta(minutes=i * 2)
+        )
 
     start = datetime(2024, 1, 15, 15, 0, 0, tzinfo=UTC)
     end = datetime(2024, 1, 15, 16, 0, 0, tzinfo=UTC)
@@ -308,7 +316,9 @@ async def test_predict_interval_without_state_simulation(
     """Test predict_interval without state simulation."""
     base_time = datetime(2024, 1, 15, 14, 0, 0, tzinfo=UTC)
     for i in range(30):
-        await forecaster.update("on" if i % 2 == 0 else "off", base_time + timedelta(minutes=i * 2))
+        await forecaster.update(
+            "on" if i % 2 == 0 else "off", base_time + timedelta(minutes=i * 2)
+        )
 
     start = datetime(2024, 1, 15, 15, 0, 0, tzinfo=UTC)
     end = datetime(2024, 1, 15, 16, 0, 0, tzinfo=UTC)
@@ -327,7 +337,9 @@ async def test_predict_interval_respects_resolution(
     """Test that predict_interval respects the resolution parameter."""
     base_time = datetime(2024, 1, 15, 14, 0, 0, tzinfo=UTC)
     for i in range(30):
-        await forecaster.update("on" if i % 2 == 0 else "off", base_time + timedelta(minutes=i * 2))
+        await forecaster.update(
+            "on" if i % 2 == 0 else "off", base_time + timedelta(minutes=i * 2)
+        )
 
     start = datetime(2024, 1, 15, 15, 0, 0, tzinfo=UTC)
     end = datetime(2024, 1, 15, 17, 0, 0, tzinfo=UTC)
@@ -353,7 +365,9 @@ async def test_predict_interval_with_boundary_support(
 
     base_time = datetime(2024, 1, 15, 14, 0, 0, tzinfo=UTC)
     for i in range(30):
-        await forecaster.update("on" if i % 2 == 0 else "off", base_time + timedelta(minutes=i * 2))
+        await forecaster.update(
+            "on" if i % 2 == 0 else "off", base_time + timedelta(minutes=i * 2)
+        )
 
     # Predict from 14:45 to 17:00 - should snap to hour boundaries
     start = datetime(2024, 1, 15, 14, 45, 0, tzinfo=UTC)
@@ -386,7 +400,9 @@ async def test_predict_interval_very_small_resolution(
     """Test predict_interval with very small resolution."""
     base_time = datetime(2024, 1, 15, 14, 0, 0, tzinfo=UTC)
     for i in range(30):
-        await forecaster.update("on" if i % 2 == 0 else "off", base_time + timedelta(minutes=i * 2))
+        await forecaster.update(
+            "on" if i % 2 == 0 else "off", base_time + timedelta(minutes=i * 2)
+        )
 
     start = datetime(2024, 1, 15, 15, 0, 0, tzinfo=UTC)
     end = datetime(2024, 1, 15, 15, 5, 0, tzinfo=UTC)  # 5 minutes
@@ -441,8 +457,12 @@ async def test_temporal_context_isolation(forecaster: TimeAwareForecaster) -> No
         await forecaster.update(state, base_time_14 + timedelta(minutes=i * 2))
 
     # Predictions should reflect temporal context
-    result_morning = await forecaster.predict(datetime(2024, 1, 16, 10, 30, 0, tzinfo=UTC))
-    result_afternoon = await forecaster.predict(datetime(2024, 1, 16, 14, 30, 0, tzinfo=UTC))
+    result_morning = await forecaster.predict(
+        datetime(2024, 1, 16, 10, 30, 0, tzinfo=UTC)
+    )
+    result_afternoon = await forecaster.predict(
+        datetime(2024, 1, 16, 14, 30, 0, tzinfo=UTC)
+    )
 
     # Both should return valid results (patterns may differ)
     assert result_morning is not None
