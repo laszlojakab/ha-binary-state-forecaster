@@ -11,9 +11,6 @@ import pytest
 from custom_components.discrete_state_forecaster.model.forecaster_engine import (
     ForecasterEngineParameters,
 )
-from custom_components.discrete_state_forecaster.model.temporal.temporal_feature import (
-    TemporalFeature,
-)
 from custom_components.discrete_state_forecaster.model.temporal.time_key import TimeKey
 from custom_components.discrete_state_forecaster.model.time_aware_forecaster import (
     TimeAwareForecaster,
@@ -27,7 +24,7 @@ class MockTimeIndexer:
 
     async def get_key(self, timestamp: datetime) -> TimeKey:
         """Return hour of day as time key."""
-        return TimeKey.from_tuple((("hour", timestamp.hour),))
+        return TimeKey(("hour", timestamp.hour))
 
     async def next_boundary(self, timestamp: datetime) -> datetime:
         """Return start of next hour."""
@@ -138,7 +135,7 @@ async def test_update_calls_indexer(
 
     # Verify the key was generated (hour should be 14)
     key = await mock_indexer.get_key(timestamp)
-    assert key.to_tuple() == (("hour", 14),)
+    assert key.parts == (("hour", 14),)
 
 
 @pytest.mark.asyncio

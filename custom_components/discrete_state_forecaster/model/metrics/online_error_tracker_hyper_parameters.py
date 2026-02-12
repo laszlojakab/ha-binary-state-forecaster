@@ -5,11 +5,14 @@ This module provides configuration for the OnlineErrorTracker, controlling how
 prediction errors are tracked over time with exponential decay.
 """
 
-from typing import Final, Self
+from __future__ import annotations
 
-from custom_components.discrete_state_forecaster.model.hyper_parameters import (
-    HyperParameters,
-)
+from typing import TYPE_CHECKING, Any, Final, Self
+
+if TYPE_CHECKING:
+    from custom_components.discrete_state_forecaster.model.hyper_parameters import (
+        HyperParameters,
+    )
 
 
 class OnlineErrorTrackerHyperParameters:
@@ -71,3 +74,15 @@ class OnlineErrorTrackerHyperParameters:
 
         """
         return self._hyper_parameters.half_life * self._half_life_factor
+
+    def to_dict(self: Self) -> dict[str, Any]:
+        return {"half_life_factor": self._half_life_factor}
+
+    @classmethod
+    def from_dict(
+        cls, data: dict[str, Any], hyper_parameters: HyperParameters
+    ) -> OnlineErrorTrackerHyperParameters:
+        return cls(
+            hyper_parameters=hyper_parameters,
+            error_half_life_factor=data["half_life_factor"],
+        )

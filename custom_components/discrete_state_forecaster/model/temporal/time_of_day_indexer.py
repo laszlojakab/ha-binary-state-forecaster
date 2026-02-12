@@ -15,7 +15,6 @@ The bucket size is configurable, allowing for different time resolutions:
 from datetime import datetime
 from typing import Final, Self
 
-from .temporal_feature import TemporalFeature
 from .time_indexer import (
     TimeIndexer,
 )
@@ -109,4 +108,4 @@ class TimeOfDayIndexer(TimeIndexer):
         total_seconds = timestamp.hour * 3600 + timestamp.minute * 60 + timestamp.second
         bucket_index = total_seconds // self.bucket_size
 
-        return TimeKey.from_tuple(((self.name, bucket_index),))
+        return TimeKey((self.name, bucket_index))

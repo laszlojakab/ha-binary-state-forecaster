@@ -1,4 +1,6 @@
-from typing import Self
+from __future__ import annotations
+
+from typing import Any, Self
 
 
 class HyperParameters:
@@ -57,3 +59,30 @@ class HyperParameters:
     @property
     def persistence_strength(self: Self) -> float:
         return self._persistence_strength
+
+    def to_dict(self: Self) -> dict[str, Any]:
+        return {
+            "half_life": self._half_life,
+            "min_prune_interval": self._min_prune_interval,
+            "prune_enabled": self._prune_enabled,
+            "persistence_strength": self._persistence_strength,
+            "base_half_life": self._base_half_life,
+            "base_min_prune_interval": self._base_min_prune_interval,
+            "base_prune_enabled": self._base_prune_enabled,
+            "base_persistence_strength": self._base_persistence_strength,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> HyperParameters:
+        parameters = cls(
+            half_life=data["half_life"],
+            min_prune_interval=data["min_prune_interval"],
+            prune_enabled=data["prune_enabled"],
+            persistence_strength=data["persistence_strength"],
+        )
+        parameters._base_half_life = data["base_half_life"]
+        parameters._base_min_prune_interval = data["base_min_prune_interval"]
+        parameters._base_prune_enabled = data["base_prune_enabled"]
+        parameters._base_persistence_strength = data["base_persistence_strength"]
+
+        return parameters

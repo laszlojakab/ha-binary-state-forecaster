@@ -9,7 +9,8 @@ separately maintained for different times, time-of-day values, seasons, etc.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Final
+from dataclasses import asdict
+from typing import TYPE_CHECKING, Any, Final
 
 from .distribution_stats import DistributionStats
 
@@ -49,16 +50,16 @@ class AggregatedStats(DistributionStats):
 
     """  # noqa: E501
 
-    def __init__(self, key: TimeKey) -> None:
+    def __init__(self, key: TimeKey, states: dict[str, Any] | None = None) -> None:
         """
         Initializes aggregated statistics for a specific temporal context.
 
         Args:
             key: The TimeKey identifying the temporal location for these
                 statistics.
-
+            states: Optional initial state statistics. If None, starts with an empty distribution.
         """
-        super().__init__()
+        super().__init__(states=states)
         self.key: Final[TimeKey] = key
 
     @classmethod
@@ -106,3 +107,10 @@ class AggregatedStats(DistributionStats):
             agg.update(state, prob * total_support)
 
         return agg
+
+    def to_dict(self):
+        return {"key": asdict(self.key), **super().to_dict()}
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> AggregatedStats:
+        return cls(key=TimeKey(**data["key"]), states=data.get("states"))

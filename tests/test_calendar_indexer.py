@@ -83,7 +83,7 @@ class TestCalendarIndexerGetKey:
         )
         indexer = CalendarIndexer(hass, "calendar.work_schedule")
         key = await indexer.get_key(datetime(2024, 1, 15, 10, 30))
-        assert key.to_tuple() == (("calendar.work_schedule", 0),)
+        assert key.parts == (("calendar.work_schedule", 0),)
 
     @pytest.mark.asyncio
     async def test_event_active_returns_one(self: Self) -> None:
@@ -105,7 +105,7 @@ class TestCalendarIndexerGetKey:
         indexer = CalendarIndexer(hass, "calendar.work_schedule")
         # 10:30 is during the work event
         key = await indexer.get_key(datetime(2024, 1, 15, 10, 30))
-        assert key.to_tuple() == (("calendar.work_schedule", 1),)
+        assert key.parts == (("calendar.work_schedule", 1),)
 
     @pytest.mark.asyncio
     async def test_multiple_events_returns_one(self: Self) -> None:
@@ -132,7 +132,7 @@ class TestCalendarIndexerGetKey:
         indexer = CalendarIndexer(hass, "calendar.work_schedule")
         # At 10:30, at least one event is active (not in the specific examples, but service says there are events)
         key = await indexer.get_key(datetime(2024, 1, 15, 10, 30))
-        assert key.to_tuple() == (("calendar.work_schedule", 1),)
+        assert key.parts == (("calendar.work_schedule", 1),)
 
     @pytest.mark.asyncio
     async def test_service_error_handled_gracefully(self: Self) -> None:
@@ -142,7 +142,7 @@ class TestCalendarIndexerGetKey:
         indexer = CalendarIndexer(hass, "calendar.work_schedule")
         key = await indexer.get_key(datetime(2024, 1, 15, 10, 30))
         # When service fails, should return 0
-        assert key.to_tuple() == (("calendar.work_schedule", 0),)
+        assert key.parts == (("calendar.work_schedule", 0),)
 
     @pytest.mark.asyncio
     async def test_service_called_with_correct_params(self: Self) -> None:
@@ -182,7 +182,7 @@ class TestCalendarIndexerGetKey:
         )
         indexer = CalendarIndexer(hass, "calendar.work_schedule")
         key = await indexer.get_key(datetime(2024, 1, 15, 10, 30))
-        assert key.to_tuple() == (("calendar.work_schedule", 1),)
+        assert key.parts == (("calendar.work_schedule", 1),)
 
 
 class TestCalendarIndexerNextBoundary:

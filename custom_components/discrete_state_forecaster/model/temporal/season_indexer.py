@@ -16,9 +16,6 @@ by the forecaster framework.
 from datetime import datetime
 from typing import Final, Self
 
-from custom_components.discrete_state_forecaster.model.temporal.temporal_feature import (
-    TemporalFeature,
-)
 from custom_components.discrete_state_forecaster.model.temporal.time_key import TimeKey
 
 from .time_indexer import (
@@ -99,7 +96,7 @@ class SeasonIndexer(TimeIndexer):
         else:
             season = "winter"
 
-        return TimeKey.from_tuple(((self.name, season),))
+        return TimeKey((self.name, season))
 
     async def next_boundary(self: Self, timestamp: datetime) -> datetime:
         """

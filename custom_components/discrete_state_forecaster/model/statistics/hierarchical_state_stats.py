@@ -13,8 +13,13 @@ when data is
 sparse by falling back to broader patterns (e.g., "afternoon" or "spring").
 """
 
-from typing import Self
+from __future__ import annotations
 
+from typing import Any, Self
+
+from custom_components.discrete_state_forecaster.model.hyper_parameters import (
+    HyperParameters,
+)
 from custom_components.discrete_state_forecaster.model.state import State
 from custom_components.discrete_state_forecaster.model.statistics.distribution_stats import (
     DistributionStats,
@@ -160,7 +165,9 @@ class HierarchicalStateStats:
             for state, prob in stats.distribution().items():
                 aggregated.update(state, prob * stats.total_support() * weight)
 
-            contributions.append(Contribution(source_key, weight, stats.total_support()))
+            contributions.append(
+                Contribution(source_key, weight, stats.total_support())
+            )
 
             if aggregated.is_confident(self._hyper_parameters.min_support):
                 break
@@ -206,3 +213,26 @@ class HierarchicalStateStats:
 
         """
         self._stats.prune(epsilon, absolute_min)
+
+    def to_dict(self: Self) -> dict[str, Any]:
+        """
+        Serializes the hyper parameters to a dictionary.
+
+        Returns:
+          A dictionary representation of the hierarchical state statistics
+        """
+        return {
+            "hyper_parameters": self._hyper_parameters.to_dict(),
+            "stats": self._stats.to_dict(),
+        }
+
+    @classmethod
+    def from_dict(
+        cls, data: dict[str, Any], hyper_parameters: HyperParameters
+    ) -> HierarchicalStateStats:
+        return cls(
+            hyper_parameters=HierarchicalStateStatsHyperParameters.from_dict(
+                data["hyper_parameters"], hyper_parameters
+            ),
+            stats=KeyedDistributionStore.from_dict(data["stats"]),
+        )

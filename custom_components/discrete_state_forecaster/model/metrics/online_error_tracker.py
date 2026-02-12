@@ -6,17 +6,24 @@ prediction errors using negative log-likelihood as the error metric. Statistics
 are updated with exponential decay to give more weight to recent errors.
 """
 
-import math
-from typing import Final, Self
+from __future__ import annotations
 
-from custom_components.discrete_state_forecaster.model.state import (
-    State,
-)
-from custom_components.discrete_state_forecaster.model.statistics.distribution_stats import (
-    DistributionStats,
+import math
+from typing import TYPE_CHECKING, Any, Final, Self
+
+from custom_components.discrete_state_forecaster.model.hyper_parameters import (
+    HyperParameters,
 )
 
 from .online_error_tracker_hyper_parameters import OnlineErrorTrackerHyperParameters
+
+if TYPE_CHECKING:
+    from custom_components.discrete_state_forecaster.model.state import (
+        State,
+    )
+    from custom_components.discrete_state_forecaster.model.statistics.distribution_stats import (
+        DistributionStats,
+    )
 
 
 class OnlineErrorTracker:
@@ -72,8 +79,8 @@ class OnlineErrorTracker:
 
         """
         self._hyper_parameters: Final = hyper_parameters
-        self._mean_error: float = 0.0
-        self._var_error: float = 0.0
+        self._mean: float = 0.0
+        self._var: float = 0.0
         self._last_ts: float | None = None
 
     def update(
@@ -101,8 +108,8 @@ class OnlineErrorTracker:
         error = -math.log(max(p, 1e-12))
 
         if self._last_ts is None:
-            self._mean_error = error
-            self._var_error = 0.0
+            self._mean = error
+            self._var = 0.0
             self._last_ts = timestamp
             return
 
@@ -113,10 +120,10 @@ class OnlineErrorTracker:
         _lambda = math.log(2.0) / (self._hyper_parameters.error_half_life)
         decay = math.exp(-_lambda * dt)
 
-        diff = error - self._mean_error
+        diff = error - self._mean
 
-        self._mean_error = decay * self._mean_error + (1.0 - decay) * error
-        self._var_error = decay * self._var_error + (1.0 - decay) * diff * diff
+        self._mean = decay * self._mean + (1.0 - decay) * error
+        self._var = decay * self._var + (1.0 - decay) * diff * diff
 
         self._last_ts = timestamp
 
@@ -130,7 +137,7 @@ class OnlineErrorTracker:
                 better prediction performance on average.
 
         """
-        return self._mean_error
+        return self._mean
 
     @property
     def std(self: Self) -> float:
@@ -142,4 +149,26 @@ class OnlineErrorTracker:
                 indicate more consistent prediction performance.
 
         """
-        return math.sqrt(max(self._var_error, 1e-12))
+        return math.sqrt(max(self._var, 1e-12))
+
+    def to_dict(self: Self) -> dict[str, Any]:
+        return {
+            "mean": self._mean,
+            "var": self._var,
+            "last_ts": self._last_ts,
+            "hyper_parameters": self._hyper_parameters.to_dict(),
+        }
+
+    @classmethod
+    def from_dict(
+        cls, data: dict[str, Any], hyper_parameters: HyperParameters
+    ) -> OnlineErrorTracker:
+        tracker = cls(
+            hyper_parameters=OnlineErrorTrackerHyperParameters.from_dict(
+                data["hyper_parameters"], hyper_parameters
+            )
+        )
+        tracker._mean = data.get("mean", 0.0)
+        tracker._var = data.get("var", 0.0)
+        tracker._last_ts = data.get("last_ts")
+        return tracker

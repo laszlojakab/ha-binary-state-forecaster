@@ -72,7 +72,7 @@ class TestCompositeIndexerGetKey:
         ts = datetime(2024, 1, 15, 14, 30)
         key = await composite.get_key(ts)
         assert len(key) == 1
-        assert key.to_tuple() == (("time_bucket", 14),)
+        assert key.parts == (("time_bucket", 14),)
 
     @pytest.mark.asyncio
     async def test_two_indexer_composition(self: Self) -> None:
@@ -86,7 +86,7 @@ class TestCompositeIndexerGetKey:
         ts = datetime(2024, 1, 15, 14, 30)
         key = await composite.get_key(ts)
         assert len(key) == 2
-        assert key.to_tuple() == (("time_bucket", 14), ("day_of_week", 0))
+        assert key.parts == (("time_bucket", 14), ("day_of_week", 0))
 
     @pytest.mark.asyncio
     async def test_three_indexer_composition(self: Self) -> None:
@@ -101,7 +101,7 @@ class TestCompositeIndexerGetKey:
         ts = datetime(2024, 1, 15, 14, 30)
         key = await composite.get_key(ts)
         assert len(key) == 3
-        assert key.to_tuple() == (
+        assert key.parts == (
             ("time_bucket", 14),
             ("day_of_week", 0),
             ("season", "winter"),
@@ -133,12 +133,12 @@ class TestCompositeIndexerGetKey:
         key2 = await comp2.get_key(ts)
 
         assert key1 != key2
-        assert key1.to_tuple() == (
+        assert key1.parts == (
             ("time_bucket", 14),
             ("day_of_week", 0),
             ("season", "winter"),
         )
-        assert key2.to_tuple() == (
+        assert key2.parts == (
             ("season", "winter"),
             ("day_of_week", 0),
             ("time_bucket", 14),
@@ -293,7 +293,7 @@ class TestCompositeIndexerConsistency:
         # So keys might be different if we include day_of_week
         # But with just time and season, they should be the same if both are Monday
         # Let's just check the repeating pattern
-        assert key1.to_tuple()[0] == key2.to_tuple()[0]  # Same hour
+        assert key1.parts[0] == key2.parts[0]  # Same hour
 
 
 class TestCompositeIndexerEdgeCases:
@@ -339,7 +339,7 @@ class TestCompositeIndexerEdgeCases:
         # 1-hr: 52200/3600 = 14
         ts = datetime(2024, 1, 15, 14, 30)
         key = await composite.get_key(ts)
-        assert key.to_tuple() == (("time_bucket", 174), ("time_bucket", 14))
+        assert key.parts == (("time_bucket", 174), ("time_bucket", 14))
 
     @pytest.mark.asyncio
     async def test_takes_iterable_of_indexers(self: Self) -> None:

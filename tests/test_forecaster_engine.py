@@ -346,7 +346,9 @@ class TestForecasterEnginePruning:
 
     def test_pruning_respects_min_interval(self: Self) -> None:
         """Test that pruning only occurs after min interval."""
-        params = ForecasterEngineParameters(half_life=100.0, min_prune_interval_factor=5.0)
+        params = ForecasterEngineParameters(
+            half_life=100.0, min_prune_interval_factor=5.0
+        )
         engine = ForecasterEngine(params)
         key = TimeKey.GLOBAL
 
@@ -411,16 +413,12 @@ class TestForecasterEngineIntegration:
 
     def test_full_workflow_with_temporal_keys(self: Self) -> None:
         """Test workflow with different temporal keys."""
-        from custom_components.discrete_state_forecaster.model.temporal.temporal_feature import (  # noqa: E501
-            TemporalFeature,
-        )
-
         engine = create_test_engine()
 
         # Use different time keys
         global_key = TimeKey.GLOBAL
         # TimeKey is built by adding TemporalFeature instances
-        specific_key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        specific_key = TimeKey(("hour", 14))
 
         # Add sufficient data for both keys
         for i in range(15):

@@ -5,11 +5,14 @@ This module provides configuration for StatePersistenceTracker, controlling
 the decay rate used when computing exponentially weighted mean durations.
 """
 
-from typing import Final, Self
+from __future__ import annotations
 
-from custom_components.discrete_state_forecaster.model.hyper_parameters import (
-    HyperParameters,
-)
+from typing import TYPE_CHECKING, Any, Final, Self
+
+if TYPE_CHECKING:
+    from custom_components.discrete_state_forecaster.model.hyper_parameters import (
+        HyperParameters,
+    )
 
 
 class StatePersistenceTrackerHyperParameters:
@@ -70,3 +73,17 @@ class StatePersistenceTrackerHyperParameters:
 
         """
         return self._hyper_parameters.half_life * self._persistence_half_life_factor
+
+    def to_dict(self: Self) -> dict[str, Any]:
+        return {
+            "persistence_half_life_factor": self._persistence_half_life_factor,
+        }
+
+    @classmethod
+    def from_dict(
+        cls, data: dict[str, Any], hyper_parameters: HyperParameters
+    ) -> StatePersistenceTrackerHyperParameters:
+        return cls(
+            hyper_parameters=hyper_parameters,
+            persistence_half_life_factor=data["persistence_half_life_factor"],
+        )

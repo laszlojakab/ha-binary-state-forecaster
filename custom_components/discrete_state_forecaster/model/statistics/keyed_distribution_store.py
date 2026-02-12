@@ -11,10 +11,14 @@ contexts (e.g., different times of day) need independent statistics that can
 still be aggregated when making predictions.
 """
 
-from collections.abc import Hashable, Iterable
-from typing import Self
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, Self
 
 from .distribution_stats import DistributionStats
+
+if TYPE_CHECKING:
+    from collections.abc import Hashable, Iterable
 
 
 class KeyedDistributionStore:
@@ -180,3 +184,29 @@ class KeyedDistributionStore:
                 return aggregated, key
 
         return (aggregated, None) if aggregated.total_support() > 0 else None
+
+    def to_dict(self) -> dict[str, Any]:
+        """
+        Serializes the store to a dictionary for persistence.
+
+        Returns:
+          A dictionary representation of the store, where each key maps to the serialized
+          form of its DistributionStats.
+        """
+        return {k: v.to_dict() for k, v in self._store.items()}
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> KeyedDistributionStore:
+        """
+        Deserializes a KeyedDistributionStore from a dictionary.
+
+        Args:
+          data: A dictionary where each key maps to the serialized form of a DistributionStats.
+
+        Returns:
+          A KeyedDistributionStore instance reconstructed from the provided dictionary.
+        """
+        store = cls()
+        for k, v in data.items():
+            store._store[k] = DistributionStats.from_dict(v)
+        return store

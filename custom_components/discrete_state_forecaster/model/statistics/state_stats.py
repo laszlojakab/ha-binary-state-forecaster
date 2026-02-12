@@ -6,11 +6,9 @@ for a single state observation. Support is accumulated over time and can be
 decayed to weight recent observations more heavily than older ones.
 """
 
-from dataclasses import dataclass
 from typing import Self
 
 
-@dataclass
 class StateStats:
     """
     Tracks cumulative support (weight) for a single state.
@@ -24,6 +22,15 @@ class StateStats:
     """
 
     _support: float = 0.0
+
+    def __init__(self, support: float = 0.0) -> None:
+        """
+        Initializes a new instance of StateStats.
+
+        Args:
+          support: Initial support value for this state. Must be non-negative. Defaults to 0.0.
+        """
+        self._support = support
 
     def update(self: Self, weight: float = 1.0) -> None:
         """
@@ -82,3 +89,20 @@ class StateStats:
 
         """
         return self._support >= min_support
+
+    def to_dict(self: Self) -> dict:
+        """Returns a JSON-serializable representation of this StateStats."""
+        return {"support": self._support}
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "StateStats":
+        """
+        Reconstructs StateStats from a dict representation.
+
+        Args:
+            data: Dictionary containing state statistics.
+
+        Returns:
+            A new StateStats instance with support initialized from data.
+        """
+        return cls(support=data.get("support", 0.0))

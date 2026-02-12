@@ -74,7 +74,7 @@ class CalendarIndexer(TimeIndexer):
 
         self.hass: Final[HomeAssistant] = hass
         self.entity_id: Final[str] = entity_id
-        self.name: Final[str] = f"{entity_id}"
+        self.name: Final[str] = f"calendar:{entity_id}"
 
     async def get_key(self: Self, timestamp: datetime) -> TimeKey:
         """
@@ -120,11 +120,11 @@ class CalendarIndexer(TimeIndexer):
             events = response.get(self.entity_id, {}).get("events", [])
 
             # Return 1 if any events are active, 0 otherwise
-            return TimeKey.from_tuple(((self.name, 1 if events else 0),))
+            return TimeKey((self.name, 1 if events else 0))
 
         except Exception:  # noqa: BLE001
             # If calendar service fails, assume no event
-            return TimeKey.from_tuple(((self.name, 0),))
+            return TimeKey((self.name, 0))
 
     async def next_boundary(self: Self, timestamp: datetime) -> datetime:
         """

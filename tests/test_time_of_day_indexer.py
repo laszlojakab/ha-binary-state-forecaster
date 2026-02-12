@@ -50,7 +50,7 @@ class TestTimeOfDayIndexerGetKey:
         indexer = TimeOfDayIndexer(bucket_size=3600)
         timestamp = datetime(2024, 1, 15, 0, 0, 0)
         key = await indexer.get_key(timestamp)
-        assert key.to_tuple() == (("time_bucket", 0),)
+        assert key.parts == (("time_bucket", 0),)
 
     @pytest.mark.asyncio
     async def test_hour_14(self: Self) -> None:
@@ -58,7 +58,7 @@ class TestTimeOfDayIndexerGetKey:
         indexer = TimeOfDayIndexer(bucket_size=3600)
         timestamp = datetime(2024, 1, 15, 14, 30, 45)
         key = await indexer.get_key(timestamp)
-        assert key.to_tuple() == (("time_bucket", 14),)
+        assert key.parts == (("time_bucket", 14),)
 
     @pytest.mark.asyncio
     async def test_hour_23(self: Self) -> None:
@@ -66,7 +66,7 @@ class TestTimeOfDayIndexerGetKey:
         indexer = TimeOfDayIndexer(bucket_size=3600)
         timestamp = datetime(2024, 1, 15, 23, 59, 59)
         key = await indexer.get_key(timestamp)
-        assert key.to_tuple() == (("time_bucket", 23),)
+        assert key.parts == (("time_bucket", 23),)
 
     @pytest.mark.asyncio
     async def test_5_minute_buckets(self: Self) -> None:
@@ -75,7 +75,7 @@ class TestTimeOfDayIndexerGetKey:
         # 14:30 = 52200 seconds = bucket 174 (52200 // 300)
         timestamp = datetime(2024, 1, 15, 14, 30, 0)
         key = await indexer.get_key(timestamp)
-        assert key.to_tuple() == (("time_bucket", 174),)
+        assert key.parts == (("time_bucket", 174),)
 
     @pytest.mark.asyncio
     async def test_1_minute_buckets(self: Self) -> None:
@@ -84,7 +84,7 @@ class TestTimeOfDayIndexerGetKey:
         # 14:30 = 52200 seconds = bucket 870 (52200 // 60)
         timestamp = datetime(2024, 1, 15, 14, 30, 0)
         key = await indexer.get_key(timestamp)
-        assert key.to_tuple() == (("time_bucket", 870),)
+        assert key.parts == (("time_bucket", 870),)
 
     @pytest.mark.asyncio
     async def test_ignores_seconds_in_hour_buckets(self: Self) -> None:
@@ -95,7 +95,7 @@ class TestTimeOfDayIndexerGetKey:
         key1 = await indexer.get_key(ts1)
         key2 = await indexer.get_key(ts2)
         assert key1 == key2
-        assert key1.to_tuple() == (("time_bucket", 14),)
+        assert key1.parts == (("time_bucket", 14),)
 
     @pytest.mark.asyncio
     async def test_keys_are_different_across_hours(self: Self) -> None:
@@ -120,7 +120,7 @@ class TestTimeOfDayIndexerGetKey:
         indexer = TimeOfDayIndexer(bucket_size=3600)
         timestamp = datetime(2024, 1, 15, 14, 0, 1)
         key = await indexer.get_key(timestamp)
-        assert key.to_tuple() == (("time_bucket", 14),)
+        assert key.parts == (("time_bucket", 14),)
 
     @pytest.mark.asyncio
     async def test_boundary_at_last_second_of_hour(self: Self) -> None:
@@ -128,7 +128,7 @@ class TestTimeOfDayIndexerGetKey:
         indexer = TimeOfDayIndexer(bucket_size=3600)
         timestamp = datetime(2024, 1, 15, 14, 59, 59)
         key = await indexer.get_key(timestamp)
-        assert key.to_tuple() == (("time_bucket", 14),)
+        assert key.parts == (("time_bucket", 14),)
 
 
 class TestTimeOfDayIndexerReturnType:
@@ -153,7 +153,7 @@ class TestTimeOfDayIndexerReturnType:
         """Test that feature name is always 'time_bucket'."""
         indexer = TimeOfDayIndexer(bucket_size=3600)
         key = await indexer.get_key(datetime(2024, 1, 15, 14, 30))
-        name, value = key.to_tuple()[0]
+        name, value = key.parts[0]
         assert name == "time_bucket"
         assert isinstance(value, int)
 
@@ -209,7 +209,7 @@ class TestTimeOfDayIndexerEdgeCases:
             for minute in [0, 15, 30, 45]:
                 timestamp = datetime(2024, 1, 15, hour, minute)
                 key = await indexer.get_key(timestamp)
-                value = key.to_tuple()[0][1]
+                value = key.parts[0][1]
                 assert value >= 0
 
     @pytest.mark.asyncio
@@ -219,7 +219,7 @@ class TestTimeOfDayIndexerEdgeCases:
         max_bucket = (86400 - 1) // 3600  # 23
         timestamp = datetime(2024, 1, 15, 23, 59, 59)
         key = await indexer.get_key(timestamp)
-        value = key.to_tuple()[0][1]
+        value = key.parts[0][1]
         assert value <= max_bucket
 
     @pytest.mark.asyncio
@@ -231,8 +231,8 @@ class TestTimeOfDayIndexerEdgeCases:
         at_midnight = datetime(2024, 1, 16, 0, 0, 0)
         key1 = await indexer.get_key(before_midnight)
         key2 = await indexer.get_key(at_midnight)
-        assert key1.to_tuple() == (("time_bucket", 23),)
-        assert key2.to_tuple() == (("time_bucket", 0),)
+        assert key1.parts == (("time_bucket", 23),)
+        assert key2.parts == (("time_bucket", 0),)
 
     @pytest.mark.asyncio
     async def test_very_small_bucket_size(self: Self) -> None:
@@ -252,7 +252,7 @@ class TestTimeOfDayIndexerEdgeCases:
         for hour in [0, 6, 12, 18, 23]:
             timestamp = datetime(2024, 1, 15, hour, 30)
             key = await indexer.get_key(timestamp)
-            assert key.to_tuple() == (("time_bucket", 0),)
+            assert key.parts == (("time_bucket", 0),)
 
 
 class TestTimeOfDayIndexerEquality:

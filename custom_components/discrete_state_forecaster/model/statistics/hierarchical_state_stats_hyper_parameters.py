@@ -7,11 +7,14 @@ prediction engine, particularly the minimum support thresholds that determine
 prediction confidence.
 """
 
-from typing import Final, Self
+from __future__ import annotations
 
-from custom_components.discrete_state_forecaster.model.hyper_parameters import (
-    HyperParameters,
-)
+from typing import TYPE_CHECKING, Any, Final, Self
+
+if TYPE_CHECKING:
+    from custom_components.discrete_state_forecaster.model.hyper_parameters import (
+        HyperParameters,
+    )
 
 
 class HierarchicalStateStatsHyperParameters:
@@ -46,7 +49,9 @@ class HierarchicalStateStatsHyperParameters:
 
     """
 
-    def __init__(self: Self, hyper_parameters: HyperParameters, min_support_factor: float = 1.0):
+    def __init__(
+        self: Self, hyper_parameters: HyperParameters, min_support_factor: float = 1.0
+    ):
         """
         Initializes hierarchical state statistics configuration.
 
@@ -77,3 +82,31 @@ class HierarchicalStateStatsHyperParameters:
 
         """
         return self._hyper_parameters.half_life * self._min_support_factor
+
+    def to_dict(self: Self) -> dict[str, Any]:
+        """
+        Serializes the hyper parameters to a dictionary.
+
+        Returns:
+          A dictionary containing the minimum support threshold.
+        """
+        return {"min_support": self.min_support}
+
+    @classmethod
+    def from_dict(
+        cls, data: dict[str, Any], hyper_parameters: HyperParameters
+    ) -> HierarchicalStateStatsHyperParameters:
+        """
+        Creates an instance of HierarchicalStateStatsHyperParameters from a dictionary.
+
+        Args:
+          data: A dictionary containing the minimum support threshold.
+          hyper_parameters: The base HyperParameters instance to use for calculations.
+
+        Returns:
+          An instance of HierarchicalStateStatsHyperParameters initialized with the provided minimum support threshold and base hyper parameters.
+        """
+        return cls(
+            hyper_parameters=hyper_parameters,
+            min_support_factor=data["min_support"] / hyper_parameters.half_life,
+        )

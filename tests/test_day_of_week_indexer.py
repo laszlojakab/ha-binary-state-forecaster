@@ -32,7 +32,7 @@ class TestDayOfWeekIndexerBasics:
         indexer = DayOfWeekIndexer()
         key = await indexer.get_key(datetime(2024, 1, 15, 10, 30))
         assert len(key) == 1
-        assert key.to_tuple() == (("day_of_week", 0),)
+        assert key.parts == (("day_of_week", 0),)
 
 
 class TestDayOfWeekIndexerMappings:
@@ -45,7 +45,7 @@ class TestDayOfWeekIndexerMappings:
         # January 8, 2024 is Monday
         timestamp = datetime(2024, 1, 8, 10, 30)
         key = await indexer.get_key(timestamp)
-        assert key.to_tuple() == (("day_of_week", 0),)
+        assert key.parts == (("day_of_week", 0),)
 
     @pytest.mark.asyncio
     async def test_tuesday(self: Self) -> None:
@@ -54,7 +54,7 @@ class TestDayOfWeekIndexerMappings:
         # January 9, 2024 is Tuesday
         timestamp = datetime(2024, 1, 9, 10, 30)
         key = await indexer.get_key(timestamp)
-        assert key.to_tuple() == (("day_of_week", 1),)
+        assert key.parts == (("day_of_week", 1),)
 
     @pytest.mark.asyncio
     async def test_wednesday(self: Self) -> None:
@@ -63,7 +63,7 @@ class TestDayOfWeekIndexerMappings:
         # January 10, 2024 is Wednesday
         timestamp = datetime(2024, 1, 10, 10, 30)
         key = await indexer.get_key(timestamp)
-        assert key.to_tuple() == (("day_of_week", 2),)
+        assert key.parts == (("day_of_week", 2),)
 
     @pytest.mark.asyncio
     async def test_thursday(self: Self) -> None:
@@ -72,7 +72,7 @@ class TestDayOfWeekIndexerMappings:
         # January 11, 2024 is Thursday
         timestamp = datetime(2024, 1, 11, 10, 30)
         key = await indexer.get_key(timestamp)
-        assert key.to_tuple() == (("day_of_week", 3),)
+        assert key.parts == (("day_of_week", 3),)
 
     @pytest.mark.asyncio
     async def test_friday(self: Self) -> None:
@@ -81,7 +81,7 @@ class TestDayOfWeekIndexerMappings:
         # January 12, 2024 is Friday
         timestamp = datetime(2024, 1, 12, 10, 30)
         key = await indexer.get_key(timestamp)
-        assert key.to_tuple() == (("day_of_week", 4),)
+        assert key.parts == (("day_of_week", 4),)
 
     @pytest.mark.asyncio
     async def test_saturday(self: Self) -> None:
@@ -90,7 +90,7 @@ class TestDayOfWeekIndexerMappings:
         # January 13, 2024 is Saturday
         timestamp = datetime(2024, 1, 13, 10, 30)
         key = await indexer.get_key(timestamp)
-        assert key.to_tuple() == (("day_of_week", 5),)
+        assert key.parts == (("day_of_week", 5),)
 
     @pytest.mark.asyncio
     async def test_sunday(self: Self) -> None:
@@ -99,7 +99,7 @@ class TestDayOfWeekIndexerMappings:
         # January 14, 2024 is Sunday
         timestamp = datetime(2024, 1, 14, 10, 30)
         key = await indexer.get_key(timestamp)
-        assert key.to_tuple() == (("day_of_week", 6),)
+        assert key.parts == (("day_of_week", 6),)
 
 
 class TestDayOfWeekIndexerIgnoresTime:
@@ -123,7 +123,7 @@ class TestDayOfWeekIndexerIgnoresTime:
             keys.append(key)
         # All keys should be equal
         assert all(k == keys[0] for k in keys)
-        assert keys[0].to_tuple() == (("day_of_week", 0),)
+        assert keys[0].parts == (("day_of_week", 0),)
 
     @pytest.mark.asyncio
     async def test_time_components_ignored(self: Self) -> None:
@@ -149,7 +149,7 @@ class TestDayOfWeekIndexerConsistency:
             datetime(2024, 1, 29, 10, 30),  # Monday
         ]
         keys = [await indexer.get_key(ts) for ts in mondays]
-        assert all(k == (("day_of_week", 0),) for k in [k.to_tuple() for k in keys])
+        assert all(k.parts == (("day_of_week", 0),) for k in keys)
 
     @pytest.mark.asyncio
     async def test_same_weekday_different_years(self: Self) -> None:
@@ -161,7 +161,7 @@ class TestDayOfWeekIndexerConsistency:
             datetime(2025, 1, 10, 10, 30),  # Friday
         ]
         keys = [await indexer.get_key(ts) for ts in fridays]
-        assert all(k == (("day_of_week", 4),) for k in [k.to_tuple() for k in keys])
+        assert all(k.parts == (("day_of_week", 4),) for k in keys)
 
     @pytest.mark.asyncio
     async def test_consecutive_days_different_keys(self: Self) -> None:
@@ -258,8 +258,8 @@ class TestDayOfWeekIndexerEdgeCases:
         start_of_2024 = datetime(2024, 1, 1, 10, 30)
         key1 = await indexer.get_key(end_of_2023)
         key2 = await indexer.get_key(start_of_2024)
-        assert key1.to_tuple() == (("day_of_week", 6),)  # Sunday
-        assert key2.to_tuple() == (("day_of_week", 0),)  # Monday
+        assert key1.parts == (("day_of_week", 6),)  # Sunday
+        assert key2.parts == (("day_of_week", 0),)  # Monday
 
     @pytest.mark.asyncio
     async def test_leap_year(self: Self) -> None:
@@ -268,7 +268,7 @@ class TestDayOfWeekIndexerEdgeCases:
         # February 29, 2024 is Thursday
         leap_day = datetime(2024, 2, 29, 10, 30)
         key = await indexer.get_key(leap_day)
-        assert key.to_tuple() == (("day_of_week", 3),)  # Thursday
+        assert key.parts == (("day_of_week", 3),)  # Thursday
 
     @pytest.mark.asyncio
     async def test_far_future_date(self: Self) -> None:
@@ -277,7 +277,7 @@ class TestDayOfWeekIndexerEdgeCases:
         # December 25, 2099 is a Friday
         future = datetime(2099, 12, 25, 10, 30)
         key = await indexer.get_key(future)
-        assert key.to_tuple() == (("day_of_week", 4),)
+        assert key.parts == (("day_of_week", 4),)
 
 
 class TestDayOfWeekIndexerValueRange:
@@ -291,7 +291,7 @@ class TestDayOfWeekIndexerValueRange:
         for day_offset in range(7):
             ts = datetime(2024, 1, 8 + day_offset, 10, 30)
             key = await indexer.get_key(ts)
-            value = key.to_tuple()[0][1]
+            value = key.parts[0][1]
             assert 0 <= value <= 6
 
     @pytest.mark.asyncio
@@ -303,6 +303,6 @@ class TestDayOfWeekIndexerValueRange:
         for day_offset in range(7):
             ts = datetime(2024, 1, 8 + day_offset, 10, 30)
             key = await indexer.get_key(ts)
-            value = key.to_tuple()[0][1]
+            value = key.parts[0][1]
             values.add(value)
         assert values == {0, 1, 2, 3, 4, 5, 6}

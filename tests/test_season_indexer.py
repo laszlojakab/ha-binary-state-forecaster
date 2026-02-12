@@ -45,7 +45,9 @@ class TestSeasonIndexerMappings:
         for month in spring_months:
             ts = datetime(2024, month, 15, 10, 30)
             key = await indexer.get_key(ts)
-            assert key.to_tuple() == (("season", "spring"),), f"Month {month} should be spring"
+            assert key.parts == (
+                ("season", "spring"),
+            ), f"Month {month} should be spring"
 
     @pytest.mark.asyncio
     async def test_summer_mapping(self: Self) -> None:
@@ -55,7 +57,9 @@ class TestSeasonIndexerMappings:
         for month in summer_months:
             ts = datetime(2024, month, 15, 10, 30)
             key = await indexer.get_key(ts)
-            assert key.to_tuple() == (("season", "summer"),), f"Month {month} should be summer"
+            assert key.parts == (
+                ("season", "summer"),
+            ), f"Month {month} should be summer"
 
     @pytest.mark.asyncio
     async def test_autumn_mapping(self: Self) -> None:
@@ -65,7 +69,9 @@ class TestSeasonIndexerMappings:
         for month in autumn_months:
             ts = datetime(2024, month, 15, 10, 30)
             key = await indexer.get_key(ts)
-            assert key.to_tuple() == (("season", "autumn"),), f"Month {month} should be autumn"
+            assert key.parts == (
+                ("season", "autumn"),
+            ), f"Month {month} should be autumn"
 
     @pytest.mark.asyncio
     async def test_winter_mapping(self: Self) -> None:
@@ -79,7 +85,9 @@ class TestSeasonIndexerMappings:
                 year = 2025  # January and February of next year
             ts = datetime(year, month, 15, 10, 30)
             key = await indexer.get_key(ts)
-            assert key.to_tuple() == (("season", "winter"),), f"Month {month} should be winter"
+            assert key.parts == (
+                ("season", "winter"),
+            ), f"Month {month} should be winter"
 
     @pytest.mark.asyncio
     async def test_boundary_first_day_of_season(self: Self) -> None:
@@ -95,7 +103,7 @@ class TestSeasonIndexerMappings:
         for month, expected_season in boundaries:
             ts = datetime(2024, month, 1, 0, 0, 0)
             key = await indexer.get_key(ts)
-            assert key.to_tuple() == (("season", expected_season),)
+            assert key.parts == (("season", expected_season),)
 
     @pytest.mark.asyncio
     async def test_boundary_last_day_of_season(self: Self) -> None:
@@ -110,7 +118,7 @@ class TestSeasonIndexerMappings:
         for month, day, expected_season in boundaries:
             ts = datetime(2024, month, day, 23, 59, 59)
             key = await indexer.get_key(ts)
-            assert key.to_tuple() == (("season", expected_season),)
+            assert key.parts == (("season", expected_season),)
 
 
 class TestSeasonIndexerIgnoresTime:
@@ -129,7 +137,7 @@ class TestSeasonIndexerIgnoresTime:
         ]
         keys = [await indexer.get_key(ts) for ts in times]
         assert all(k == keys[0] for k in keys)
-        assert keys[0].to_tuple() == (("season", "spring"),)
+        assert keys[0].parts == (("season", "spring"),)
 
 
 class TestSeasonIndexerConsistency:
@@ -145,7 +153,7 @@ class TestSeasonIndexerConsistency:
             datetime(2025, 3, 15, 10, 30),
         ]
         keys = [await indexer.get_key(ts) for ts in march_dates]
-        assert all(k.to_tuple() == (("season", "spring"),) for k in keys)
+        assert all(k.parts == (("season", "spring"),) for k in keys)
 
 
 class TestSeasonIndexerHashability:
@@ -317,7 +325,7 @@ class TestSeasonIndexerEdgeCases:
         # February 29, 2024 is winter
         ts = datetime(2024, 2, 29, 10, 30)
         key = await indexer.get_key(ts)
-        assert key.to_tuple() == (("season", "winter"),)
+        assert key.parts == (("season", "winter"),)
 
     @pytest.mark.asyncio
     async def test_year_boundary_december_to_january(self: Self) -> None:
@@ -327,8 +335,8 @@ class TestSeasonIndexerEdgeCases:
         jan = datetime(2025, 1, 1, 0, 0, 0)
         key_dec = await indexer.get_key(dec)
         key_jan = await indexer.get_key(jan)
-        assert key_dec.to_tuple() == (("season", "winter"),)
-        assert key_jan.to_tuple() == (("season", "winter"),)
+        assert key_dec.parts == (("season", "winter"),)
+        assert key_jan.parts == (("season", "winter"),)
         assert key_dec == key_jan
 
     @pytest.mark.asyncio
@@ -337,7 +345,7 @@ class TestSeasonIndexerEdgeCases:
         indexer = SeasonIndexer()
         ts = datetime(2099, 7, 15, 10, 30)
         key = await indexer.get_key(ts)
-        assert key.to_tuple() == (("season", "summer"),)
+        assert key.parts == (("season", "summer"),)
 
 
 class TestSeasonIndexerValueRange:
@@ -353,7 +361,7 @@ class TestSeasonIndexerValueRange:
         for month in range(1, 13):
             ts = datetime(2024, month, 15, 10, 30)
             key = await indexer.get_key(ts)
-            season = key.to_tuple()[0][1]
+            season = key.parts[0][1]
             assert season in valid_seasons
 
     @pytest.mark.asyncio
@@ -372,7 +380,7 @@ class TestSeasonIndexerValueRange:
         for _season, month in months_per_season.items():
             ts = datetime(2024, month, 15, 10, 30)
             key = await indexer.get_key(ts)
-            found_season = key.to_tuple()[0][1]
+            found_season = key.parts[0][1]
             seasons.add(found_season)
 
         assert seasons == {"spring", "summer", "autumn", "winter"}

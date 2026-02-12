@@ -6,9 +6,14 @@ typically persist and computes persistence boosts based on hazard-style decay.
 This helps predictions favor the current state when it's expected to persist.
 """
 
-import math
-from typing import Final, Self
+from __future__ import annotations
 
+import math
+from typing import Any, Final, Self
+
+from custom_components.discrete_state_forecaster.model.hyper_parameters import (
+    HyperParameters,
+)
 from custom_components.discrete_state_forecaster.model.state import (
     State,
 )
@@ -55,7 +60,9 @@ class StatePersistenceTracker:
 
     """
 
-    def __init__(self: Self, hyper_parameters: StatePersistenceTrackerHyperParameters) -> None:
+    def __init__(
+        self: Self, hyper_parameters: StatePersistenceTrackerHyperParameters
+    ) -> None:
         """
         Initialize state persistence tracker.
 
@@ -96,7 +103,9 @@ class StatePersistenceTracker:
             _lambda = math.log(2.0) / self._hyper_parameters.persistence_half_life
             decay = math.exp(-_lambda * dt)
 
-            self._mean_duration[self._current_state] = decay * prev + (1 - decay) * duration
+            self._mean_duration[self._current_state] = (
+                decay * prev + (1 - decay) * duration
+            )
 
             self._current_state = state
             self._current_state_start = timestamp
@@ -176,3 +185,28 @@ class StatePersistenceTracker:
 
         # exp(-ratio) → strong when fresh, weak when overstaying
         return math.exp(-ratio)
+
+    def to_dict(self: Self) -> dict[str, Any]:
+        return {
+            "hyper_parameters": self._hyper_parameters.to_dict(),
+            "mean_duration": self._mean_duration,
+            "last_ts": self._last_ts,
+            "current_state": self._current_state,
+            "current_state_start": self._current_state_start,
+        }
+
+    @classmethod
+    def from_dict(
+        cls, data: dict[str, Any], hyper_parameters: HyperParameters
+    ) -> StatePersistenceTracker:
+        hyper_parameters = StatePersistenceTrackerHyperParameters.from_dict(
+            data["hyper_parameters"], hyper_parameters
+        )
+
+        tracker = cls(hyper_parameters=hyper_parameters)
+        tracker._mean_duration = data.get("mean_duration", {})
+        tracker._last_ts = data.get("last_ts")
+        tracker._current_state = data.get("current_state")
+        tracker._current_state_start = data.get("current_state_start")
+
+        return tracker

@@ -13,9 +13,6 @@ from custom_components.discrete_state_forecaster.model.statistics.aggregated_sta
 from custom_components.discrete_state_forecaster.model.statistics.distribution_stats import (
     DistributionStats,
 )
-from custom_components.discrete_state_forecaster.model.temporal.temporal_feature import (
-    TemporalFeature,
-)
 from custom_components.discrete_state_forecaster.model.temporal.time_key import TimeKey
 
 
@@ -30,25 +27,21 @@ class TestAggregatedStatsInitialization:
 
     def test_create_with_single_feature_key(self: Self) -> None:
         """Test creating AggregatedStats with single-feature key."""
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey.GLOBAL + ("hour", 14)
         stats = AggregatedStats(key)
         assert stats.key == key
         assert stats.is_empty()
 
     def test_create_with_multi_feature_key(self: Self) -> None:
         """Test creating AggregatedStats with multi-feature key."""
-        key = (
-            TimeKey.GLOBAL
-            + TemporalFeature("hour", 14)
-            + TemporalFeature("day_of_week", 3)
-        )
+        key = TimeKey.GLOBAL + ("hour", 14) + ("day_of_week", 3)
         stats = AggregatedStats(key)
         assert stats.key == key
         assert len(stats.key) == 2
 
     def test_key_is_immutable(self: Self) -> None:
         """Test that key attribute is immutable."""
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey.GLOBAL + ("hour", 14)
         stats = AggregatedStats(key)
         # Check that Final[TimeKey] is properly typed
         assert stats.key == key
@@ -60,7 +53,7 @@ class TestAggregatedStatsInitialization:
 
     def test_initial_support_is_zero(self: Self) -> None:
         """Test initial total support is zero."""
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey.GLOBAL + ("hour", 14)
         stats = AggregatedStats(key)
         assert stats.total_support() == 0.0
 
@@ -70,14 +63,14 @@ class TestAggregatedStatsInheritedMethods:
 
     def test_update_works(self: Self) -> None:
         """Test that inherited update method works."""
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey.GLOBAL + ("hour", 14)
         stats = AggregatedStats(key)
         stats.update("on", 5.0)
         assert stats.support("on") == 5.0
 
     def test_distribution_works(self: Self) -> None:
         """Test that inherited distribution method works."""
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey.GLOBAL + ("hour", 14)
         stats = AggregatedStats(key)
         stats.update("on", 2.0)
         stats.update("off", 1.0)
@@ -87,7 +80,7 @@ class TestAggregatedStatsInheritedMethods:
 
     def test_entropy_works(self: Self) -> None:
         """Test that inherited entropy method works."""
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey.GLOBAL + ("hour", 14)
         stats = AggregatedStats(key)
         stats.update("on", 1.0)
         stats.update("off", 1.0)
@@ -96,7 +89,7 @@ class TestAggregatedStatsInheritedMethods:
 
     def test_apply_decay_works(self: Self) -> None:
         """Test that inherited apply_decay method works."""
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey.GLOBAL + ("hour", 14)
         stats = AggregatedStats(key)
         stats.update("on", 10.0)
         stats.apply_decay(0.5)
@@ -104,7 +97,7 @@ class TestAggregatedStatsInheritedMethods:
 
     def test_prune_works(self: Self) -> None:
         """Test that inherited prune method works."""
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey.GLOBAL + ("hour", 14)
         stats = AggregatedStats(key)
         stats.update("a", 5.0)
         stats.update("b", 15.0)
@@ -120,7 +113,7 @@ class TestAggregatedStatsFromDistribution:
         dist = DistributionStats()
         dist.update("on", 10.0)
 
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey.GLOBAL + ("hour", 14)
         agg = AggregatedStats.from_distribution(dist, key)
 
         assert agg.key == key
@@ -133,7 +126,7 @@ class TestAggregatedStatsFromDistribution:
         dist.update("off", 1.0)
         dist.update("unknown", 1.0)
 
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey.GLOBAL + ("hour", 14)
         agg = AggregatedStats.from_distribution(dist, key)
 
         # Total support should be preserved
@@ -147,7 +140,7 @@ class TestAggregatedStatsFromDistribution:
     def test_from_distribution_empty(self: Self) -> None:
         """Test conversion from empty distribution."""
         dist = DistributionStats()
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey.GLOBAL + ("hour", 14)
         agg = AggregatedStats.from_distribution(dist, key)
 
         assert agg.key == key
@@ -160,7 +153,7 @@ class TestAggregatedStatsFromDistribution:
         dist.update("b", 20.0)
         dist.update("c", 30.0)
 
-        key = TimeKey.from_tuple((("hour", 10),))
+        key = TimeKey(("hour", 10))
         agg = AggregatedStats.from_distribution(dist, key)
 
         # Check that probabilities (not absolute support) are preserved
@@ -176,12 +169,7 @@ class TestAggregatedStatsFromDistribution:
         dist.update("on", 100.0)
         dist.update("off", 50.0)
 
-        key = (
-            TimeKey.GLOBAL
-            + TemporalFeature("season", "spring")
-            + TemporalFeature("day_of_week", 2)
-            + TemporalFeature("hour", 14)
-        )
+        key = TimeKey.GLOBAL + ("season", "spring") + ("day_of_week", 2) + ("hour", 14)
         agg = AggregatedStats.from_distribution(dist, key)
 
         assert agg.key == key
@@ -192,7 +180,7 @@ class TestAggregatedStatsFromDistribution:
         dist = DistributionStats()
         dist.update("on", 5.0)
 
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey.GLOBAL + ("hour", 14)
         agg = AggregatedStats.from_distribution(dist, key)
 
         assert isinstance(agg, AggregatedStats)
@@ -203,7 +191,7 @@ class TestAggregatedStatsFromDistribution:
         dist.update("a", 100.0)
         dist.update("b", 50.0)
 
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey.GLOBAL + ("hour", 14)
         agg = AggregatedStats.from_distribution(dist, key)
 
         # Total should be 150
@@ -220,8 +208,8 @@ class TestAggregatedStatsKeyAssociation:
 
     def test_different_keys_create_different_instances(self: Self) -> None:
         """Test that different keys create distinct instances."""
-        key1 = TimeKey.GLOBAL + TemporalFeature("hour", 14)
-        key2 = TimeKey.GLOBAL + TemporalFeature("hour", 15)
+        key1 = TimeKey.GLOBAL + ("hour", 14)
+        key2 = TimeKey.GLOBAL + ("hour", 15)
 
         stats1 = AggregatedStats(key1)
         stats2 = AggregatedStats(key2)
@@ -232,7 +220,7 @@ class TestAggregatedStatsKeyAssociation:
 
     def test_same_key_creates_equal_stats(self: Self) -> None:
         """Test that same key creates equal key objects."""
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey.GLOBAL + ("hour", 14)
         stats1 = AggregatedStats(key)
         stats2 = AggregatedStats(key)
 
@@ -252,8 +240,8 @@ class TestAggregatedStatsComparison:
         self: Self,
     ) -> None:
         """Test that different keys can store same states."""
-        key1 = TimeKey.GLOBAL + TemporalFeature("hour", 14)
-        key2 = TimeKey.GLOBAL + TemporalFeature("hour", 15)
+        key1 = TimeKey.GLOBAL + ("hour", 14)
+        key2 = TimeKey.GLOBAL + ("hour", 15)
 
         dist = DistributionStats()
         dist.update("on", 10.0)
@@ -276,7 +264,7 @@ class TestAggregatedStatsEdgeCases:
         dist = DistributionStats()
         dist.update("a", 0.0)
 
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey.GLOBAL + ("hour", 14)
         agg = AggregatedStats.from_distribution(dist, key)
 
         assert agg.total_support() == 0.0
@@ -288,7 +276,7 @@ class TestAggregatedStatsEdgeCases:
         dist.update("a", 1e10)
         dist.update("b", 1e10)
 
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey.GLOBAL + ("hour", 14)
         agg = AggregatedStats.from_distribution(dist, key)
 
         assert agg.total_support() == 2e10
@@ -299,7 +287,7 @@ class TestAggregatedStatsEdgeCases:
         for i in range(100):
             dist.update(f"state_{i}", 1.0)
 
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey.GLOBAL + ("hour", 14)
         agg = AggregatedStats.from_distribution(dist, key)
 
         assert len(agg.states()) == 100
@@ -318,7 +306,7 @@ class TestAggregatedStatsEdgeCases:
         for state, weight in states_and_weights:
             dist.update(state, weight)
 
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey.GLOBAL + ("hour", 14)
         agg = AggregatedStats.from_distribution(dist, key)
 
         # Check all states are present
@@ -333,13 +321,13 @@ class TestAggregatedStatsInheritanceChain:
 
     def test_is_instance_of_distribution_stats(self: Self) -> None:
         """Test that AggregatedStats is instance of DistributionStats."""
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey.GLOBAL + ("hour", 14)
         stats = AggregatedStats(key)
         assert isinstance(stats, DistributionStats)
 
     def test_has_all_parent_methods(self: Self) -> None:
         """Test that all parent methods are accessible."""
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey.GLOBAL + ("hour", 14)
         stats = AggregatedStats(key)
 
         # Check key parent methods exist
@@ -359,7 +347,7 @@ class TestAggregatedStatsInheritanceChain:
 
     def test_parent_method_functionality(self: Self) -> None:
         """Test that parent methods work correctly through inheritance."""
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey.GLOBAL + ("hour", 14)
         stats = AggregatedStats(key)
 
         # Use inherited methods

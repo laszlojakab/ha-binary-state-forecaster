@@ -16,9 +16,6 @@ from custom_components.discrete_state_forecaster.model.statistics.hierarchical_s
 from custom_components.discrete_state_forecaster.model.statistics.hierarchical_state_stats_hyper_parameters import (  # noqa: E501
     HierarchicalStateStatsHyperParameters,
 )
-from custom_components.discrete_state_forecaster.model.temporal.temporal_feature import (
-    TemporalFeature,
-)
 from custom_components.discrete_state_forecaster.model.temporal.time_key import TimeKey
 
 
@@ -75,7 +72,7 @@ class TestHierarchicalStateStatsUpdate:
         hp = create_test_hp(min_support_factor=0.01)
         stats = HierarchicalStateStats(hp)
 
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey(("hour", 14))
         stats.update(key, "on", weight=1.0)
 
         # Should have updated GLOBAL and the hour level
@@ -95,7 +92,7 @@ class TestHierarchicalStateStatsUpdate:
         stats = HierarchicalStateStats(hp)
 
         # Create multi-level key
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14) + TemporalFeature("day_of_week", 3)
+        key = TimeKey(("hour", 14), ("day_of_week", 3))
         stats.update(key, "on", weight=10.0)
 
         # Check that we can predict at different levels
@@ -113,7 +110,7 @@ class TestHierarchicalStateStatsUpdate:
         hp = HierarchicalStateStatsHyperParameters(base_hp, min_support_factor=0.01)
         stats = HierarchicalStateStats(hp)
 
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey(("hour", 14))
         stats.update(key, "on", weight=5.0)
         stats.update(key, "on", weight=5.0)
 
@@ -133,7 +130,7 @@ class TestHierarchicalStateStatsUpdate:
         hp = HierarchicalStateStatsHyperParameters(base_hp, min_support_factor=0.01)
         stats = HierarchicalStateStats(hp)
 
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey(("hour", 14))
         stats.update(key, "on", weight=10.0)
         stats.update(key, "off", weight=10.0)
 
@@ -152,7 +149,7 @@ class TestHierarchicalStateStatsPredict:
         hp = create_test_hp(min_support_factor=0.1)
         stats = HierarchicalStateStats(hp)
 
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey(("hour", 14))
         # Add enough support for confidence
         stats.update(key, "on", weight=100.0)
 
@@ -171,7 +168,7 @@ class TestHierarchicalStateStatsPredict:
         stats.update(TimeKey.GLOBAL, "on", weight=100.0)
 
         # Update specific with insufficient data
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey(("hour", 14))
         stats.update(key, "on", weight=1.0)
 
         # Predict at specific level should fallback to global
@@ -185,7 +182,7 @@ class TestHierarchicalStateStatsPredict:
         hp = create_test_hp()
         stats = HierarchicalStateStats(hp)
 
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey(("hour", 14))
         result = stats.predict(key)
         assert result is None
 
@@ -197,10 +194,10 @@ class TestHierarchicalStateStatsPredict:
         # Add data at different levels
         stats.update(TimeKey.GLOBAL, "on", weight=100.0)
 
-        level1 = TimeKey.GLOBAL + TemporalFeature("season", "spring")
+        level1 = TimeKey(("season", "spring"))
         stats.update(level1, "on", weight=50.0)
 
-        level2 = level1 + TemporalFeature("day_of_week", 2)
+        level2 = level1 + ("day_of_week", 2)
         stats.update(level2, "on", weight=10.0)
 
         # Predict at level2 should chain through levels
@@ -216,10 +213,10 @@ class TestHierarchicalStateStatsPredict:
         # Build hierarchy
         stats.update(TimeKey.GLOBAL, "on", weight=100.0)
 
-        key1 = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key1 = TimeKey(("hour", 14))
         stats.update(key1, "on", weight=50.0)
 
-        key2 = key1 + TemporalFeature("day_of_week", 3)
+        key2 = key1 + ("day_of_week", 3)
         stats.update(key2, "on", weight=20.0)
 
         result = stats.predict(key2)
@@ -233,7 +230,7 @@ class TestHierarchicalStateStatsPredict:
         stats = HierarchicalStateStats(hp)
 
         # Create insufficient data at specific level
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey(("hour", 14))
         stats.update(key, "on", weight=1.0)
 
         # Create data at ancestor level
@@ -258,7 +255,7 @@ class TestHierarchicalStateStatsApplyDecay:
         hp = create_test_hp(min_support_factor=0.01)
         stats = HierarchicalStateStats(hp)
 
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey(("hour", 14))
         stats.update(key, "on", weight=100.0)
 
         result1 = stats.predict(key)
@@ -278,7 +275,7 @@ class TestHierarchicalStateStatsApplyDecay:
         hp = create_test_hp(min_support_factor=0.001)
         stats = HierarchicalStateStats(hp)
 
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey(("hour", 14))
         stats.update(key, "on", weight=1000.0)
 
         # Apply decay multiple times
@@ -299,7 +296,7 @@ class TestHierarchicalStateStatsApplyDecay:
         # Update at multiple levels
         stats.update(TimeKey.GLOBAL, "on", weight=100.0)
 
-        key1 = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key1 = TimeKey(("hour", 14))
         stats.update(key1, "on", weight=100.0)
 
         # Decay
@@ -323,7 +320,7 @@ class TestHierarchicalStateStatsPrune:
         hp = create_test_hp(min_support_factor=0.01)
         stats = HierarchicalStateStats(hp)
 
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey(("hour", 14))
         stats.update(key, "frequent", 1000.0)
         stats.update(key, "rare", 1.0)
 
@@ -388,7 +385,7 @@ class TestHierarchicalStateStatsEdgeCases:
         # Build 5-level deep key
         key = TimeKey.GLOBAL
         for i in range(5):
-            key = key + TemporalFeature(f"level_{i}", i)
+            key = key + (f"level_{i}", i)
 
         stats.update(key, "on", weight=100.0)
         result = stats.predict(key)
@@ -399,7 +396,7 @@ class TestHierarchicalStateStatsEdgeCases:
         hp = create_test_hp(min_support_factor=0.001)
         stats = HierarchicalStateStats(hp)
 
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey("hour", 14)
 
         for i in range(100):
             stats.update(key, f"state_{i}", 1.0)
@@ -413,7 +410,7 @@ class TestHierarchicalStateStatsEdgeCases:
         hp = create_test_hp()
         stats = HierarchicalStateStats(hp)
 
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey(("hour", 14))
         stats.update(key, "on", weight=0.0)
 
         result = stats.predict(key)
@@ -424,7 +421,7 @@ class TestHierarchicalStateStatsEdgeCases:
         hp = create_test_hp(min_support_factor=0.001)
         stats = HierarchicalStateStats(hp)
 
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey(("hour", 14))
         stats.update(key, "on", weight=1e10)
 
         result = stats.predict(key)
@@ -442,7 +439,7 @@ class TestHierarchicalStateStatsIntegration:
 
         # Simulate a day of observations
         for hour in range(24):
-            key = TimeKey.GLOBAL + TemporalFeature("hour", hour)
+            key = TimeKey(("hour", hour))
 
             # Different patterns for different times
             if 8 <= hour < 18:
@@ -455,11 +452,11 @@ class TestHierarchicalStateStatsIntegration:
                 stats.update(key, "inactive", weight=10.0)
 
         # Check predictions at different times
-        morning_key = TimeKey.GLOBAL + TemporalFeature("hour", 10)
+        morning_key = TimeKey(("hour", 10))
         morning_result = stats.predict(morning_key)
         assert morning_result is not None
 
-        evening_key = TimeKey.GLOBAL + TemporalFeature("hour", 22)
+        evening_key = TimeKey(("hour", 22))
         evening_result = stats.predict(evening_key)
         assert evening_result is not None
 
@@ -468,7 +465,7 @@ class TestHierarchicalStateStatsIntegration:
         hp = create_test_hp(min_support_factor=0.01)
         stats = HierarchicalStateStats(hp)
 
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey(("hour", 14))
         stats.update(key, "on", weight=100.0)
         stats.update(key, "off", weight=50.0)
 
@@ -520,7 +517,7 @@ class TestHierarchicalStateStatsIntegration:
         hp_permissive = create_test_hp(min_support_factor=0.1)
         stats_permissive = HierarchicalStateStats(hp_permissive)
 
-        key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        key = TimeKey(("hour", 14))
 
         # Add moderate amount of data
         stats_strict.update(key, "on", weight=40.0)

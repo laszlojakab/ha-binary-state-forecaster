@@ -87,4 +87,4 @@ class DayOfWeekIndexer(TimeIndexer):
         """
         weekday = timestamp.weekday()  # Monday=0, Sunday=6
 
-        return TimeKey.from_tuple(((self.name, weekday),))
+        return TimeKey((self.name, weekday))

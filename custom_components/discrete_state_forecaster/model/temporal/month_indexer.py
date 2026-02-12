@@ -27,7 +27,7 @@ class MonthIndexer(TimeIndexer):
         month number (1-12) extracted from `timestamp`.
         """
         month = timestamp.month
-        return TimeKey.from_tuple(((self.name, month),))
+        return TimeKey((self.name, month))
 
     async def next_boundary(self, timestamp: datetime) -> datetime:
         """

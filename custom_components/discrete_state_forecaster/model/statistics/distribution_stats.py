@@ -13,7 +13,7 @@ enabling features like decay weighting and minimum support thresholds.
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Any, Self
 
 from custom_components.discrete_state_forecaster.model.statistics.state_stats import (
     StateStats,
@@ -46,9 +46,14 @@ class DistributionStats:
 
     """
 
-    def __init__(self: Self) -> None:
-        """Initialize an empty distribution."""
-        self._states: dict[State, StateStats] = {}
+    def __init__(self: Self, states: dict[State, StateStats] | None = None) -> None:
+        """
+        Initializes a distribution.
+
+        Args:
+          states: Optional initial state statistics. If None, starts with an empty distribution.
+        """
+        self._states: dict[State, StateStats] = {} if states is None else states
 
     def update(self: Self, state: State, weight: float = 1.0) -> None:
         """
@@ -140,7 +145,11 @@ class DistributionStats:
                 empty set if no states meet the threshold.
 
         """
-        return {state for state, stats in self._states.items() if stats.is_active(min_support)}
+        return {
+            state
+            for state, stats in self._states.items()
+            if stats.is_active(min_support)
+        }
 
     def entropy(self: Self) -> float:
         """
@@ -224,7 +233,9 @@ class DistributionStats:
                 support < min_state_duration are removed.
 
         """
-        self._states = {s: d for s, d in self._states.items() if d.is_active(min_state_duration)}
+        self._states = {
+            s: d for s, d in self._states.items() if d.is_active(min_state_duration)
+        }
 
     def prune_adaptive(
         self: Self,
@@ -251,3 +262,27 @@ class DistributionStats:
         """
         threshold = max(self.total_support() * epsilon, absolute_min)
         self.prune(threshold)
+
+    def to_dict(self: Self) -> dict[str, Any]:
+        """Returns a JSON-serializable representation of this DistributionStats."""
+        return {
+            "states": {s: stats.to_dict() for s, stats in self._states.items()},
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> DistributionStats:
+        """
+        Reconstructs DistributionStats from a dict representation.
+
+        Args:
+          data: Dictionary containing distribution statistics.
+
+        Returns:
+          A new DistributionStats instance with states initialized from data.
+        """
+        return cls(
+            states={
+                s: StateStats.from_dict(stats)
+                for s, stats in data.get("states", {}).items()
+            }
+        )
