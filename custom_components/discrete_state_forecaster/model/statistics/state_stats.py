@@ -8,9 +8,11 @@ decayed to weight recent observations more heavily than older ones.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Self
 
 
+@dataclass
 class StateStats:
     """
     Tracks cumulative support (weight) for a single state.
@@ -39,10 +41,6 @@ class StateStats:
 
     _support: float = 0.0
     """Cumulative support for this state. Represents the total weight of observations."""
-
-    def __init__(self) -> None:
-        """Initializes a new instance of `StateStats` class."""
-        self._support = 0.0
 
     def update(self: Self, weight: float) -> None:
         """

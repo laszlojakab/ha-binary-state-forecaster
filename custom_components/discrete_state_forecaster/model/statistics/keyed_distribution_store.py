@@ -192,7 +192,7 @@ class KeyedDistributionStore:
           A dictionary representation of the store, where each key maps to the serialized
           form of its DistributionStats.
         """
-        return {k: v.to_dict() for k, v in self._store.items()}
+        return {k:v.to_dict() for k, v in self._store.items()}
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> KeyedDistributionStore:

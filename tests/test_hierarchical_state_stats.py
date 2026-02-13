@@ -16,6 +16,9 @@ from custom_components.discrete_state_forecaster.model.statistics.hierarchical_s
 from custom_components.discrete_state_forecaster.model.statistics.hierarchical_state_stats_hyper_parameters import (  # noqa: E501
     HierarchicalStateStatsHyperParameters,
 )
+from custom_components.discrete_state_forecaster.model.statistics.hierarchical_state_stats_runtime_parameters import (
+    HierarchicalStateStatsRuntimeParameters,
+)
 from custom_components.discrete_state_forecaster.model.temporal.time_key import TimeKey
 
 
@@ -24,7 +27,6 @@ def create_test_hp(
     min_prune_interval: float = 10.0,
     prune_enabled: bool = True,
     persistence_strength: float = 0.95,
-    min_support_factor: float = 1.0,
 ) -> HierarchicalStateStatsHyperParameters:
     """Helper to create HyperParameters for testing."""
     base_hp = HyperParameters(
@@ -33,7 +35,16 @@ def create_test_hp(
         prune_enabled=prune_enabled,
         persistence_strength=persistence_strength,
     )
-    return HierarchicalStateStatsHyperParameters(base_hp, min_support_factor)
+    return HierarchicalStateStatsHyperParameters(base_hp)
+
+
+def create_test_rp(
+    min_support_factor: float = 1.0,
+) -> HierarchicalStateStatsRuntimeParameters:
+    """Helper to create RuntimeParameters for testing."""
+    return HierarchicalStateStatsRuntimeParameters(
+        min_support_factor=min_support_factor
+    )
 
 
 class TestHierarchicalStateStatsInitialization:
@@ -41,27 +52,17 @@ class TestHierarchicalStateStatsInitialization:
 
     def test_create_with_hyper_parameters(self: Self) -> None:
         """Test creating HierarchicalStateStats with hyper parameters."""
-        base_hp = HyperParameters(
-            half_life=50.0,
-            min_prune_interval=10.0,
-            prune_enabled=True,
-            persistence_strength=0.95,
-        )
-        hp = HierarchicalStateStatsHyperParameters(base_hp)
-        stats = HierarchicalStateStats(hp)
+        hp = create_test_hp()
+        rp = create_test_rp(min_support_factor=1.0)
+        stats = HierarchicalStateStats(hp, rp)
         assert stats is not None
 
     def test_create_with_custom_min_support_factor(self: Self) -> None:
         """Test creating with custom min_support_factor."""
-        base_hp = HyperParameters(
-            half_life=50.0,
-            min_prune_interval=10.0,
-            prune_enabled=True,
-            persistence_strength=0.95,
-        )
-        hp = HierarchicalStateStatsHyperParameters(base_hp, min_support_factor=0.5)
-        _stats = HierarchicalStateStats(hp)
-        assert hp.min_support == 25.0
+        hp = create_test_hp()
+        rp = create_test_rp(min_support_factor=0.5)
+        _stats = HierarchicalStateStats(hp, rp)
+        assert _stats.parameters.min_support == 25.0
 
 
 class TestHierarchicalStateStatsUpdate:
@@ -69,8 +70,9 @@ class TestHierarchicalStateStatsUpdate:
 
     def test_update_at_specific_level(self: Self) -> None:
         """Test update at specific temporal level."""
-        hp = create_test_hp(min_support_factor=0.01)
-        stats = HierarchicalStateStats(hp)
+        hp = create_test_hp()
+        rp = create_test_rp(min_support_factor=0.01)
+        stats = HierarchicalStateStats(hp, rp)
 
         key = TimeKey(("hour", 14))
         stats.update(key, "on", weight=1.0)
@@ -82,14 +84,9 @@ class TestHierarchicalStateStatsUpdate:
 
     def test_update_updates_all_ancestors(self: Self) -> None:
         """Test that update updates all ancestor levels."""
-        base_hp = HyperParameters(
-            half_life=50.0,
-            min_prune_interval=10.0,
-            prune_enabled=True,
-            persistence_strength=0.95,
-        )
-        hp = HierarchicalStateStatsHyperParameters(base_hp, min_support_factor=0.01)
-        stats = HierarchicalStateStats(hp)
+        hp = create_test_hp()
+        rp = create_test_rp(min_support_factor=0.01)
+        stats = HierarchicalStateStats(hp, rp)
 
         # Create multi-level key
         key = TimeKey(("hour", 14), ("day_of_week", 3))
@@ -101,14 +98,9 @@ class TestHierarchicalStateStatsUpdate:
 
     def test_update_multiple_times_accumulates(self: Self) -> None:
         """Test that multiple updates accumulate support."""
-        base_hp = HyperParameters(
-            half_life=50.0,
-            min_prune_interval=10.0,
-            prune_enabled=True,
-            persistence_strength=0.95,
-        )
-        hp = HierarchicalStateStatsHyperParameters(base_hp, min_support_factor=0.01)
-        stats = HierarchicalStateStats(hp)
+        hp = create_test_hp()
+        rp = create_test_rp(min_support_factor=0.01)
+        stats = HierarchicalStateStats(hp, rp)
 
         key = TimeKey(("hour", 14))
         stats.update(key, "on", weight=5.0)
@@ -121,14 +113,9 @@ class TestHierarchicalStateStatsUpdate:
 
     def test_update_with_different_states(self: Self) -> None:
         """Test updating with different states."""
-        base_hp = HyperParameters(
-            half_life=50.0,
-            min_prune_interval=10.0,
-            prune_enabled=True,
-            persistence_strength=0.95,
-        )
-        hp = HierarchicalStateStatsHyperParameters(base_hp, min_support_factor=0.01)
-        stats = HierarchicalStateStats(hp)
+        hp = create_test_hp()
+        rp = create_test_rp(min_support_factor=0.01)
+        stats = HierarchicalStateStats(hp, rp)
 
         key = TimeKey(("hour", 14))
         stats.update(key, "on", weight=10.0)
@@ -146,8 +133,9 @@ class TestHierarchicalStateStatsPredict:
 
     def test_predict_specific_level_confident(self: Self) -> None:
         """Test prediction at specific level with sufficient data."""
-        hp = create_test_hp(min_support_factor=0.1)
-        stats = HierarchicalStateStats(hp)
+        hp = create_test_hp()
+        rp = create_test_rp(min_support_factor=0.1)
+        stats = HierarchicalStateStats(hp, rp)
 
         key = TimeKey(("hour", 14))
         # Add enough support for confidence
@@ -161,8 +149,9 @@ class TestHierarchicalStateStatsPredict:
 
     def test_predict_insufficient_specific_level_fallback(self: Self) -> None:
         """Test fallback to ancestors when specific level insufficient."""
-        hp = create_test_hp(min_support_factor=1.0)
-        stats = HierarchicalStateStats(hp)
+        hp = create_test_hp()
+        rp = create_test_rp(min_support_factor=1.0)
+        stats = HierarchicalStateStats(hp, rp)
 
         # Update global with sufficient data
         stats.update(TimeKey.GLOBAL, "on", weight=100.0)
@@ -180,7 +169,8 @@ class TestHierarchicalStateStatsPredict:
     def test_predict_no_data_returns_none(self: Self) -> None:
         """Test prediction returns None when no data available."""
         hp = create_test_hp()
-        stats = HierarchicalStateStats(hp)
+        rp = create_test_rp()
+        stats = HierarchicalStateStats(hp, rp)
 
         key = TimeKey(("hour", 14))
         result = stats.predict(key)
@@ -188,8 +178,9 @@ class TestHierarchicalStateStatsPredict:
 
     def test_predict_multi_level_fallback_chain(self: Self) -> None:
         """Test prediction through multiple fallback levels."""
-        hp = create_test_hp(min_support_factor=0.05)
-        stats = HierarchicalStateStats(hp)
+        hp = create_test_hp()
+        rp = create_test_rp(min_support_factor=0.05)
+        stats = HierarchicalStateStats(hp, rp)
 
         # Add data at different levels
         stats.update(TimeKey.GLOBAL, "on", weight=100.0)
@@ -207,8 +198,9 @@ class TestHierarchicalStateStatsPredict:
 
     def test_predict_contributions_ordered(self: Self) -> None:
         """Test that contributions are ordered from specific to global."""
-        hp = create_test_hp(min_support_factor=0.01)
-        stats = HierarchicalStateStats(hp)
+        hp = create_test_hp()
+        rp = create_test_rp(min_support_factor=0.01)
+        stats = HierarchicalStateStats(hp, rp)
 
         # Build hierarchy
         stats.update(TimeKey.GLOBAL, "on", weight=100.0)
@@ -226,8 +218,9 @@ class TestHierarchicalStateStatsPredict:
 
     def test_predict_with_weak_confidence_weights(self: Self) -> None:
         """Test that confidence weights decrease with distance."""
-        hp = create_test_hp(min_support_factor=0.01)
-        stats = HierarchicalStateStats(hp)
+        hp = create_test_hp()
+        rp = create_test_rp(min_support_factor=0.01)
+        stats = HierarchicalStateStats(hp, rp)
 
         # Create insufficient data at specific level
         key = TimeKey(("hour", 14))
@@ -252,8 +245,9 @@ class TestHierarchicalStateStatsApplyDecay:
 
     def test_apply_decay_affects_predictions(self: Self) -> None:
         """Test that decay affects subsequent predictions."""
-        hp = create_test_hp(min_support_factor=0.01)
-        stats = HierarchicalStateStats(hp)
+        hp = create_test_hp()
+        rp = create_test_rp(min_support_factor=0.01)
+        stats = HierarchicalStateStats(hp, rp)
 
         key = TimeKey(("hour", 14))
         stats.update(key, "on", weight=100.0)
@@ -272,8 +266,9 @@ class TestHierarchicalStateStatsApplyDecay:
 
     def test_apply_decay_multiple_times(self: Self) -> None:
         """Test repeated decay operations."""
-        hp = create_test_hp(min_support_factor=0.001)
-        stats = HierarchicalStateStats(hp)
+        hp = create_test_hp()
+        rp = create_test_rp(min_support_factor=0.001)
+        stats = HierarchicalStateStats(hp, rp)
 
         key = TimeKey(("hour", 14))
         stats.update(key, "on", weight=1000.0)
@@ -290,8 +285,9 @@ class TestHierarchicalStateStatsApplyDecay:
 
     def test_apply_decay_at_all_levels(self: Self) -> None:
         """Test that decay affects all hierarchy levels."""
-        hp = create_test_hp(min_support_factor=0.001)
-        stats = HierarchicalStateStats(hp)
+        hp = create_test_hp()
+        rp = create_test_rp(min_support_factor=0.001)
+        stats = HierarchicalStateStats(hp, rp)
 
         # Update at multiple levels
         stats.update(TimeKey.GLOBAL, "on", weight=100.0)
@@ -317,8 +313,9 @@ class TestHierarchicalStateStatsPrune:
 
     def test_prune_removes_infrequent_states(self: Self) -> None:
         """Test that prune removes infrequent states."""
-        hp = create_test_hp(min_support_factor=0.01)
-        stats = HierarchicalStateStats(hp)
+        hp = create_test_hp()
+        rp = create_test_rp(min_support_factor=0.01)
+        stats = HierarchicalStateStats(hp, rp)
 
         key = TimeKey(("hour", 14))
         stats.update(key, "frequent", 1000.0)
@@ -336,8 +333,9 @@ class TestHierarchicalStateStatsPrune:
 
     def test_prune_with_custom_parameters(self: Self) -> None:
         """Test prune with custom epsilon and absolute_min."""
-        hp = create_test_hp(min_support_factor=0.001)
-        stats = HierarchicalStateStats(hp)
+        hp = create_test_hp()
+        rp = create_test_rp(min_support_factor=0.001)
+        stats = HierarchicalStateStats(hp, rp)
 
         key = TimeKey.GLOBAL
         for i in range(100):
@@ -355,7 +353,8 @@ class TestHierarchicalStateStatsPrune:
     def test_prune_empty_store(self: Self) -> None:
         """Test prune on empty statistics."""
         hp = create_test_hp()
-        stats = HierarchicalStateStats(hp)
+        rp = create_test_rp()
+        stats = HierarchicalStateStats(hp, rp)
 
         # Should not raise error
         stats.prune()
@@ -369,8 +368,9 @@ class TestHierarchicalStateStatsEdgeCases:
 
     def test_global_key_only(self: Self) -> None:
         """Test updating and predicting at GLOBAL level."""
-        hp = create_test_hp(min_support_factor=0.01)
-        stats = HierarchicalStateStats(hp)
+        hp = create_test_hp()
+        rp = create_test_rp(min_support_factor=0.01)
+        stats = HierarchicalStateStats(hp, rp)
 
         stats.update(TimeKey.GLOBAL, "on", weight=100.0)
         result = stats.predict(TimeKey.GLOBAL)
@@ -379,8 +379,9 @@ class TestHierarchicalStateStatsEdgeCases:
 
     def test_deeply_nested_keys(self: Self) -> None:
         """Test with deeply nested temporal hierarchy."""
-        hp = create_test_hp(min_support_factor=0.001)
-        stats = HierarchicalStateStats(hp)
+        hp = create_test_hp()
+        rp = create_test_rp(min_support_factor=0.001)
+        stats = HierarchicalStateStats(hp, rp)
 
         # Build 5-level deep key
         key = TimeKey.GLOBAL
@@ -393,8 +394,9 @@ class TestHierarchicalStateStatsEdgeCases:
 
     def test_many_different_states(self: Self) -> None:
         """Test with many different states."""
-        hp = create_test_hp(min_support_factor=0.001)
-        stats = HierarchicalStateStats(hp)
+        hp = create_test_hp()
+        rp = create_test_rp(min_support_factor=0.001)
+        stats = HierarchicalStateStats(hp, rp)
 
         key = TimeKey("hour", 14)
 
@@ -408,7 +410,8 @@ class TestHierarchicalStateStatsEdgeCases:
     def test_zero_weight_update(self: Self) -> None:
         """Test updating with zero weight."""
         hp = create_test_hp()
-        stats = HierarchicalStateStats(hp)
+        rp = create_test_rp()
+        stats = HierarchicalStateStats(hp, rp)
 
         key = TimeKey(("hour", 14))
         stats.update(key, "on", weight=0.0)
@@ -418,8 +421,9 @@ class TestHierarchicalStateStatsEdgeCases:
 
     def test_very_large_weights(self: Self) -> None:
         """Test with very large weight values."""
-        hp = create_test_hp(min_support_factor=0.001)
-        stats = HierarchicalStateStats(hp)
+        hp = create_test_hp()
+        rp = create_test_rp(min_support_factor=0.001)
+        stats = HierarchicalStateStats(hp, rp)
 
         key = TimeKey(("hour", 14))
         stats.update(key, "on", weight=1e10)
@@ -434,8 +438,9 @@ class TestHierarchicalStateStatsIntegration:
 
     def test_complete_temporal_pattern_learning(self: Self) -> None:
         """Test learning temporal patterns over multiple time points."""
-        hp = create_test_hp(min_support_factor=0.01)
-        stats = HierarchicalStateStats(hp)
+        hp = create_test_hp()
+        rp = create_test_rp(min_support_factor=0.01)
+        stats = HierarchicalStateStats(hp, rp)
 
         # Simulate a day of observations
         for hour in range(24):
@@ -462,8 +467,9 @@ class TestHierarchicalStateStatsIntegration:
 
     def test_workflow_update_decay_predict(self: Self) -> None:
         """Test complete workflow: update, decay, predict."""
-        hp = create_test_hp(min_support_factor=0.01)
-        stats = HierarchicalStateStats(hp)
+        hp = create_test_hp()
+        rp = create_test_rp(min_support_factor=0.01)
+        stats = HierarchicalStateStats(hp, rp)
 
         key = TimeKey(("hour", 14))
         stats.update(key, "on", weight=100.0)
@@ -485,8 +491,9 @@ class TestHierarchicalStateStatsIntegration:
 
     def test_workflow_multiple_updates_prune_predict(self: Self) -> None:
         """Test workflow with updates, pruning, and predictions."""
-        hp = create_test_hp(min_support_factor=0.001)
-        stats = HierarchicalStateStats(hp)
+        hp = create_test_hp()
+        rp = create_test_rp(min_support_factor=0.001)
+        stats = HierarchicalStateStats(hp, rp)
 
         # Add data
         key = TimeKey.GLOBAL
@@ -510,12 +517,14 @@ class TestHierarchicalStateStatsIntegration:
     def test_confidence_threshold_behavior(self: Self) -> None:
         """Test behavior with different confidence thresholds."""
         # Strict threshold
-        hp_strict = create_test_hp(min_support_factor=2.0)
-        stats_strict = HierarchicalStateStats(hp_strict)
+        hp_strict = create_test_hp()
+        rp_strict = create_test_rp(min_support_factor=2.0)
+        stats_strict = HierarchicalStateStats(hp_strict, rp_strict)
 
         # Permissive threshold
-        hp_permissive = create_test_hp(min_support_factor=0.1)
-        stats_permissive = HierarchicalStateStats(hp_permissive)
+        hp_permissive = create_test_hp()
+        rp_permissive = create_test_rp(min_support_factor=0.1)
+        stats_permissive = HierarchicalStateStats(hp_permissive, rp_permissive)
 
         key = TimeKey(("hour", 14))
 
@@ -538,15 +547,9 @@ class TestHierarchicalStateStatsSerialization:
     """Tests for HierarchicalStateStats serialization and deserialization."""
 
     def test_to_dict_and_from_dict_roundtrip(self: Self) -> None:
-        base_hp = HyperParameters(
-            half_life=50.0,
-            min_prune_interval=10.0,
-            prune_enabled=True,
-            persistence_strength=0.5,
-        )
-
-        hp = HierarchicalStateStatsHyperParameters(base_hp, min_support_factor=0.01)
-        stats = HierarchicalStateStats(hp)
+        hp = create_test_hp()
+        rp = create_test_rp(min_support_factor=0.01)
+        stats = HierarchicalStateStats(hp, rp)
 
         key = TimeKey.GLOBAL + ("hour", 14)
         stats.update(key, "on", weight=10.0)
@@ -555,10 +558,7 @@ class TestHierarchicalStateStatsSerialization:
         data = stats.to_dict()
 
         # Reconstruct using base hyper-parameters (same base used to create hp)
-        restored = HierarchicalStateStats.from_dict(data, base_hp)
-
-        # Hyper-parameter min_support should be preserved
-        assert abs(restored._hyper_parameters.min_support - hp.min_support) < 1e-12
+        restored = HierarchicalStateStats.from_dict(data, hp, rp)
 
         # Restored store should contain distributions for the keys we updated
         res = restored.predict(key)

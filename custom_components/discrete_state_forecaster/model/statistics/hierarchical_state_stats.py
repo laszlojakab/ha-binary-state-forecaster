@@ -20,21 +20,23 @@ from typing import TYPE_CHECKING, Any, Final, Self
 from custom_components.discrete_state_forecaster.model.statistics.distribution_stats import (
     DistributionStats,
 )
-from custom_components.discrete_state_forecaster.model.statistics.hierarchical_state_stats_hyper_parameters import (  # noqa: E501
-    HierarchicalStateStatsHyperParameters,
-)
 
 from .contribution import Contribution
+from .hierarchical_state_stats_parameters import HierarchicalStateStatsParameters
 from .keyed_distribution_store import KeyedDistributionStore
 from .prediction_result import PredictionResult
 
 if TYPE_CHECKING:
-    from custom_components.discrete_state_forecaster.model.hyper_parameters import (
-        HyperParameters,
-    )
     from custom_components.discrete_state_forecaster.model.state import State
     from custom_components.discrete_state_forecaster.model.temporal.time_key import (
         TimeKey,
+    )
+
+    from .hierarchical_state_stats_hyper_parameters import (
+        HierarchicalStateStatsHyperParameters,
+    )
+    from .hierarchical_state_stats_runtime_parameters import (
+        HierarchicalStateStatsRuntimeParameters,
     )
 
 
@@ -53,7 +55,8 @@ class HierarchicalStateStats:
 
     Example:
         >>> hp = HierarchicalStateStatsHyperParameters(min_support=10.0)
-        >>> stats = HierarchicalStateStats(hp)
+        >>> rp = HierarchicalStateStatsRuntimeParameters(min_support_factor=1.0)
+        >>> stats = HierarchicalStateStats(hp, rp)
         >>> key = TimeKey(("hour", 14))
         >>> stats.update(key, "on", weight=1.0)
         >>> result = stats.predict(key)
@@ -65,12 +68,10 @@ class HierarchicalStateStats:
     _stats: Final[KeyedDistributionStore]
     """Store of distributions for all temporal keys in the hierarchy."""
 
-    _hyper_parameters: Final[HierarchicalStateStatsHyperParameters]
-    """Configuration parameters including minimum support thresholds."""
-
     def __init__(
         self: Self,
         hyper_parameters: HierarchicalStateStatsHyperParameters,
+        runtime_parameters: HierarchicalStateStatsRuntimeParameters,
     ):
         """
         Initializes the hierarchical state statistics engine.
@@ -78,10 +79,13 @@ class HierarchicalStateStats:
         Args:
             hyper_parameters: Configuration including minimum support thresholds
                 and other prediction parameters.
+            runtime_parameters: Runtime parameters that can be adjusted during
+                execution, such as scaling factors for thresholds.
         """
-        # Allow injecting an existing KeyedDistributionStore when deserializing
         self._stats = KeyedDistributionStore()
-        self._hyper_parameters = hyper_parameters
+        self.parameters = HierarchicalStateStatsParameters(
+            hyper_parameters, runtime_parameters
+        )
 
     def update(
         self: Self,
@@ -138,7 +142,7 @@ class HierarchicalStateStats:
         """
         specific = self._stats.get_distribution(key)
 
-        if specific and specific.is_confident(self._hyper_parameters.min_support):
+        if specific and specific.is_confident(self.parameters.min_support):
             return PredictionResult(
                 key=key,
                 distribution_stats=specific,
@@ -167,10 +171,10 @@ class HierarchicalStateStats:
 
             contributions.append(Contribution(source_key, weight, stats.total_support))
 
-            if aggregated.is_confident(self._hyper_parameters.min_support):
+            if aggregated.is_confident(self.parameters.min_support):
                 break
 
-        if not aggregated.is_confident(self._hyper_parameters.min_support):
+        if not aggregated.is_confident(self.parameters.min_support):
             return None
 
         return PredictionResult(
@@ -222,25 +226,26 @@ class HierarchicalStateStats:
           A dictionary representation of the hierarchical state statistics
         """
         return {
-            "hyper_parameters": self._hyper_parameters.to_dict(),
             "stats": self._stats.to_dict(),
         }
 
     @classmethod
     def from_dict(
-        cls, data: dict[str, Any], hyper_parameters: HyperParameters
+        cls,
+        data: dict[str, Any],
+        hyper_parameters: HierarchicalStateStatsHyperParameters,
+        runtime_parameters: HierarchicalStateStatsRuntimeParameters,
     ) -> HierarchicalStateStats:
         """
         Deserializes a dictionary into an instance of HierarchicalStateStats.
 
         Args:
             data: Dictionary containing serialized hierarchical state statistics.
-            hyper_parameters: The base HyperParameters instance to use for calculations.
+            hyper_parameters: Hyper parameters needed to reconstruct the instance.
+            runtime_parameters: Runtime parameters needed to reconstruct the instance.
         """
         stats = cls(
-            hyper_parameters=HierarchicalStateStatsHyperParameters.from_dict(
-                data["hyper_parameters"], hyper_parameters
-            )
+            hyper_parameters=hyper_parameters, runtime_parameters=runtime_parameters
         )
 
         stats._stats = KeyedDistributionStore.from_dict(data["stats"])

@@ -8,22 +8,23 @@ learn and predict patterns within different temporal contexts.
 """
 
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime
 from typing import Final, Self
 
 from custom_components.discrete_state_forecaster.model.statistics.prediction_result import (
     PredictionResult,
-)
-from custom_components.discrete_state_forecaster.model.temporal.time_indexer import (
-    TimeIndexer,
 )
 
 from .forecaster_engine import (
     ForecasterEngine,
     ForecasterEngineParameters,
 )
+from .runtime_parameters import RuntimeParameters
 from .state import (
     State,
+)
+from .structural_parameters import (
+    StructuralParameters,
 )
 
 
@@ -35,15 +36,13 @@ class TimeAwareForecasterParameters:
     Contains both temporal indexing configuration and forecaster engine parameters.
 
     Attributes:
-        indexer: TimeIndexer instance for converting timestamps to temporal keys.
-            This indexer determines the temporal granularity and hierarchy for
-            pattern learning (e.g., hourly buckets, day of week, seasons).
         forecaster_engine_parameters: Configuration for the underlying ForecasterEngine.
             Controls decay rates, drift detection, persistence modeling, etc.
     """
 
-    indexer: TimeIndexer
-    forecaster_engine_parameters: ForecasterEngineParameters = ForecasterEngineParameters()
+    forecaster_engine_parameters: ForecasterEngineParameters = (
+        ForecasterEngineParameters()
+    )
 
 
 class TimeAwareForecaster:
@@ -62,23 +61,29 @@ class TimeAwareForecaster:
     Example:
         >>> from datetime import datetime
         >>> params = TimeAwareForecasterParameters(
-        ...     half_life=3600.0,
-        ...     indexer=CompositeIndexer([TimeOfDayIndexer(), DayOfWeekIndexer()])
+        ...     forecaster_engine_parameters=ForecasterEngineParameters(half_life=3600.0),
         ... )
         >>> forecaster = TimeAwareForecaster(params)
         >>> await forecaster.update(datetime.now(), "on")
         >>> prediction = await forecaster.predict(datetime.now())
     """
 
-    def __init__(self: Self, parameters: TimeAwareForecasterParameters) -> None:
+    def __init__(
+        self: Self,
+        structural_parameters: StructuralParameters,
+        runtime_parameters: RuntimeParameters,
+        parameters: TimeAwareForecasterParameters,
+    ) -> None:
         """
         Initializes the time-aware forecaster.
 
         Args:
-            parameters: Configuration parameters including the time indexer.
+            structural_parameters: Structural parameters including the time indexer.
+            parameters: Configuration parameters including the forecaster engine parameters.
         """
         self._engine: Final = ForecasterEngine(parameters.forecaster_engine_parameters)
-        self._indexer: Final = parameters.indexer
+        self._runtime_parameters: Final = runtime_parameters
+        self._structural_parameters: Final = structural_parameters
 
     async def update(self: Self, state: State, timestamp: datetime) -> None:
         """
@@ -94,7 +99,7 @@ class TimeAwareForecaster:
         Example:
             >>> await forecaster.update("on", datetime(2024, 1, 15, 14, 30))
         """
-        key = await self._indexer.get_key(timestamp)
+        key = await self._structural_parameters.indexer.get_key(timestamp)
         self._engine.update(key, state, timestamp.timestamp())
 
     async def predict(self: Self, timestamp: datetime) -> PredictionResult | None:
@@ -117,7 +122,7 @@ class TimeAwareForecaster:
             ...     dist = prediction.distribution
             ...     print(f"Probability of 'on': {dist.get('on', 0.0)}")
         """
-        key = await self._indexer.get_key(timestamp)
+        key = await self._structural_parameters.indexer.get_key(timestamp)
         return self._engine.predict(key)
 
     async def predict_interval(
@@ -176,13 +181,15 @@ class TimeAwareForecaster:
         sim_duration = current_state_duration or 0.0
 
         while ts < end_ts:
-            key = await self._indexer.get_key(ts)
+            key = await self._structural_parameters.indexer.get_key(ts)
 
             # Calculate step end time, respecting boundaries and resolution.
 
             step_end_ts = min(
                 ts.timestamp() + resolution,
-                (await self._indexer.next_boundary(ts)).timestamp(),
+                (
+                    await self._structural_parameters.indexer.next_boundary(ts)
+                ).timestamp(),
                 end_ts.timestamp(),
             )
             step_dt = step_end_ts - ts.timestamp()
