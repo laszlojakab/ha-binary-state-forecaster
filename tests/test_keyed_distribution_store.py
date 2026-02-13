@@ -39,7 +39,7 @@ class TestKeyedDistributionStoreUpdate:
         store.update("key1", "on", 5.0)
         dist = store.get_distribution("key1")
         assert dist is not None
-        assert dist.get_state_support("on") == 5.0
+        assert dist.to_dict()["states"]["on"]["support"] == 5.0
 
     def test_update_single_key_multiple_states(self: Self) -> None:
         """Test updating multiple states in same key."""
@@ -66,7 +66,7 @@ class TestKeyedDistributionStoreUpdate:
         store = KeyedDistributionStore()
         store.update("key1", "state1")
         dist = store.get_distribution("key1")
-        assert dist.get_state_support("state1") == 1.0
+        assert dist.to_dict()["states"]["state1"]["support"] == 1.0
 
     def test_update_accumulates_in_key(self: Self) -> None:
         """Test that updates to same key accumulate."""
@@ -74,7 +74,7 @@ class TestKeyedDistributionStoreUpdate:
         store.update("key1", "on", 2.0)
         store.update("key1", "on", 3.0)
         dist = store.get_distribution("key1")
-        assert dist.get_state_support("on") == 5.0
+        assert dist.to_dict()["states"]["on"]["support"] == 5.0
 
 
 class TestKeyedDistributionStoreGetDistribution:
@@ -111,7 +111,7 @@ class TestKeyedDistributionStoreApplyDecay:
         store.update("key1", "on", 10.0)
         store.apply_decay(0.5)
         dist = store.get_distribution("key1")
-        assert dist.get_state_support("on") == 5.0
+        assert dist.to_dict()["states"]["on"]["support"] == 5.0
 
     def test_apply_decay_multiple_keys(self: Self) -> None:
         """Test decay applied to all keys."""
@@ -123,8 +123,8 @@ class TestKeyedDistributionStoreApplyDecay:
         dist1 = store.get_distribution("key1")
         dist2 = store.get_distribution("key2")
 
-        assert dist1.get_state_support("on") == 5.0
-        assert dist2.get_state_support("on") == 10.0
+        assert dist1.to_dict()["states"]["on"]["support"] == 5.0
+        assert dist2.to_dict()["states"]["on"]["support"] == 10.0
 
     def test_apply_decay_empty_store(self: Self) -> None:
         """Test decay on empty store does nothing."""
@@ -138,9 +138,9 @@ class TestKeyedDistributionStoreApplyDecay:
         store.update("key1", "a", 10.0)
         store.update("key1", "b", 10.0)
 
-        dist_before = store.get_distribution("key1").distribution()
+        dist_before = store.get_distribution("key1").distribution
         store.apply_decay(0.7)
-        dist_after = store.get_distribution("key1").distribution()
+        dist_after = store.get_distribution("key1").distribution
 
         # Probabilities should remain same
         for state in ["a", "b"]:
@@ -278,11 +278,11 @@ class TestKeyedDistributionStoreAggregate:
 
         result = store.aggregate(["key1", "key2"], min_support=5.0)
         assert result is not None
-        agg, key = result
+        agg, _ = result
 
         # Verify aggregation accumulated data
         assert agg.total_support > 0
-        dist = agg.distribution()
+        dist = agg.distribution
         # Verify both states are present
         assert "on" in dist
         assert "off" in dist
@@ -318,7 +318,7 @@ class TestKeyedDistributionStoreEdgeCases:
 
         dist = store.get_distribution(key)
         assert dist is not None
-        assert dist.get_state_support("on") == 5.0
+        assert dist.to_dict()["states"]["on"]["support"] == 5.0
 
     def test_very_large_number_of_keys(self: Self) -> None:
         """Test with many different keys."""
@@ -336,7 +336,7 @@ class TestKeyedDistributionStoreEdgeCases:
         store = KeyedDistributionStore()
         store.update("key1", "on", 0.0)
         dist = store.get_distribution("key1")
-        assert dist.get_state_support("on") == 0.0
+        assert dist.to_dict()["states"]["on"]["support"] == 0.0
 
     def test_many_states_per_key(self: Self) -> None:
         """Test key with many different states."""
@@ -416,7 +416,7 @@ class TestKeyedDistributionStoreIntegration:
 
         dist = store.get_distribution("key1")
         # Should still have some support
-        assert dist.get_state_support("state") > 0
+        assert dist.to_dict()["states"]["state"]["support"] > 0
 
 
 class TestKeyedDistributionStoreSerialization:
@@ -446,8 +446,10 @@ class TestKeyedDistributionStoreSerialization:
         dist_k1 = restored.get_distribution("k1")
         dist_k2 = restored.get_distribution("k2")
 
-        assert dist_k1 is not None and abs(dist_k1.get_state_support("x") - 3.0) < 1e-12
-        assert dist_k2 is not None and abs(dist_k2.get_state_support("y") - 4.0) < 1e-12
+        assert dist_k1 is not None
+        assert abs(dist_k1.to_dict()["states"]["x"]["support"] - 3.0) < 1e-12
+        assert dist_k2 is not None
+        assert abs(dist_k2.to_dict()["states"]["y"]["support"] - 4.0) < 1e-12
 
     def test_from_dict_handles_empty_mapping(self: Self) -> None:
         restored = KeyedDistributionStore.from_dict({})

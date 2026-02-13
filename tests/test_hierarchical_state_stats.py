@@ -136,7 +136,7 @@ class TestHierarchicalStateStatsUpdate:
 
         result = stats.predict(key)
         assert result is not None
-        dist = result.distribution.distribution()
+        dist = result.distribution.distribution
         assert abs(dist["on"] - 0.5) < 1e-9
         assert abs(dist["off"] - 0.5) < 1e-9
 
@@ -561,4 +561,4 @@ class TestHierarchicalStateStatsSerialization:
         res = restored.predict(key)
         assert res is not None
         # Check that the restored distribution preserves support for 'on'
-        assert abs(res.distribution.get_state_support("on") - 10.0) < 1e-9
+        assert abs(res.distribution.to_dict()["states"]["on"]["support"] - 10.0) < 1e-9

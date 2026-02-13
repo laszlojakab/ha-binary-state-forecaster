@@ -174,7 +174,7 @@ class KeyedDistributionStore:
             if not stats:
                 continue
 
-            for state, prob in stats.distribution().items():
+            for state, prob in stats.distribution.items():
                 aggregated.update(
                     state,
                     prob * stats.total_support,

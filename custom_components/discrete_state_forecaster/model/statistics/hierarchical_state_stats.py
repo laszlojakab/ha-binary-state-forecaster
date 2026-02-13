@@ -169,7 +169,7 @@ class HierarchicalStateStats:
 
             weight = 1.0 / (1.0 + level)
 
-            for state, prob in stats.distribution().items():
+            for state, prob in stats.distribution.items():
                 aggregated.update(state, prob * stats.total_support * weight)
 
             contributions.append(

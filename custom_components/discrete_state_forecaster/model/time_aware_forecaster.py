@@ -201,7 +201,7 @@ class TimeAwareForecaster:
 
             # Forward simulation of state
             if simulate_state_path:
-                dist = prediction.distribution.distribution()
+                dist = prediction.distribution.distribution
 
                 if dist:
                     # Select most likely (argmax) state

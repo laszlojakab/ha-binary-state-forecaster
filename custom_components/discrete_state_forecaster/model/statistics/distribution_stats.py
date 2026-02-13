@@ -77,21 +77,7 @@ class DistributionStats:
         """
         return sum(stats.support for stats in self._states.values())
 
-    def get_state_support(self, state: State) -> float:
-        """
-        Gets the support for a specific state.
-
-        Args:
-            state: The state to query.
-
-        Returns:
-            The support value for the state. Returns 0.0 if the state has
-                not been observed.
-
-        """
-        stats = self._states.get(state)
-        return 0.0 if stats is None else stats.support
-
+    @property
     def distribution(self: Self) -> dict[State, float]:
         """
         Calculates probability distribution by normalizing support values.
@@ -124,25 +110,6 @@ class DistributionStats:
         """
         return self.total_support >= min_support
 
-    def active_states(self: Self, min_support: float) -> set[State]:
-        """
-        Gets states that meet or exceed the minimum support threshold.
-
-        Args:
-            min_support: The minimum support threshold for a state to be
-                considered active.
-
-        Returns:
-            Set of states where individual support >= min_support. Returns
-                empty set if no states meet the threshold.
-
-        """
-        return {
-            state
-            for state, stats in self._states.items()
-            if stats.is_active(min_support)
-        }
-
     def entropy(self: Self) -> float:
         """
         Calculates Shannon entropy of the probability distribution.
@@ -156,7 +123,7 @@ class DistributionStats:
                 empty or only one state has non-zero probability.
 
         """
-        dist = self.distribution()
+        dist = self.distribution
         if not dist:
             return 0.0
 
@@ -171,7 +138,7 @@ class DistributionStats:
                 no states have been observed.
 
         """
-        return max(self.distribution().values(), default=0.0)
+        return max(self.distribution.values(), default=0.0)
 
     def apply_decay(self: Self, factor: float) -> None:
         """
