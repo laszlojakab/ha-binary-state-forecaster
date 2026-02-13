@@ -148,7 +148,7 @@ class HierarchicalStateStats:
         if specific and specific.is_confident(self._hyper_parameters.min_support):
             return PredictionResult(
                 key=key,
-                distribution=specific,
+                distribution_stats=specific,
                 contributions=(
                     Contribution(
                         key=key,
@@ -184,7 +184,7 @@ class HierarchicalStateStats:
 
         return PredictionResult(
             key=key,
-            distribution=aggregated,
+            distribution_stats=aggregated,
             contributions=tuple(contributions),
         )
 

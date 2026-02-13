@@ -250,7 +250,7 @@ class ForecasterEngine:
 
         if global_prediction:
             # After the first update we may not be able to get a global prediction.
-            self._drift_monitor.update(global_prediction.distribution.distribution, timestamp)
+            self._drift_monitor.update(global_prediction.distribution, timestamp)
 
         self._prune(timestamp)
 
@@ -317,9 +317,8 @@ class ForecasterEngine:
         if prediction is None:
             return None
 
-        base_dist = prediction.distribution
-        base_probs = base_dist.distribution
-        total_support = base_dist.total_support
+        base_probs = prediction.distribution
+        total_support = prediction.confidence.support
 
         adjusted = DistributionStats()
 
@@ -343,7 +342,7 @@ class ForecasterEngine:
 
             return PredictionResult(
                 key=prediction.key,
-                distribution=adjusted,
+                distribution_stats=adjusted,
                 contributions=prediction.contributions,
             )
 
@@ -373,7 +372,7 @@ class ForecasterEngine:
 
                 return PredictionResult(
                     key=prediction.key,
-                    distribution=adjusted,
+                    distribution_stats=adjusted,
                     contributions=prediction.contributions,
                 )
 

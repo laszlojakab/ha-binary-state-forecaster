@@ -85,7 +85,7 @@ class OnlineErrorTracker:
 
     def update(
         self: Self,
-        prediction: DistributionStats,
+        prediction: dict[State, float],
         y_true: State,
         timestamp: float,
     ) -> None:
@@ -102,7 +102,7 @@ class OnlineErrorTracker:
             timestamp: Time of this observation (monotonically increasing).
 
         """
-        p = prediction.distribution.get(y_true, 0.0)
+        p = prediction.get(y_true, 0.0)
 
         # Clamp to avoid log(0)
         error = -math.log(max(p, 1e-12))

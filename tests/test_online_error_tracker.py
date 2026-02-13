@@ -71,7 +71,7 @@ class TestOnlineErrorTrackerUpdate:
         dist = DistributionStats()
         dist.update("on", 1.0)
 
-        tracker.update(dist, "on", 100.0)
+        tracker.update(dist.distribution, "on", 100.0)
 
         # Error should be -log(1.0) = 0
         assert abs(tracker.mean - 0.0) < 1e-9
@@ -84,7 +84,7 @@ class TestOnlineErrorTrackerUpdate:
         dist = DistributionStats()
         dist.update("on", 1.0)
 
-        tracker.update(dist, "off", 100.0)
+        tracker.update(dist.distribution, "off", 100.0)
 
         # Error should be -log(1e-12) which is large
         assert tracker.mean > 10.0
@@ -98,7 +98,7 @@ class TestOnlineErrorTrackerUpdate:
         dist.update("on", 1.0)
         dist.update("off", 1.0)
 
-        tracker.update(dist, "on", 100.0)
+        tracker.update(dist.distribution, "on", 100.0)
 
         # Error should be -log(0.5) ≈ 0.693
         expected_error = -math.log(0.5)
@@ -115,7 +115,7 @@ class TestOnlineErrorTrackerUpdate:
 
         # Update multiple times with same prediction
         for i in range(5):
-            tracker.update(dist, "on", 100.0 + i * 10.0)
+            tracker.update(dist.distribution, "on", 100.0 + i * 10.0)
 
         # Mean should stabilize around -log(2/3)
         expected = -math.log(2.0 / 3.0)
@@ -129,11 +129,11 @@ class TestOnlineErrorTrackerUpdate:
         dist = DistributionStats()
         dist.update("on", 1.0)
 
-        tracker.update(dist, "on", 100.0)
+        tracker.update(dist.distribution, "on", 100.0)
         mean_before = tracker.mean
 
         # Update again at same timestamp
-        tracker.update(dist, "on", 100.0)
+        tracker.update(dist.distribution, "on", 100.0)
         mean_after = tracker.mean
 
         assert mean_before == mean_after
@@ -146,11 +146,11 @@ class TestOnlineErrorTrackerUpdate:
         dist = DistributionStats()
         dist.update("on", 1.0)
 
-        tracker.update(dist, "on", 100.0)
+        tracker.update(dist.distribution, "on", 100.0)
         mean_before = tracker.mean
 
         # Update with earlier timestamp
-        tracker.update(dist, "on", 50.0)
+        tracker.update(dist.distribution, "on", 50.0)
         mean_after = tracker.mean
 
         assert mean_before == mean_after
@@ -168,7 +168,7 @@ class TestOnlineErrorTrackerMeanProperty:
         dist.update("on", 3.0)
         dist.update("off", 1.0)
 
-        tracker.update(dist, "on", 100.0)
+        tracker.update(dist.distribution, "on", 100.0)
 
         # Mean should be -log(0.75)
         expected = -math.log(0.75)
@@ -182,7 +182,7 @@ class TestOnlineErrorTrackerMeanProperty:
         dist = DistributionStats()
         dist.update("on", 1.0)
 
-        tracker.update(dist, "on", 100.0)
+        tracker.update(dist.distribution, "on", 100.0)
 
         mean1 = tracker.mean
         mean2 = tracker.mean
@@ -200,7 +200,7 @@ class TestOnlineErrorTrackerStdProperty:
         dist = DistributionStats()
         dist.update("on", 1.0)
 
-        tracker.update(dist, "on", 100.0)
+        tracker.update(dist.distribution, "on", 100.0)
 
         # After first update, variance is 0
         assert tracker.std < 1e-5
@@ -213,13 +213,13 @@ class TestOnlineErrorTrackerStdProperty:
         # Perfect prediction
         dist1 = DistributionStats()
         dist1.update("on", 1.0)
-        tracker.update(dist1, "on", 100.0)
+        tracker.update(dist1.distribution, "on", 100.0)
 
         # Bad prediction
         dist2 = DistributionStats()
         dist2.update("on", 0.1)
         dist2.update("off", 0.9)
-        tracker.update(dist2, "on", 200.0)
+        tracker.update(dist2.distribution, "on", 200.0)
 
         # Should have some variance now
         assert tracker.std > 0.1
@@ -233,8 +233,8 @@ class TestOnlineErrorTrackerStdProperty:
         dist.update("on", 1.0)
         dist.update("off", 1.0)
 
-        tracker.update(dist, "on", 100.0)
-        tracker.update(dist, "off", 150.0)
+        tracker.update(dist.distribution, "on", 100.0)
+        tracker.update(dist.distribution, "off", 150.0)
 
         std1 = tracker.std
         std2 = tracker.std
@@ -253,7 +253,7 @@ class TestOnlineErrorTrackerDecay:
         dist_bad = DistributionStats()
         dist_bad.update("on", 0.01)
         dist_bad.update("off", 0.99)
-        tracker.update(dist_bad, "on", 0.0)
+        tracker.update(dist_bad.distribution, "on", 0.0)
 
         mean_after_bad = tracker.mean
 
@@ -262,9 +262,9 @@ class TestOnlineErrorTrackerDecay:
         dist_good.update("on", 1.0)
 
         # Multiple updates after 1 half-life
-        tracker.update(dist_good, "on", 50.0)
-        tracker.update(dist_good, "on", 100.0)
-        tracker.update(dist_good, "on", 150.0)
+        tracker.update(dist_good.distribution, "on", 50.0)
+        tracker.update(dist_good.distribution, "on", 100.0)
+        tracker.update(dist_good.distribution, "on", 150.0)
 
         mean_after_good = tracker.mean
 
@@ -286,15 +286,15 @@ class TestOnlineErrorTrackerDecay:
         dist_bad.update("on", 0.1)
         dist_bad.update("off", 0.9)
 
-        tracker_fast.update(dist_bad, "on", 0.0)
-        tracker_slow.update(dist_bad, "on", 0.0)
+        tracker_fast.update(dist_bad.distribution, "on", 0.0)
+        tracker_slow.update(dist_bad.distribution, "on", 0.0)
 
         # Good prediction after time
         dist_good = DistributionStats()
         dist_good.update("on", 1.0)
 
-        tracker_fast.update(dist_good, "on", 50.0)
-        tracker_slow.update(dist_good, "on", 50.0)
+        tracker_fast.update(dist_good.distribution, "on", 50.0)
+        tracker_slow.update(dist_good.distribution, "on", 50.0)
 
         # Fast decay should adapt quicker
         assert tracker_fast.mean < tracker_slow.mean
@@ -312,7 +312,7 @@ class TestOnlineErrorTrackerEdgeCases:
         dist.update("on", 1.0)
 
         # Predict "on" but observe "off" (not in distribution)
-        tracker.update(dist, "off", 100.0)
+        tracker.update(dist.distribution, "off", 100.0)
 
         # Should clamp to 1e-12 and compute -log(1e-12)
         expected = -math.log(1e-12)
@@ -327,7 +327,7 @@ class TestOnlineErrorTrackerEdgeCases:
         dist.update("on", 1000.0)
         dist.update("off", 1.0)
 
-        tracker.update(dist, "on", 100.0)
+        tracker.update(dist.distribution, "on", 100.0)
 
         # Error should be very small
         assert tracker.mean < 0.01
@@ -341,7 +341,7 @@ class TestOnlineErrorTrackerEdgeCases:
         dist.update("on", 1.0)
 
         for i in range(10):
-            tracker.update(dist, "on", 100.0 + i * 10.0)
+            tracker.update(dist.distribution, "on", 100.0 + i * 10.0)
 
         # Mean should be 0
         assert abs(tracker.mean - 0.0) < 1e-9
@@ -355,7 +355,7 @@ class TestOnlineErrorTrackerEdgeCases:
         dist.update("on", 1.0)
 
         for i in range(10):
-            tracker.update(dist, "off", 100.0 + i * 10.0)
+            tracker.update(dist.distribution, "off", 100.0 + i * 10.0)
 
         # Mean should be -log(1e-12)
         expected = -math.log(1e-12)
@@ -376,9 +376,9 @@ class TestOnlineErrorTrackerEdgeCases:
 
         for i in range(20):
             if i % 2 == 0:
-                tracker.update(dist_good, "on", 100.0 + i * 10.0)
+                tracker.update(dist_good.distribution, "on", 100.0 + i * 10.0)
             else:
-                tracker.update(dist_bad, "on", 100.0 + i * 10.0)
+                tracker.update(dist_bad.distribution, "on", 100.0 + i * 10.0)
 
         # Should have some mean and variance
         assert tracker.mean > 0.0
@@ -399,7 +399,7 @@ class TestOnlineErrorTrackerIntegration:
         dist_uncertain.update("off", 1.0)
 
         for i in range(10):
-            tracker.update(dist_uncertain, "on", i * 10.0)
+            tracker.update(dist_uncertain.distribution, "on", i * 10.0)
 
         mean_uncertain = tracker.mean
 
@@ -409,7 +409,7 @@ class TestOnlineErrorTrackerIntegration:
         dist_confident.update("off", 1.0)
 
         for i in range(10, 20):
-            tracker.update(dist_confident, "on", i * 10.0)
+            tracker.update(dist_confident.distribution, "on", i * 10.0)
 
         mean_confident = tracker.mean
 
@@ -430,7 +430,7 @@ class TestOnlineErrorTrackerSerialization:
         dist = DistributionStats()
         dist.update("on", 1.0)
 
-        tracker.update(dist, "on", 100.0)
+        tracker.update(dist.distribution, "on", 100.0)
 
         data = tracker.to_dict()
         assert isinstance(data, dict)
@@ -448,8 +448,8 @@ class TestOnlineErrorTrackerSerialization:
         dist.update("on", 2.0)
         dist.update("off", 1.0)
 
-        tracker.update(dist, "on", 100.0)
-        tracker.update(dist, "on", 150.0)
+        tracker.update(dist.distribution, "on", 100.0)
+        tracker.update(dist.distribution, "on", 150.0)
 
         data = tracker.to_dict()
 
@@ -483,7 +483,7 @@ class TestOnlineErrorTrackerSerialization:
             dist = DistributionStats()
             dist.update("on", prob_on)
             dist.update("off", 1.0 - prob_on)
-            tracker.update(dist, true_state, i * 100.0)
+            tracker.update(dist.distribution, true_state, i * 100.0)
 
         # Should have reasonable mean and std
         assert tracker.mean > 0.0

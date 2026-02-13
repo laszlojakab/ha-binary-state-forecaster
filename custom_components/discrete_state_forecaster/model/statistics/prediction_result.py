@@ -6,8 +6,11 @@ complete result of a prediction, including the predicted distribution and
 information about which temporal levels contributed to the prediction.
 """
 
+import math
 from dataclasses import dataclass
+from typing import Self
 
+from custom_components.discrete_state_forecaster.model.state import State
 from custom_components.discrete_state_forecaster.model.statistics.distribution_stats import (
     DistributionStats,
 )
@@ -15,6 +18,7 @@ from custom_components.discrete_state_forecaster.model.temporal.time_key import 
     TimeKey,
 )
 
+from .confidence import Confidence
 from .contribution import Contribution
 
 
@@ -59,5 +63,33 @@ class PredictionResult:
     """  # noqa: E501
 
     key: TimeKey
-    distribution: DistributionStats
+    distribution: dict[State, float]
+    confidence: Confidence  # TODO: docs...
     contributions: tuple[Contribution, ...]
+
+    def __init__(
+        self: Self,
+        key: TimeKey,
+        distribution_stats: DistributionStats,
+        contributions: tuple[Contribution, ...],
+    ):
+        object.__setattr__(self, "key", key)
+        object.__setattr__(self, "distribution", distribution_stats.distribution)
+
+        n = len(distribution_stats.distribution)
+        entropy = distribution_stats.entropy()
+        max_entropy = math.log(n) if n > 1 else 1.0
+        entropy_conf = 1.0 - (entropy / max_entropy)
+
+        object.__setattr__(
+            self,
+            "confidence",
+            Confidence(
+                support=distribution_stats.total_support,
+                depth=len(contributions) - 1,
+                max_probability=distribution_stats.max_probability(),
+                entropy_confidence=entropy_conf,
+            ),
+        )
+
+        object.__setattr__(self, "contributions", contributions)

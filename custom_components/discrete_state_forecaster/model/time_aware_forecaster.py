@@ -114,7 +114,7 @@ class TimeAwareForecaster:
         Example:
             >>> prediction = await forecaster.predict(datetime(2024, 1, 15, 15, 0))
             >>> if prediction:
-            ...     dist = prediction.distribution.distribution()
+            ...     dist = prediction.distribution
             ...     print(f"Probability of 'on': {dist.get('on', 0.0)}")
         """
         key = await self._indexer.get_key(timestamp)
@@ -201,7 +201,7 @@ class TimeAwareForecaster:
 
             # Forward simulation of state
             if simulate_state_path:
-                dist = prediction.distribution.distribution
+                dist = prediction.distribution
 
                 if dist:
                     # Select most likely (argmax) state

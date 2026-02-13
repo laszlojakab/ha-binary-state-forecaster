@@ -214,7 +214,7 @@ class TestForecasterEnginePredict:
 
         prediction = engine.predict(key)
         assert prediction is not None
-        dist = prediction.distribution.distribution
+        dist = prediction.distribution
         # Both states should be present
         assert "on" in dist
         assert "off" in dist
@@ -389,7 +389,7 @@ class TestForecasterEngineIntegration:
         assert persistence_prediction is not None
 
         # Should predict "on" with high probability
-        dist = prediction.distribution.distribution
+        dist = prediction.distribution
         assert "on" in dist
         assert dist["on"] > 0.5
 
@@ -408,7 +408,7 @@ class TestForecasterEngineIntegration:
         assert prediction is not None
 
         # Distribution should reflect both states
-        dist = prediction.distribution.distribution
+        dist = prediction.distribution
         assert "on" in dist
         assert "off" in dist
 

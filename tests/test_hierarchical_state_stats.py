@@ -117,7 +117,7 @@ class TestHierarchicalStateStatsUpdate:
         result = stats.predict(key)
         assert result is not None
         # Support should be accumulated
-        assert result.distribution.total_support >= 10.0
+        assert result.confidence.support >= 10.0
 
     def test_update_with_different_states(self: Self) -> None:
         """Test updating with different states."""
@@ -136,7 +136,7 @@ class TestHierarchicalStateStatsUpdate:
 
         result = stats.predict(key)
         assert result is not None
-        dist = result.distribution.distribution
+        dist = result.distribution
         assert abs(dist["on"] - 0.5) < 1e-9
         assert abs(dist["off"] - 0.5) < 1e-9
 
@@ -259,13 +259,13 @@ class TestHierarchicalStateStatsApplyDecay:
         stats.update(key, "on", weight=100.0)
 
         result1 = stats.predict(key)
-        support1 = result1.distribution.total_support
+        support1 = result1.confidence.support
 
         # Apply decay
         stats.apply_decay(0.5)
 
         result2 = stats.predict(key)
-        support2 = result2.distribution.total_support
+        support2 = result2.confidence.support
 
         # Support should be reduced
         assert support2 < support1
@@ -285,8 +285,8 @@ class TestHierarchicalStateStatsApplyDecay:
         result = stats.predict(key)
         assert result is not None
         # Support should be reduced but still positive
-        assert result.distribution.total_support < 1000.0
-        assert result.distribution.total_support > 0
+        assert result.confidence.support < 1000.0
+        assert result.confidence.support > 0
 
     def test_apply_decay_at_all_levels(self: Self) -> None:
         """Test that decay affects all hierarchy levels."""
@@ -307,7 +307,7 @@ class TestHierarchicalStateStatsApplyDecay:
         specific_result = stats.predict(key1)
 
         # GLOBAL was updated twice (once directly, once via key1), so 200.0 -> 100.0
-        assert global_result.distribution.total_support == 100.0
+        assert global_result.confidence.support == 100.0
         # Specific level has its own copy affected
         assert specific_result is not None
 
@@ -330,7 +330,7 @@ class TestHierarchicalStateStatsPrune:
         result = stats.predict(key)
         if result is not None:
             # Rare state should be removed
-            states = result.distribution.states()
+            states = result.distribution
             assert "frequent" in states
             assert "rare" not in states
 
@@ -349,7 +349,7 @@ class TestHierarchicalStateStatsPrune:
         result = stats.predict(key)
         assert result is not None
         # Only higher-numbered states should remain
-        states = result.distribution.states()
+        states = result.distribution
         assert len(states) < 100
 
     def test_prune_empty_store(self: Self) -> None:
@@ -403,7 +403,7 @@ class TestHierarchicalStateStatsEdgeCases:
 
         result = stats.predict(key)
         assert result is not None
-        assert len(result.distribution.states()) == 100
+        assert len(result.distribution) == 100
 
     def test_zero_weight_update(self: Self) -> None:
         """Test updating with zero weight."""
@@ -426,7 +426,7 @@ class TestHierarchicalStateStatsEdgeCases:
 
         result = stats.predict(key)
         assert result is not None
-        assert result.distribution.total_support > 0
+        assert result.confidence.support > 0
 
 
 class TestHierarchicalStateStatsIntegration:
@@ -471,14 +471,14 @@ class TestHierarchicalStateStatsIntegration:
 
         # Get baseline prediction
         result1 = stats.predict(key)
-        support1 = result1.distribution.total_support
+        support1 = result1.confidence.support
 
         # Apply decay
         stats.apply_decay(0.8)
 
         # Predict again
         result2 = stats.predict(key)
-        support2 = result2.distribution.total_support
+        support2 = result2.confidence.support
 
         # Verify decay effect
         assert abs(support2 - support1 * 0.8) < 1e-6
@@ -495,14 +495,14 @@ class TestHierarchicalStateStatsIntegration:
 
         # Check before pruning
         result_before = stats.predict(key)
-        states_before = len(result_before.distribution.states())
+        states_before = len(result_before.distribution)
 
         # Prune
         stats.prune(epsilon=0.003, absolute_min=20.0)
 
         # Check after pruning
         result_after = stats.predict(key)
-        states_after = len(result_after.distribution.states())
+        states_after = len(result_after.distribution)
 
         # Rare state should be gone
         assert states_after <= states_before
@@ -539,7 +539,10 @@ class TestHierarchicalStateStatsSerialization:
 
     def test_to_dict_and_from_dict_roundtrip(self: Self) -> None:
         base_hp = HyperParameters(
-            half_life=50.0, min_prune_interval=10.0, prune_enabled=True, persistence_strength=0.5
+            half_life=50.0,
+            min_prune_interval=10.0,
+            prune_enabled=True,
+            persistence_strength=0.5,
         )
 
         hp = HierarchicalStateStatsHyperParameters(base_hp, min_support_factor=0.01)
@@ -561,4 +564,6 @@ class TestHierarchicalStateStatsSerialization:
         res = restored.predict(key)
         assert res is not None
         # Check that the restored distribution preserves support for 'on'
-        assert abs(res.distribution.to_dict()["states"]["on"]["support"] - 10.0) < 1e-9
+        on_contribution = next((c for c in res.contributions if c.key == key), None)
+        assert on_contribution is not None
+        assert abs(on_contribution.support - 10.0) < 1e-9
