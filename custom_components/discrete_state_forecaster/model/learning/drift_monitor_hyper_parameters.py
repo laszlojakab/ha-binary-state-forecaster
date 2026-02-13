@@ -5,7 +5,7 @@ This module provides configuration for the DriftMonitor, controlling how concept
 drift is detected through comparison of fast and slow baseline distributions.
 """
 
-from typing import Final, Self
+from typing import Any, Final, Self
 
 from custom_components.discrete_state_forecaster.model.hyper_parameters import (
     HyperParameters,
@@ -18,25 +18,48 @@ class DriftMonitorHyperParameters:
 
     Controls the behavior of drift detection including baseline half-lives,
     drift thresholds, and adaptive threshold adjustment.
-
-    Attributes:
-        _hyper_parameters: Base hyper-parameters.
-        _slow_half_life_factor: Multiplier for slow baseline half-life.
-        _slow_prune_threshold: Pruning threshold for slow baseline.
-        _slow_epsilon: Laplace smoothing for slow baseline.
-        _fast_half_life_factor: Multiplier for fast baseline half-life.
-        _fast_prune_threshold: Pruning threshold for fast baseline.
-        _fast_epsilon: Laplace smoothing for fast baseline.
-        _drift_half_life_factor: Multiplier for drift statistics half-life.
-        _tau_enter: Fixed drift threshold to enter drifting state.
-        _tau_exit: Fixed drift threshold to exit drifting state.
-        _adaptive_tau: Whether to compute thresholds adaptively.
-        _n_enter: Consecutive high-drift updates needed to enter drifting.
-        _n_exit: Consecutive low-drift updates needed to exit drifting.
-
     """
 
-    def __init__(
+    _hyper_parameters: Final[HyperParameters]
+    """Base hyper-parameters providing the half-life value used for baselines."""
+
+    _slow_half_life_factor: Final[float]
+    """Multiplier applied to base half-life to get slow baseline half-life."""
+
+    _slow_prune_threshold: Final[float]
+    """Pruning threshold for slow baseline to remove low-probability states."""
+
+    _slow_epsilon: Final[float]
+    """Laplace smoothing parameter for slow baseline to handle zero counts."""
+
+    _fast_half_life_factor: Final[float]
+    """Multiplier applied to base half-life to get fast baseline half-life."""
+
+    _fast_prune_threshold: Final[float]
+    """Pruning threshold for fast baseline to remove low-probability states."""
+
+    _fast_epsilon: Final[float]
+    """Laplace smoothing parameter for fast baseline to handle zero counts."""
+
+    _drift_half_life_factor: Final[float]
+    """Multiplier applied to base half-life to get drift statistics half-life."""
+
+    _tau_enter: Final[float]
+    """Fixed drift threshold to enter drifting state."""
+
+    _tau_exit: Final[float]
+    """Fixed drift threshold to exit drifting state."""
+
+    _adaptive_tau: Final[bool]
+    """Whether to compute thresholds adaptively based on drift history."""
+
+    _n_enter: Final[int]
+    """Consecutive high-drift updates needed to enter drifting state."""
+
+    _n_exit: Final[int]
+    """Consecutive low-drift updates needed to exit drifting state."""
+
+    def __init__(  # noqa: PLR0913
         self: Self,
         *,
         hyper_parameters: HyperParameters,
@@ -150,3 +173,58 @@ class DriftMonitorHyperParameters:
     def n_exit(self: Self) -> int:
         """Get number of consecutive low-drift updates to exit drifting."""
         return self._n_exit
+
+    def to_dict(self: Self) -> dict[str, Any]:
+        """
+        Serialize hyper-parameters to a dictionary.
+
+        Returns:
+            A dictionary containing all drift monitor hyper-parameters.
+        """
+        return {
+            "half_life": self.half_life,
+            "slow_half_life_factor": self.slow_half_life_factor,
+            "slow_prune_threshold": self.slow_prune_threshold,
+            "slow_epsilon": self.slow_epsilon,
+            "fast_half_life_factor": self.fast_half_life_factor,
+            "fast_prune_threshold": self.fast_prune_threshold,
+            "fast_epsilon": self.fast_epsilon,
+            "drift_half_life_factor": self.drift_half_life_factor,
+            "tau_enter": self.tau_enter,
+            "tau_exit": self.tau_exit,
+            "adaptive_tau": self.adaptive_tau,
+            "n_enter": self.n_enter,
+            "n_exit": self.n_exit,
+        }
+
+    @classmethod
+    def from_dict(
+        cls,
+        data: dict[str, Any],
+        hyper_parameters: HyperParameters,
+    ) -> Self:
+        """
+        Create an instance from a dictionary.
+
+        Args:
+            data: Dictionary containing all drift monitor hyper-parameters.
+            hyper_parameters: Base hyper-parameters to use for the instance.
+
+        Returns:
+            A new DriftMonitorHyperParameters instance initialized with the provided data.
+        """
+        return cls(
+            hyper_parameters=hyper_parameters,
+            slow_half_life_factor=data["slow_half_life_factor"],
+            slow_prune_threshold=data["slow_prune_threshold"],
+            slow_epsilon=data["slow_epsilon"],
+            fast_half_life_factor=data["fast_half_life_factor"],
+            fast_prune_threshold=data["fast_prune_threshold"],
+            fast_epsilon=data["fast_epsilon"],
+            drift_half_life_factor=data["drift_half_life_factor"],
+            tau_enter=data["tau_enter"],
+            tau_exit=data["tau_exit"],
+            adaptive_tau=data["adaptive_tau"],
+            n_enter=data["n_enter"],
+            n_exit=data["n_exit"],
+        )

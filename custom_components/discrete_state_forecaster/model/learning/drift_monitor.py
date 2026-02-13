@@ -7,8 +7,11 @@ diverge significantly, it indicates that the underlying data patterns are changi
 """
 
 import math
-from typing import Final, Self
+from typing import Any, Final, Self
 
+from custom_components.discrete_state_forecaster.model.hyper_parameters import (
+    HyperParameters,
+)
 from custom_components.discrete_state_forecaster.model.state import (
     State,
 )
@@ -30,22 +33,7 @@ class DriftMonitor:
     Jensen-Shannon divergence to detect when the data distribution is changing.
     Uses consecutive threshold crossings with adaptive or fixed thresholds.
 
-    Attributes:
-        _hyper_parameters: Configuration for drift detection.
-        _fast_baseline: Quickly adapting baseline for recent patterns.
-        _slow_baseline: Slowly adapting baseline for established patterns.
-        _drift_stats: Statistics of drift magnitudes for adaptive thresholds.
-        _enter_counter: Count of consecutive high-drift updates.
-        _exit_counter: Count of consecutive low-drift updates.
-        _is_drifting: Current drift state.
-        _last_drift: Most recent drift magnitude.
-        _tau_enter: Current threshold for entering drift state.
-        _tau_exit: Current threshold for exiting drift state.
-
     Example:
-        >>> from custom_components.discrete_state_forecaster.model.hyper_parameters import (
-        ...     HyperParameters,
-        ... )
         >>> base_hp = HyperParameters(
         ...     half_life=50.0,
         ...     min_prune_interval=10.0,
@@ -61,6 +49,36 @@ class DriftMonitor:
 
     """
 
+    _hyper_parameters: Final[DriftMonitorHyperParameters]
+    """Configuration for drift detection."""
+
+    _fast_baseline: Final[DurationWeightedBaseline]
+    """Quickly adapting baseline for recent patterns."""
+
+    _slow_baseline: Final[DurationWeightedBaseline]
+    """Slowly adapting baseline for established patterns."""
+
+    _drift_stats: Final[DriftStats]
+    """Statistics of drift magnitudes for adaptive thresholds."""
+
+    _enter_counter: int
+    """Count of consecutive high-drift updates."""
+
+    _exit_counter: int
+    """Count of consecutive low-drift updates."""
+
+    _is_drifting: bool
+    """Current drift state."""
+
+    _last_drift: float
+    """Most recent drift magnitude."""
+
+    _tau_enter: float
+    """Current threshold for entering drift state."""
+
+    _tau_exit: float
+    """Current threshold for exiting drift state."""
+
     def __init__(
         self: Self,
         hyper_parameters: DriftMonitorHyperParameters,
@@ -72,8 +90,8 @@ class DriftMonitor:
             hyper_parameters: Configuration controlling drift detection behavior.
 
         """
-        self._hyper_parameters: Final = hyper_parameters
-        self._fast_baseline: Final = DurationWeightedBaseline(
+        self._hyper_parameters = hyper_parameters
+        self._fast_baseline = DurationWeightedBaseline(
             DurationWeightedBaselineHyperParameters(
                 hyper_parameters=hyper_parameters,
                 half_life_factor=hyper_parameters.fast_half_life_factor,
@@ -81,7 +99,7 @@ class DriftMonitor:
                 epsilon=hyper_parameters.fast_epsilon,
             )
         )
-        self._slow_baseline: Final = DurationWeightedBaseline(
+        self._slow_baseline = DurationWeightedBaseline(
             DurationWeightedBaselineHyperParameters(
                 hyper_parameters=hyper_parameters,
                 half_life_factor=hyper_parameters.slow_half_life_factor,
@@ -90,7 +108,7 @@ class DriftMonitor:
             )
         )
 
-        self._drift_stats: Final = DriftStats(
+        self._drift_stats = DriftStats(
             DriftStatsHyperParameters(
                 hyper_parameters=hyper_parameters,
                 half_life_factor=hyper_parameters.drift_half_life_factor,
@@ -222,3 +240,70 @@ class DriftMonitor:
             js += 0.5 * qk * math.log2(qk / mk)
 
         return js
+
+    def to_dict(self: Self) -> dict[str, Any]:
+        """
+        Serialize current state of the drift monitor to a dictionary.
+
+        Returns:
+            Dictionary containing current drift state, last drift magnitude,
+                thresholds, and statistics for both baselines.
+
+        """
+        return {
+            "hyper_parameters": self._hyper_parameters.to_dict(),
+            "fast_baseline": self._fast_baseline.to_dict(),
+            "slow_baseline": self._slow_baseline.to_dict(),
+            "drift_stats": self._drift_stats.to_dict(),
+            "enter_counter": self._enter_counter,
+            "exit_counter": self._exit_counter,
+            "is_drifting": self._is_drifting,
+            "last_drift": self._last_drift,
+            "tau_enter": self._tau_enter,
+            "tau_exit": self._tau_exit,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any], hyper_parameters: HyperParameters) -> Self:
+        """
+        Deserialize a DriftMonitor from a dictionary.
+
+        Args:
+            data: Dictionary containing all necessary information to reconstruct
+                the DriftMonitor, including hyper-parameters, baselines, and statistics.
+            hyper_parameters: External hyper-parameters to use for reconstruction.
+
+        Returns:
+            A new DriftMonitor instance initialized with the provided data, with
+            all internal state restored.
+        """
+        hyper_parameters = DriftMonitorHyperParameters.from_dict(
+            data["hyper_parameters"], hyper_parameters
+        )
+        monitor = cls(hyper_parameters=hyper_parameters)
+        monitor._fast_baseline = DurationWeightedBaseline.from_dict(
+            data["fast_baseline"],
+            DurationWeightedBaselineHyperParameters.from_dict(
+                data["fast_baseline"]["hyper_parameters"], hyper_parameters
+            ),
+        )
+        monitor._slow_baseline = DurationWeightedBaseline.from_dict(
+            data["slow_baseline"],
+            DurationWeightedBaselineHyperParameters.from_dict(
+                data["slow_baseline"]["hyper_parameters"], hyper_parameters
+            ),
+        )
+        monitor._drift_stats = DriftStats.from_dict(
+            data["drift_stats"],
+            DriftStatsHyperParameters.from_dict(
+                data["drift_stats"]["hyper_parameters"], hyper_parameters
+            ),
+        )
+        monitor._enter_counter = data["enter_counter"]
+        monitor._exit_counter = data["exit_counter"]
+        monitor._is_drifting = data["is_drifting"]
+        monitor._last_drift = data["last_drift"]
+        monitor._tau_enter = data["tau_enter"]
+        monitor._tau_exit = data["tau_exit"]
+
+        return monitor
