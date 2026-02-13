@@ -9,13 +9,13 @@ from typing import Self
 from custom_components.discrete_state_forecaster.model.hyper_parameters import (
     HyperParameters,
 )
-from custom_components.discrete_state_forecaster.model.learning.drift_monitor_hyper_parameters import (
+from custom_components.discrete_state_forecaster.model.learning.drift_monitor_hyper_parameters import (  # noqa: E501
     DriftMonitorHyperParameters,
 )
 from custom_components.discrete_state_forecaster.model.learning.duration_weighted_baseline import (
     DurationWeightedBaseline,
 )
-from custom_components.discrete_state_forecaster.model.learning.duration_weighted_baseline_hyper_parameters import (
+from custom_components.discrete_state_forecaster.model.learning.duration_weighted_baseline_hyper_parameters import (  # noqa: E501
     DurationWeightedBaselineHyperParameters,
 )
 
@@ -283,3 +283,165 @@ class TestDurationWeightedBaselineEdgeCases:
         result = baseline.distribution()
         # Should reflect the shift
         assert result.get("off", 0) > 0.3
+
+
+class TestDurationWeightedBaselineInstanceIsolation:
+    """Tests for instance isolation (verifies bug fix)."""
+
+    def test_instances_dont_share_mass(self: Self) -> None:
+        """Test that multiple instances don't share mass dictionary."""
+        hp = create_test_hp()
+        baseline1 = DurationWeightedBaseline(hp)
+        baseline2 = DurationWeightedBaseline(hp)
+
+        baseline1.update({"on": 1.0}, 100.0)
+        baseline1.update({"on": 1.0}, 110.0)
+
+        baseline2.update({"off": 1.0}, 100.0)
+        baseline2.update({"off": 1.0}, 110.0)
+
+        dist1 = baseline1.distribution()
+        dist2 = baseline2.distribution()
+
+        # Each should have only their own state
+        assert "on" in dist1
+        assert "off" not in dist1
+        assert "off" in dist2
+        assert "on" not in dist2
+
+    def test_instances_dont_share_timestamp(self: Self) -> None:
+        """Test that instances have independent timestamps."""
+        hp = create_test_hp()
+        baseline1 = DurationWeightedBaseline(hp)
+        baseline2 = DurationWeightedBaseline(hp)
+
+        baseline1.update({"on": 1.0}, 100.0)
+        baseline1.update({"on": 1.0}, 150.0)
+
+        baseline2.update({"off": 1.0}, 200.0)
+        baseline2.update({"off": 1.0}, 210.0)
+
+        # Different time deltas should result in different masses
+        mass1 = baseline1.total_mass()
+        mass2 = baseline2.total_mass()
+
+        # baseline1 had dt=50, baseline2 had dt=10
+        assert mass1 > mass2 * 4  # Roughly 5x since dt is 5x
+
+    def test_multiple_instances_independent_updates(self: Self) -> None:
+        """Test that updates to one instance don't affect others."""
+        hp = create_test_hp()
+        baselines = [DurationWeightedBaseline(hp) for _ in range(3)]
+
+        for i, baseline in enumerate(baselines):
+            state = f"state{i}"
+            baseline.update({state: 1.0}, 100.0)
+            baseline.update({state: 1.0}, 110.0)
+
+        # Each should have only their own state
+        for i, baseline in enumerate(baselines):
+            dist = baseline.distribution()
+            expected_state = f"state{i}"
+            assert expected_state in dist
+            assert len(dist) == 1
+
+
+class TestDurationWeightedBaselineSerialization:
+    """Tests for serialization and deserialization."""
+
+    def test_to_dict_structure(self: Self) -> None:
+        """Test that to_dict returns correct structure."""
+        hp = create_test_hp()
+        baseline = DurationWeightedBaseline(hp)
+
+        baseline.update({"on": 0.6, "off": 0.4}, 100.0)
+        baseline.update({"on": 0.6, "off": 0.4}, 110.0)
+
+        data = baseline.to_dict()
+
+        assert "hyper_parameters" in data
+        assert "mass" in data
+        assert "last_ts" in data
+        assert isinstance(data["mass"], dict)
+
+    def test_from_dict_reconstruction(self: Self) -> None:
+        """Test reconstruction from dictionary."""
+        hp = create_test_hp()
+        data = {
+            "hyper_parameters": hp.to_dict(),
+            "mass": {"on": 100.0, "off": 50.0},
+            "last_ts": 200.0,
+        }
+
+        baseline = DurationWeightedBaseline.from_dict(data, hp)
+
+        assert baseline.total_mass() == 150.0
+        dist = baseline.distribution()
+        assert "on" in dist
+        assert "off" in dist
+
+    def test_round_trip_serialization(self: Self) -> None:
+        """Test that serialization and deserialization preserves state."""
+        hp = create_test_hp()
+        original = DurationWeightedBaseline(hp)
+
+        original.update({"on": 0.7, "off": 0.3}, 100.0)
+        original.update({"on": 0.7, "off": 0.3}, 120.0)
+        original.update({"on": 0.6, "off": 0.4}, 140.0)
+
+        data = original.to_dict()
+        restored = DurationWeightedBaseline.from_dict(data, hp)
+
+        assert abs(restored.total_mass() - original.total_mass()) < 1e-9
+
+        orig_dist = original.distribution()
+        rest_dist = restored.distribution()
+
+        for state in orig_dist:
+            assert abs(orig_dist[state] - rest_dist[state]) < 1e-9
+
+    def test_serialization_with_no_updates(self: Self) -> None:
+        """Test serialization before any updates."""
+        hp = create_test_hp()
+        baseline = DurationWeightedBaseline(hp)
+
+        data = baseline.to_dict()
+        restored = DurationWeightedBaseline.from_dict(data, hp)
+
+        assert restored.total_mass() == 0.0
+        assert restored.distribution() == {}
+
+    def test_serialization_preserves_mass_dict(self: Self) -> None:
+        """Test that serialization creates a copy of mass dict."""
+        hp = create_test_hp()
+        baseline = DurationWeightedBaseline(hp)
+
+        baseline.update({"on": 1.0}, 100.0)
+        baseline.update({"on": 1.0}, 110.0)
+
+        data = baseline.to_dict()
+        original_mass = baseline.total_mass()
+
+        # Modify the serialized dict
+        data["mass"]["on"] = 999.0
+
+        # Original baseline should be unchanged
+        assert abs(baseline.total_mass() - original_mass) < 1e-9
+        assert baseline.total_mass() != 999.0
+
+    def test_deserialization_creates_copy(self: Self) -> None:
+        """Test that deserialization creates independent copy."""
+        hp = create_test_hp()
+        data = {
+            "hyper_parameters": hp.to_dict(),
+            "mass": {"on": 100.0},
+            "last_ts": 200.0,
+        }
+
+        baseline = DurationWeightedBaseline.from_dict(data, hp)
+
+        # Modify the source dict
+        data["mass"]["on"] = 999.0
+
+        # Restored baseline should be unchanged
+        assert baseline.total_mass() == 100.0

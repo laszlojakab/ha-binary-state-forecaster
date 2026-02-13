@@ -107,10 +107,10 @@ class DurationWeightedBaselineHyperParameters:
 
     def to_dict(self: Self) -> dict[str, Any]:
         """
-        Serializes the instance into a dictionary.
+        Serialize the instance into a dictionary.
 
         Returns:
-            A dictionary representation of the instance, including hyper-parameters.
+            A dictionary containing half_life_factor, prune_threshold, and epsilon.
         """
         return {
             "half_life_factor": self._half_life_factor,
@@ -123,12 +123,16 @@ class DurationWeightedBaselineHyperParameters:
         cls, data: dict[str, Any], hyper_parameters: DriftMonitorHyperParameters
     ) -> DurationWeightedBaselineHyperParameters:
         """
-        Deserializes an instance from a dictionary.
+        Deserialize an instance from a dictionary.
 
         Args:
-            data: Dictionary containing serialized hyper-parameters.
-            hyper_parameters: Parent drift monitor configuration needed to reconstruct
-                the DurationWeightedBaselineHyperParameters.
+            data: Dictionary containing serialized half_life_factor, prune_threshold,
+                and epsilon values.
+            hyper_parameters: Parent drift monitor configuration providing the base
+                half-life value used to compute the baseline half-life.
+
+        Returns:
+            A new DurationWeightedBaselineHyperParameters instance.
         """
         return cls(
             hyper_parameters=hyper_parameters,

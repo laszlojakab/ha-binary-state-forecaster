@@ -29,10 +29,6 @@ class KeyedDistributionStore:
     objects. Supports bulk operations across all stored distributions and
     provides aggregation across multiple distributions with confidence thresholds.
 
-    Attributes:
-        _store: Dictionary mapping hashable keys to their associated
-            DistributionStats objects.
-
     Example:
         >>> store = KeyedDistributionStore()
         >>> store.update("breakfast", "on", weight=2.0)
@@ -43,6 +39,9 @@ class KeyedDistributionStore:
         {'on': 0.6667, 'off': 0.3333}
 
     """
+
+    _store: dict[Hashable, DistributionStats]
+    """Dictionary mapping hashable keys to their associated DistributionStats."""
 
     def __init__(self: Self) -> None:
         """Initializes an empty distribution store."""

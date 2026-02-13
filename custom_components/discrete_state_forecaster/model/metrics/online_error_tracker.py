@@ -56,11 +56,11 @@ class OnlineErrorTracker:
 
     _hyper_parameters: Final[OnlineErrorTrackerHyperParameters]
     """Configuration controlling error decay and tracking."""
-    _mean: float = 0.0
+    _mean: float
     """Current mean of negative log-likelihood errors."""
-    _var: float = 0.0
+    _var: float
     """Current variance of negative log-likelihood errors."""
-    _last_ts: float | None = None
+    _last_ts: float | None
     """Timestamp of last update, or None if never updated."""
 
     def __init__(
@@ -74,6 +74,9 @@ class OnlineErrorTracker:
             hyper_parameters: Configuration controlling error decay and tracking.
         """
         self._hyper_parameters = hyper_parameters
+        self._mean = 0.0
+        self._var = 0.0
+        self._last_ts = None
 
     def update(
         self: Self,

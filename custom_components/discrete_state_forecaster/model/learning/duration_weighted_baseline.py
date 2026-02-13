@@ -10,7 +10,7 @@ decays exponentially.
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING, Final, Self
+from typing import TYPE_CHECKING, Any, Final, Self
 
 if TYPE_CHECKING:
     from custom_components.discrete_state_forecaster.model.state import (
@@ -55,7 +55,7 @@ class DurationWeightedBaseline:
     _hyper_parameters: Final[DurationWeightedBaselineHyperParameters]
     """Configuration controlling decay and smoothing."""
 
-    _mass: Final[dict[State, float]]
+    _mass: dict[State, float]
     """Accumulated mass for each state."""
 
     _last_ts: float | None
@@ -147,12 +147,13 @@ class DurationWeightedBaseline:
         """
         return sum(self._mass.values())
 
-    def to_dict(self: Self) -> dict:
+    def to_dict(self: Self) -> dict[str, Any]:
         """
         Serialize baseline state to a dictionary.
 
         Returns:
-            Dictionary containing hyper-parameters and current mass state.
+            Dictionary containing hyper-parameters, accumulated mass for each state,
+            and the timestamp of the last update.
 
         """
         return {
@@ -164,18 +165,20 @@ class DurationWeightedBaseline:
     @classmethod
     def from_dict(
         cls,
-        data: dict,
+        data: dict[str, Any],
         hyper_parameters: DurationWeightedBaselineHyperParameters,
     ) -> DurationWeightedBaseline:
         """
         Deserialize baseline state from a dictionary.
 
         Args:
-            data: Dictionary containing serialized state and hyper-parameters.
-            hyper_parameters: Hyper-parameters to use for the instance.
+            data: Dictionary containing serialized state including mass dict
+                and last_ts timestamp.
+            hyper_parameters: Hyper-parameters to use for the reconstructed instance.
 
         Returns:
-            A DurationWeightedBaseline instance initialized with the provided data.
+            A DurationWeightedBaseline instance initialized with the provided data,
+            with all internal state restored.
         """
         instance = cls(hyper_parameters=hyper_parameters)
         instance._mass = dict(data["mass"])

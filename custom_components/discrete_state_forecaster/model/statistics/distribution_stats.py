@@ -43,7 +43,7 @@ class DistributionStats:
         0.6667
     """
 
-    _states: Final[dict[State, StateStats]] = {}
+    _states: Final[dict[State, StateStats]]
     """Dictionary mapping each state to its cumulative support statistics."""
 
     def __init__(self: Self) -> None:
