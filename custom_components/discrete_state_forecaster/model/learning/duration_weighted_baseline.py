@@ -7,16 +7,19 @@ represents a distribution that was valid for dt seconds, and older evidence
 decays exponentially.
 """
 
+from __future__ import annotations
+
 import math
-from typing import Final, Self
+from typing import TYPE_CHECKING, Final, Self
 
-from custom_components.discrete_state_forecaster.model.state import (
-    State,
-)
+if TYPE_CHECKING:
+    from custom_components.discrete_state_forecaster.model.state import (
+        State,
+    )
 
-from .duration_weighted_baseline_hyper_parameters import (
-    DurationWeightedBaselineHyperParameters,
-)
+    from .duration_weighted_baseline_hyper_parameters import (
+        DurationWeightedBaselineHyperParameters,
+    )
 
 
 class DurationWeightedBaseline:
@@ -28,16 +31,7 @@ class DurationWeightedBaseline:
     the baseline to adapt to changing patterns while giving appropriate
     weight to how long each distribution persisted.
 
-    Attributes:
-        _hyper_parameters: Configuration controlling decay and smoothing.
-        _mass: Accumulated mass for each state.
-        _last_ts: Timestamp of last update, or None if never updated.
-
     Example:
-        >>> from custom_components.discrete_state_forecaster.model.hyper_parameters import (
-        ...     HyperParameters,
-        ... )
-        >>> from .drift_monitor_hyper_parameters import DriftMonitorHyperParameters
         >>> base_hp = HyperParameters(
         ...     half_life=50.0,
         ...     min_prune_interval=10.0,
@@ -56,8 +50,16 @@ class DurationWeightedBaseline:
         >>> result = baseline.distribution()
         >>> abs(result["on"] - 0.7) < 0.01
         True
-
     """
+
+    _hyper_parameters: Final[DurationWeightedBaselineHyperParameters]
+    """Configuration controlling decay and smoothing."""
+
+    _mass: Final[dict[State, float]]
+    """Accumulated mass for each state."""
+
+    _last_ts: float | None
+    """Timestamp of last update, or None if never updated."""
 
     def __init__(
         self: Self,
@@ -70,10 +72,9 @@ class DurationWeightedBaseline:
             hyper_parameters: Configuration controlling decay and smoothing.
 
         """
-        self._hyper_parameters: Final = hyper_parameters
-
-        self._mass: dict[State, float] = {}
-        self._last_ts: float | None = None
+        self._hyper_parameters = hyper_parameters
+        self._mass = {}
+        self._last_ts = None
 
     def update(
         self: Self,
@@ -131,7 +132,10 @@ class DurationWeightedBaseline:
         num_states = len(self._mass)
         denom = total + self._hyper_parameters.epsilon * num_states
 
-        return {s: (m + self._hyper_parameters.epsilon) / denom for s, m in self._mass.items()}
+        return {
+            s: (m + self._hyper_parameters.epsilon) / denom
+            for s, m in self._mass.items()
+        }
 
     def total_mass(self: Self) -> float:
         """
@@ -142,3 +146,38 @@ class DurationWeightedBaseline:
 
         """
         return sum(self._mass.values())
+
+    def to_dict(self: Self) -> dict:
+        """
+        Serialize baseline state to a dictionary.
+
+        Returns:
+            Dictionary containing hyper-parameters and current mass state.
+
+        """
+        return {
+            "hyper_parameters": self._hyper_parameters.to_dict(),
+            "mass": dict(self._mass),
+            "last_ts": self._last_ts,
+        }
+
+    @classmethod
+    def from_dict(
+        cls,
+        data: dict,
+        hyper_parameters: DurationWeightedBaselineHyperParameters,
+    ) -> DurationWeightedBaseline:
+        """
+        Deserialize baseline state from a dictionary.
+
+        Args:
+            data: Dictionary containing serialized state and hyper-parameters.
+            hyper_parameters: Hyper-parameters to use for the instance.
+
+        Returns:
+            A DurationWeightedBaseline instance initialized with the provided data.
+        """
+        instance = cls(hyper_parameters=hyper_parameters)
+        instance._mass = dict(data["mass"])
+        instance._last_ts = data["last_ts"]
+        return instance

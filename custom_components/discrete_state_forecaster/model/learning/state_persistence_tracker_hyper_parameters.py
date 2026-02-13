@@ -73,7 +73,12 @@ class StatePersistenceTrackerHyperParameters:
         return self._hyper_parameters.half_life * self._persistence_half_life_factor
 
     def to_dict(self: Self) -> dict[str, Any]:
-        """Serializes the instance into a dictionary."""
+        """
+        Serialize the instance into a dictionary.
+
+        Returns:
+            A dictionary containing the persistence_half_life_factor.
+        """
         return {
             "persistence_half_life_factor": self._persistence_half_life_factor,
         }
@@ -83,12 +88,15 @@ class StatePersistenceTrackerHyperParameters:
         cls, data: dict[str, Any], hyper_parameters: HyperParameters
     ) -> StatePersistenceTrackerHyperParameters:
         """
-        Deserializes an instance from a dictionary.
+        Deserialize an instance from a dictionary.
 
         Args:
-            data: Dictionary containing serialized hyper-parameters.
-            hyper_parameters: Base hyper-parameters needed to reconstruct the
-                StatePersistenceTrackerHyperParameters.
+            data: Dictionary containing the serialized persistence_half_life_factor.
+            hyper_parameters: Base hyper-parameters providing the reference half_life
+                value used to compute the persistence half-life.
+
+        Returns:
+            A new StatePersistenceTrackerHyperParameters instance.
         """
         return cls(
             hyper_parameters=hyper_parameters,
