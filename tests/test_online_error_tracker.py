@@ -17,12 +17,15 @@ from custom_components.discrete_state_forecaster.model.metrics.online_error_trac
 from custom_components.discrete_state_forecaster.model.metrics.online_error_tracker_hyper_parameters import (  # noqa: E501
     OnlineErrorTrackerHyperParameters,
 )
+from custom_components.discrete_state_forecaster.model.metrics.online_error_tracker_runtime_parameters import (
+    OnlineErrorTrackerRuntimeParameters,
+)
 from custom_components.discrete_state_forecaster.model.statistics.distribution_stats import (
     DistributionStats,
 )
 
 
-def create_test_hp(error_half_life_factor: float = 1.0) -> OnlineErrorTrackerHyperParameters:
+def create_test_hp() -> OnlineErrorTrackerHyperParameters:
     """Create OnlineErrorTrackerHyperParameters for testing purposes."""
     base_hp = HyperParameters(
         half_life=50.0,
@@ -32,7 +35,15 @@ def create_test_hp(error_half_life_factor: float = 1.0) -> OnlineErrorTrackerHyp
     )
     return OnlineErrorTrackerHyperParameters(
         hyper_parameters=base_hp,
-        error_half_life_factor=error_half_life_factor,
+    )
+
+
+def create_test_rp(
+    error_half_life_factor: float = 1.0,
+) -> OnlineErrorTrackerRuntimeParameters:
+    """Create OnlineErrorTrackerRuntimeParameters for testing purposes."""
+    return OnlineErrorTrackerRuntimeParameters(
+        error_half_life_factor=error_half_life_factor
     )
 
 
@@ -42,20 +53,23 @@ class TestOnlineErrorTrackerInitialization:
     def test_create_default(self: Self) -> None:
         """Test creating OnlineErrorTracker with default hyper-parameters."""
         hp = create_test_hp()
-        tracker = OnlineErrorTracker(hp)
+        rp = create_test_rp()
+        tracker = OnlineErrorTracker(hp, rp)
         assert tracker.mean == 0.0
         assert tracker.std >= 0.0
 
     def test_initial_mean_is_zero(self: Self) -> None:
         """Test that initial mean error is zero."""
         hp = create_test_hp()
-        tracker = OnlineErrorTracker(hp)
+        rp = create_test_rp()
+        tracker = OnlineErrorTracker(hp, rp)
         assert tracker.mean == 0.0
 
     def test_initial_std_is_small(self: Self) -> None:
         """Test that initial std is very small (floor value)."""
         hp = create_test_hp()
-        tracker = OnlineErrorTracker(hp)
+        rp = create_test_rp()
+        tracker = OnlineErrorTracker(hp, rp)
         # Should be sqrt(max(0.0, 1e-12)) = sqrt(1e-12)
         assert tracker.std < 1e-5
 
@@ -66,7 +80,8 @@ class TestOnlineErrorTrackerUpdate:
     def test_first_update_perfect_prediction(self: Self) -> None:
         """Test first update with perfect prediction (p=1.0)."""
         hp = create_test_hp()
-        tracker = OnlineErrorTracker(hp)
+        rp = create_test_rp()
+        tracker = OnlineErrorTracker(hp, rp)
 
         dist = DistributionStats()
         dist.update("on", 1.0)
@@ -79,7 +94,8 @@ class TestOnlineErrorTrackerUpdate:
     def test_first_update_wrong_prediction(self: Self) -> None:
         """Test first update with completely wrong prediction."""
         hp = create_test_hp()
-        tracker = OnlineErrorTracker(hp)
+        rp = create_test_rp()
+        tracker = OnlineErrorTracker(hp, rp)
 
         dist = DistributionStats()
         dist.update("on", 1.0)
@@ -92,7 +108,8 @@ class TestOnlineErrorTrackerUpdate:
     def test_first_update_uncertain_prediction(self: Self) -> None:
         """Test first update with uncertain prediction."""
         hp = create_test_hp()
-        tracker = OnlineErrorTracker(hp)
+        rp = create_test_rp()
+        tracker = OnlineErrorTracker(hp, rp)
 
         dist = DistributionStats()
         dist.update("on", 1.0)
@@ -106,8 +123,9 @@ class TestOnlineErrorTrackerUpdate:
 
     def test_multiple_updates_same_prediction(self: Self) -> None:
         """Test multiple updates with same prediction quality."""
-        hp = create_test_hp(error_half_life_factor=1.0)
-        tracker = OnlineErrorTracker(hp)
+        hp = create_test_hp()
+        rp = create_test_rp(error_half_life_factor=1.0)
+        tracker = OnlineErrorTracker(hp, rp)
 
         dist = DistributionStats()
         dist.update("on", 2.0)
@@ -124,7 +142,8 @@ class TestOnlineErrorTrackerUpdate:
     def test_update_with_zero_time_delta(self: Self) -> None:
         """Test that update with zero time delta doesn't change statistics."""
         hp = create_test_hp()
-        tracker = OnlineErrorTracker(hp)
+        rp = create_test_rp()
+        tracker = OnlineErrorTracker(hp, rp)
 
         dist = DistributionStats()
         dist.update("on", 1.0)
@@ -141,7 +160,8 @@ class TestOnlineErrorTrackerUpdate:
     def test_update_with_negative_time_delta(self: Self) -> None:
         """Test that update with negative time delta doesn't change statistics."""
         hp = create_test_hp()
-        tracker = OnlineErrorTracker(hp)
+        rp = create_test_rp()
+        tracker = OnlineErrorTracker(hp, rp)
 
         dist = DistributionStats()
         dist.update("on", 1.0)
@@ -162,7 +182,8 @@ class TestOnlineErrorTrackerMeanProperty:
     def test_mean_after_single_update(self: Self) -> None:
         """Test mean after single update."""
         hp = create_test_hp()
-        tracker = OnlineErrorTracker(hp)
+        rp = create_test_rp()
+        tracker = OnlineErrorTracker(hp, rp)
 
         dist = DistributionStats()
         dist.update("on", 3.0)
@@ -177,7 +198,8 @@ class TestOnlineErrorTrackerMeanProperty:
     def test_mean_multiple_calls(self: Self) -> None:
         """Test that mean returns same value on multiple calls."""
         hp = create_test_hp()
-        tracker = OnlineErrorTracker(hp)
+        rp = create_test_rp()
+        tracker = OnlineErrorTracker(hp, rp)
 
         dist = DistributionStats()
         dist.update("on", 1.0)
@@ -195,7 +217,8 @@ class TestOnlineErrorTrackerStdProperty:
     def test_std_after_first_update(self: Self) -> None:
         """Test std after first update is near zero."""
         hp = create_test_hp()
-        tracker = OnlineErrorTracker(hp)
+        rp = create_test_rp()
+        tracker = OnlineErrorTracker(hp, rp)
 
         dist = DistributionStats()
         dist.update("on", 1.0)
@@ -207,8 +230,9 @@ class TestOnlineErrorTrackerStdProperty:
 
     def test_std_with_varying_errors(self: Self) -> None:
         """Test std increases with varying prediction quality."""
-        hp = create_test_hp(error_half_life_factor=10.0)
-        tracker = OnlineErrorTracker(hp)
+        hp = create_test_hp()
+        rp = create_test_rp(error_half_life_factor=10.0)
+        tracker = OnlineErrorTracker(hp, rp)
 
         # Perfect prediction
         dist1 = DistributionStats()
@@ -227,7 +251,8 @@ class TestOnlineErrorTrackerStdProperty:
     def test_std_multiple_calls(self: Self) -> None:
         """Test that std returns same value on multiple calls."""
         hp = create_test_hp()
-        tracker = OnlineErrorTracker(hp)
+        rp = create_test_rp()
+        tracker = OnlineErrorTracker(hp, rp)
 
         dist = DistributionStats()
         dist.update("on", 1.0)
@@ -246,8 +271,9 @@ class TestOnlineErrorTrackerDecay:
 
     def test_decay_reduces_old_error_influence(self: Self) -> None:
         """Test that old errors have less influence after time passes."""
-        hp = create_test_hp(error_half_life_factor=1.0)
-        tracker = OnlineErrorTracker(hp)
+        hp = create_test_hp()
+        rp = create_test_rp(error_half_life_factor=1.0)
+        tracker = OnlineErrorTracker(hp, rp)
 
         # Large error
         dist_bad = DistributionStats()
@@ -274,12 +300,14 @@ class TestOnlineErrorTrackerDecay:
     def test_decay_with_different_half_lives(self: Self) -> None:
         """Test decay behavior with different half-life factors."""
         # Fast decay
-        hp_fast = create_test_hp(error_half_life_factor=0.1)
-        tracker_fast = OnlineErrorTracker(hp_fast)
+        hp_fast = create_test_hp()
+        rp_fast = create_test_rp(error_half_life_factor=0.1)
+        tracker_fast = OnlineErrorTracker(hp_fast, rp_fast)
 
         # Slow decay
-        hp_slow = create_test_hp(error_half_life_factor=10.0)
-        tracker_slow = OnlineErrorTracker(hp_slow)
+        hp_slow = create_test_hp()
+        rp_slow = create_test_rp(error_half_life_factor=10.0)
+        tracker_slow = OnlineErrorTracker(hp_slow, rp_slow)
 
         # Initial bad error
         dist_bad = DistributionStats()
@@ -306,7 +334,8 @@ class TestOnlineErrorTrackerEdgeCases:
     def test_prediction_with_zero_probability(self: Self) -> None:
         """Test handling of prediction with zero probability for true state."""
         hp = create_test_hp()
-        tracker = OnlineErrorTracker(hp)
+        rp = create_test_rp()
+        tracker = OnlineErrorTracker(hp, rp)
 
         dist = DistributionStats()
         dist.update("on", 1.0)
@@ -321,7 +350,8 @@ class TestOnlineErrorTrackerEdgeCases:
     def test_very_confident_correct_prediction(self: Self) -> None:
         """Test with very confident correct prediction."""
         hp = create_test_hp()
-        tracker = OnlineErrorTracker(hp)
+        rp = create_test_rp()
+        tracker = OnlineErrorTracker(hp, rp)
 
         dist = DistributionStats()
         dist.update("on", 1000.0)
@@ -335,7 +365,8 @@ class TestOnlineErrorTrackerEdgeCases:
     def test_sequence_of_perfect_predictions(self: Self) -> None:
         """Test sequence of perfect predictions."""
         hp = create_test_hp()
-        tracker = OnlineErrorTracker(hp)
+        rp = create_test_rp()
+        tracker = OnlineErrorTracker(hp, rp)
 
         dist = DistributionStats()
         dist.update("on", 1.0)
@@ -349,7 +380,8 @@ class TestOnlineErrorTrackerEdgeCases:
     def test_sequence_of_wrong_predictions(self: Self) -> None:
         """Test sequence of completely wrong predictions."""
         hp = create_test_hp()
-        tracker = OnlineErrorTracker(hp)
+        rp = create_test_rp()
+        tracker = OnlineErrorTracker(hp, rp)
 
         dist = DistributionStats()
         dist.update("on", 1.0)
@@ -363,8 +395,9 @@ class TestOnlineErrorTrackerEdgeCases:
 
     def test_alternating_predictions(self: Self) -> None:
         """Test alternating between good and bad predictions."""
-        hp = create_test_hp(error_half_life_factor=10.0)
-        tracker = OnlineErrorTracker(hp)
+        hp = create_test_hp()
+        rp = create_test_rp(error_half_life_factor=10.0)
+        tracker = OnlineErrorTracker(hp, rp)
 
         dist_good = DistributionStats()
         dist_good.update("on", 0.9)
@@ -390,8 +423,9 @@ class TestOnlineErrorTrackerIntegration:
 
     def test_complete_tracking_workflow(self: Self) -> None:
         """Test complete workflow of tracking errors over time."""
-        hp = create_test_hp(error_half_life_factor=1.0)
-        tracker = OnlineErrorTracker(hp)
+        hp = create_test_hp()
+        rp = create_test_rp(error_half_life_factor=1.0)
+        tracker = OnlineErrorTracker(hp, rp)
 
         # Start with uncertain predictions
         dist_uncertain = DistributionStats()
@@ -421,11 +455,9 @@ class TestOnlineErrorTrackerSerialization:
     """Tests for OnlineErrorTracker serialization helpers."""
 
     def test_to_dict_contains_expected_keys(self: Self) -> None:
-        base_hp = HyperParameters(
-            half_life=50.0, min_prune_interval=10.0, prune_enabled=True, persistence_strength=0.95
-        )
-        hp = OnlineErrorTrackerHyperParameters(hyper_parameters=base_hp, error_half_life_factor=1.0)
-        tracker = OnlineErrorTracker(hp)
+        hp = create_test_hp()
+        rp = create_test_rp(error_half_life_factor=1.0)
+        tracker = OnlineErrorTracker(hp, rp)
 
         dist = DistributionStats()
         dist.update("on", 1.0)
@@ -434,15 +466,18 @@ class TestOnlineErrorTrackerSerialization:
 
         data = tracker.to_dict()
         assert isinstance(data, dict)
-        assert set(["mean", "var", "last_ts", "hyper_parameters"]).issubset(set(data.keys()))
-        assert isinstance(data["hyper_parameters"], dict)
+        assert set(["mean", "var", "last_ts"]).issubset(set(data.keys()))
 
     def test_from_dict_restores_tracker_state(self: Self) -> None:
         base_hp = HyperParameters(
-            half_life=60.0, min_prune_interval=10.0, prune_enabled=True, persistence_strength=0.9
+            half_life=60.0,
+            min_prune_interval=10.0,
+            prune_enabled=True,
+            persistence_strength=0.9,
         )
-        hp = OnlineErrorTrackerHyperParameters(hyper_parameters=base_hp, error_half_life_factor=0.5)
-        tracker = OnlineErrorTracker(hp)
+        hp = OnlineErrorTrackerHyperParameters(hyper_parameters=base_hp)
+        rp = create_test_rp(error_half_life_factor=0.5)
+        tracker = OnlineErrorTracker(hp, rp)
 
         dist = DistributionStats()
         dist.update("on", 2.0)
@@ -453,7 +488,7 @@ class TestOnlineErrorTrackerSerialization:
 
         data = tracker.to_dict()
 
-        restored = OnlineErrorTracker.from_dict(data, base_hp)
+        restored = OnlineErrorTracker.from_dict(data, hp, rp)
 
         # Numeric values restored
         assert abs(restored.mean - tracker.mean) < 1e-12
@@ -461,12 +496,19 @@ class TestOnlineErrorTrackerSerialization:
         assert restored._last_ts == tracker._last_ts
 
         # Hyper-parameters reconstructed correctly
-        assert abs(restored._hyper_parameters.error_half_life - hp.error_half_life) < 1e-12
+        assert (
+            abs(
+                restored._parameters.error_half_life
+                - tracker._parameters.error_half_life
+            )
+            < 1e-12
+        )
 
     def test_realistic_prediction_sequence(self: Self) -> None:
         """Test with realistic sequence of varying prediction quality."""
-        hp = create_test_hp(error_half_life_factor=2.0)
-        tracker = OnlineErrorTracker(hp)
+        hp = create_test_hp()
+        rp = create_test_rp(error_half_life_factor=2.0)
+        tracker = OnlineErrorTracker(hp, rp)
 
         # Sequence of predictions with varying confidence
         predictions = [

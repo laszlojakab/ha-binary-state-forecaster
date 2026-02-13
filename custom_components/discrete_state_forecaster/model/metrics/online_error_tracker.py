@@ -5,14 +5,16 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING, Any, Final, Self
 
-from .online_error_tracker_hyper_parameters import OnlineErrorTrackerHyperParameters
+from .online_error_tracker_parameters import OnlineErrorTrackerParameters
 
 if TYPE_CHECKING:
-    from custom_components.discrete_state_forecaster.model.hyper_parameters import (
-        HyperParameters,
-    )
     from custom_components.discrete_state_forecaster.model.state import (
         State,
+    )
+
+    from .online_error_tracker_hyper_parameters import OnlineErrorTrackerHyperParameters
+    from .online_error_tracker_runtime_parameters import (
+        OnlineErrorTrackerRuntimeParameters,
     )
 
 
@@ -66,14 +68,18 @@ class OnlineErrorTracker:
     def __init__(
         self: Self,
         hyper_parameters: OnlineErrorTrackerHyperParameters,
+        runtime_parameters: OnlineErrorTrackerRuntimeParameters,
     ):
         """
         Initialize the online error tracker.
 
         Args:
-            hyper_parameters: Configuration controlling error decay and tracking.
+            hyper_parameters: Base hyper-parameters providing reference half-life.
+            runtime_parameters: Runtime parameters containing dynamic configuration values.
         """
-        self._hyper_parameters = hyper_parameters
+        self._parameters = OnlineErrorTrackerParameters(
+            hyper_parameters=hyper_parameters, runtime_parameters=runtime_parameters
+        )
         self._mean = 0.0
         self._var = 0.0
         self._last_ts = None
@@ -112,7 +118,7 @@ class OnlineErrorTracker:
         if dt <= 0:
             return
 
-        _lambda = math.log(2.0) / (self._hyper_parameters.error_half_life)
+        _lambda = math.log(2.0) / (self._parameters.error_half_life)
         decay = math.exp(-_lambda * dt)
 
         diff = error - self._mean
@@ -153,7 +159,6 @@ class OnlineErrorTracker:
             A dictionary containing the hyper-parameters and current error statistics.
         """
         return {
-            "hyper_parameters": self._hyper_parameters.to_dict(),
             "mean": self._mean,
             "var": self._var,
             "last_ts": self._last_ts,
@@ -161,7 +166,10 @@ class OnlineErrorTracker:
 
     @classmethod
     def from_dict(
-        cls, data: dict[str, Any], hyper_parameters: HyperParameters
+        cls,
+        data: dict[str, Any],
+        hyper_parameters: OnlineErrorTrackerHyperParameters,
+        runtime_parameters: OnlineErrorTrackerRuntimeParameters,
     ) -> OnlineErrorTracker:
         """
         Deserialize an OnlineErrorTracker from a dictionary.
@@ -170,11 +178,11 @@ class OnlineErrorTracker:
             data: Dictionary containing the serialized state of the error tracker.
             hyper_parameters: Base hyper-parameters needed to reconstruct the
                 OnlineErrorTrackerHyperParameters.
+            runtime_parameters: Runtime parameters needed to reconstruct the
+                OnlineErrorTrackerRuntimeParameters.
         """
         tracker = cls(
-            hyper_parameters=OnlineErrorTrackerHyperParameters.from_dict(
-                data["hyper_parameters"], hyper_parameters
-            )
+            hyper_parameters=hyper_parameters, runtime_parameters=runtime_parameters
         )
         tracker._mean = data.get("mean", 0.0)
         tracker._var = data.get("var", 0.0)
