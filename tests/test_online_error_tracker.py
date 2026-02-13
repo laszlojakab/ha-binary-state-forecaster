@@ -416,6 +416,53 @@ class TestOnlineErrorTrackerIntegration:
         # Mean should decrease (less error)
         assert mean_confident < mean_uncertain
 
+
+class TestOnlineErrorTrackerSerialization:
+    """Tests for OnlineErrorTracker serialization helpers."""
+
+    def test_to_dict_contains_expected_keys(self: Self) -> None:
+        base_hp = HyperParameters(
+            half_life=50.0, min_prune_interval=10.0, prune_enabled=True, persistence_strength=0.95
+        )
+        hp = OnlineErrorTrackerHyperParameters(hyper_parameters=base_hp, error_half_life_factor=1.0)
+        tracker = OnlineErrorTracker(hp)
+
+        dist = DistributionStats()
+        dist.update("on", 1.0)
+
+        tracker.update(dist, "on", 100.0)
+
+        data = tracker.to_dict()
+        assert isinstance(data, dict)
+        assert set(["mean", "var", "last_ts", "hyper_parameters"]).issubset(set(data.keys()))
+        assert isinstance(data["hyper_parameters"], dict)
+
+    def test_from_dict_restores_tracker_state(self: Self) -> None:
+        base_hp = HyperParameters(
+            half_life=60.0, min_prune_interval=10.0, prune_enabled=True, persistence_strength=0.9
+        )
+        hp = OnlineErrorTrackerHyperParameters(hyper_parameters=base_hp, error_half_life_factor=0.5)
+        tracker = OnlineErrorTracker(hp)
+
+        dist = DistributionStats()
+        dist.update("on", 2.0)
+        dist.update("off", 1.0)
+
+        tracker.update(dist, "on", 100.0)
+        tracker.update(dist, "on", 150.0)
+
+        data = tracker.to_dict()
+
+        restored = OnlineErrorTracker.from_dict(data, base_hp)
+
+        # Numeric values restored
+        assert abs(restored.mean - tracker.mean) < 1e-12
+        assert abs(restored._var - tracker._var) < 1e-12
+        assert restored._last_ts == tracker._last_ts
+
+        # Hyper-parameters reconstructed correctly
+        assert abs(restored._hyper_parameters.error_half_life - hp.error_half_life) < 1e-12
+
     def test_realistic_prediction_sequence(self: Self) -> None:
         """Test with realistic sequence of varying prediction quality."""
         hp = create_test_hp(error_half_life_factor=2.0)

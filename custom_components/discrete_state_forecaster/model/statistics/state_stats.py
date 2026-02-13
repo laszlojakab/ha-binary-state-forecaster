@@ -6,6 +6,8 @@ for a single state observation. Support is accumulated over time and can be
 decayed to weight recent observations more heavily than older ones.
 """
 
+from __future__ import annotations
+
 from typing import Self
 
 
@@ -15,33 +17,24 @@ class StateStats:
 
     Support is accumulated as observations are made and can be decayed
     over time to emphasize recent observations.
-
-    Attributes:
-        _support: Cumulative weight/support for this state. Defaults to 0.0.
-
     """
 
     _support: float = 0.0
+    """Cumulative support for this state. Represents the total weight of observations."""
 
-    def __init__(self, support: float = 0.0) -> None:
-        """
-        Initializes a new instance of StateStats.
+    def __init__(self) -> None:
+        """Initializes a new instance of `StateStats` class."""
+        self._support = 0.0
 
-        Args:
-          support: Initial support value for this state. Must be non-negative. Defaults to 0.0.
-        """
-        self._support = support
-
-    def update(self: Self, weight: float = 1.0) -> None:
+    def update(self: Self, weight: float) -> None:
         """
         Adds weighted observation to state support.
 
         Args:
-            weight: Weight to add. Must be non-negative. Defaults to 1.0.
+            weight: Weight to add.
 
         Raises:
             ValueError: If weight is negative.
-
         """
         if weight < 0:
             raise ValueError("weight must be non negative")
@@ -64,9 +57,10 @@ class StateStats:
 
         self._support *= factor
 
-        if self._support < 1e-12:
+        if self._support < 1e-12:  # noqa: PLR2004
             self._support = 0.0
 
+    @property
     def support(self: Self) -> float:
         """
         Gets the current support value.
@@ -91,18 +85,21 @@ class StateStats:
         return self._support >= min_support
 
     def to_dict(self: Self) -> dict:
-        """Returns a JSON-serializable representation of this StateStats."""
+        """Returns a JSON-serializable representation of the instance."""
         return {"support": self._support}
 
     @classmethod
-    def from_dict(cls, data: dict) -> "StateStats":
+    def from_dict(cls, data: dict) -> StateStats:
         """
-        Reconstructs StateStats from a dict representation.
+        Reconstructs `StateStats` from a `dict` representation.
 
         Args:
             data: Dictionary containing state statistics.
 
         Returns:
-            A new StateStats instance with support initialized from data.
+            A new `StateStats` instance initialized from data.
         """
-        return cls(support=data.get("support", 0.0))
+        stats = cls()
+        stats._support = data["support"]
+
+        return stats

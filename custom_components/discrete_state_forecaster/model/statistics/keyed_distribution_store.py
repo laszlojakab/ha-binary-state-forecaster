@@ -163,7 +163,7 @@ class KeyedDistributionStore:
             >>> agg, key = store.aggregate([("14:00", "afternoon")], min_support=15.0)
             >>> key
             ('14:00', 'afternoon')
-            >>> agg.total_support()  # doctest: +SKIP
+            >>> agg.total_support
             27.0
 
         """
@@ -177,13 +177,13 @@ class KeyedDistributionStore:
             for state, prob in stats.distribution().items():
                 aggregated.update(
                     state,
-                    prob * stats.total_support(),
+                    prob * stats.total_support,
                 )
 
             if aggregated.is_confident(min_support):
                 return aggregated, key
 
-        return (aggregated, None) if aggregated.total_support() > 0 else None
+        return (aggregated, None) if aggregated.total_support > 0 else None
 
     def to_dict(self) -> dict[str, Any]:
         """

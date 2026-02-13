@@ -18,7 +18,7 @@ class TestDistributionStatsInitialization:
     def test_create_empty_distribution(self: Self) -> None:
         """Test creating an empty distribution."""
         dist = DistributionStats()
-        assert dist.total_support() == 0.0
+        assert dist.total_support == 0.0
         assert dist.is_empty()
 
     def test_empty_states_set(self: Self) -> None:
@@ -39,36 +39,30 @@ class TestDistributionStatsUpdate:
         """Test updating a single state."""
         dist = DistributionStats()
         dist.update("on", 1.0)
-        assert dist.support("on") == 1.0
-        assert dist.total_support() == 1.0
+        assert dist.get_state_support("on") == 1.0
+        assert dist.total_support == 1.0
 
     def test_update_multiple_states(self: Self) -> None:
         """Test updating multiple different states."""
         dist = DistributionStats()
         dist.update("on", 2.0)
         dist.update("off", 3.0)
-        assert dist.total_support() == 5.0
-        assert dist.support("on") == 2.0
-        assert dist.support("off") == 3.0
+        assert dist.total_support == 5.0
+        assert dist.get_state_support("on") == 2.0
+        assert dist.get_state_support("off") == 3.0
 
     def test_update_same_state_twice(self: Self) -> None:
         """Test accumulating support for same state."""
         dist = DistributionStats()
         dist.update("on", 1.0)
         dist.update("on", 2.0)
-        assert dist.support("on") == 3.0
-
-    def test_update_default_weight(self: Self) -> None:
-        """Test update with default weight 1.0."""
-        dist = DistributionStats()
-        dist.update("on")
-        assert dist.support("on") == 1.0
+        assert dist.get_state_support("on") == 3.0
 
     def test_update_zero_weight(self: Self) -> None:
         """Test update with zero weight."""
         dist = DistributionStats()
         dist.update("on", 0.0)
-        assert dist.support("on") == 0.0
+        assert dist.get_state_support("on") == 0.0
 
     def test_update_fractional_weights(self: Self) -> None:
         """Test updates with fractional weights."""
@@ -76,14 +70,14 @@ class TestDistributionStatsUpdate:
         dist.update("a", 0.5)
         dist.update("b", 0.3)
         dist.update("c", 0.2)
-        assert abs(dist.total_support() - 1.0) < 1e-9
+        assert abs(dist.total_support - 1.0) < 1e-9
 
     def test_update_creates_new_states(self: Self) -> None:
         """Test that update creates entries for new states."""
         dist = DistributionStats()
-        dist.update("state1")
-        dist.update("state2")
-        dist.update("state3")
+        dist.update("state1", 1.0)
+        dist.update("state2", 1.0)
+        dist.update("state3", 1.0)
         assert len(dist.states()) == 3
 
 
@@ -93,13 +87,13 @@ class TestDistributionStatsTotalSupport:
     def test_total_support_empty(self: Self) -> None:
         """Test total_support on empty distribution."""
         dist = DistributionStats()
-        assert dist.total_support() == 0.0
+        assert dist.total_support == 0.0
 
     def test_total_support_single_state(self: Self) -> None:
         """Test total_support with single state."""
         dist = DistributionStats()
         dist.update("on", 5.0)
-        assert dist.total_support() == 5.0
+        assert dist.total_support == 5.0
 
     def test_total_support_multiple_states(self: Self) -> None:
         """Test total_support aggregates all states."""
@@ -107,14 +101,14 @@ class TestDistributionStatsTotalSupport:
         dist.update("a", 1.0)
         dist.update("b", 2.0)
         dist.update("c", 3.0)
-        assert dist.total_support() == 6.0
+        assert dist.total_support == 6.0
 
     def test_total_support_fractional(self: Self) -> None:
         """Test total_support with fractional values."""
         dist = DistributionStats()
         dist.update("a", 0.25)
         dist.update("b", 0.75)
-        assert abs(dist.total_support() - 1.0) < 1e-9
+        assert abs(dist.total_support - 1.0) < 1e-9
 
 
 class TestDistributionStatsSupport:
@@ -124,13 +118,13 @@ class TestDistributionStatsSupport:
         """Test getting support for existing state."""
         dist = DistributionStats()
         dist.update("on", 5.0)
-        assert dist.support("on") == 5.0
+        assert dist.get_state_support("on") == 5.0
 
     def test_support_nonexistent_state(self: Self) -> None:
         """Test support returns 0.0 for nonexistent state."""
         dist = DistributionStats()
         dist.update("on", 5.0)
-        assert dist.support("off") == 0.0
+        assert dist.get_state_support("off") == 0.0
 
     def test_support_accumulates(self: Self) -> None:
         """Test support accumulates across updates."""
@@ -138,7 +132,7 @@ class TestDistributionStatsSupport:
         dist.update("on", 2.0)
         dist.update("on", 3.0)
         dist.update("on", 5.0)
-        assert dist.support("on") == 10.0
+        assert dist.get_state_support("on") == 10.0
 
 
 class TestDistributionStatsDistribution:
@@ -325,7 +319,7 @@ class TestDistributionStatsApplyDecay:
         dist = DistributionStats()
         dist.update("on", 10.0)
         dist.apply_decay(0.5)
-        assert dist.support("on") == 5.0
+        assert dist.get_state_support("on") == 5.0
 
     def test_apply_decay_multiple_states(self: Self) -> None:
         """Test decay applies to all states."""
@@ -333,8 +327,8 @@ class TestDistributionStatsApplyDecay:
         dist.update("a", 10.0)
         dist.update("b", 20.0)
         dist.apply_decay(0.5)
-        assert dist.support("a") == 5.0
-        assert dist.support("b") == 10.0
+        assert dist.get_state_support("a") == 5.0
+        assert dist.get_state_support("b") == 10.0
 
     def test_apply_decay_preserves_ratios(self: Self) -> None:
         """Test decay preserves relative probabilities."""
@@ -360,15 +354,15 @@ class TestDistributionStatsStates:
     def test_states_single_state(self: Self) -> None:
         """Test states with single state."""
         dist = DistributionStats()
-        dist.update("on")
+        dist.update("on", 1.0)
         assert dist.states() == {"on"}
 
     def test_states_multiple_states(self: Self) -> None:
         """Test states returns all observed states."""
         dist = DistributionStats()
-        dist.update("a")
-        dist.update("b")
-        dist.update("c")
+        dist.update("a", 1.0)
+        dist.update("b", 1.0)
+        dist.update("c", 1.0)
         assert dist.states() == {"a", "b", "c"}
 
 
@@ -383,7 +377,7 @@ class TestDistributionStatsIsEmpty:
     def test_is_empty_after_update(self: Self) -> None:
         """Test is_empty returns False after update."""
         dist = DistributionStats()
-        dist.update("on")
+        dist.update("on", 1.0)
         assert not dist.is_empty()
 
     def test_is_empty_with_zero_weight(self: Self) -> None:
@@ -508,9 +502,33 @@ class TestDistributionStatsIntegration:
 
         # Check total support
         total = sum(i + 1 for i in range(100))
-        assert abs(dist.total_support() - total) < 1e-6
+        assert abs(dist.total_support - total) < 1e-6
 
         # Check distribution sums to 1
         dist_dict = dist.distribution()
         prob_sum = sum(dist_dict.values())
         assert abs(prob_sum - 1.0) < 1e-9
+
+
+class TestDistributionStatsSerialization:
+    """Tests for DistributionStats JSON (de)serialization helpers."""
+
+    def test_to_dict_contains_states_and_support(self: Self) -> None:
+        """Ensure `to_dict` returns a mapping with nested state dicts."""
+        dist = DistributionStats()
+        dist.update("on", 2.5)
+        dist.update("off", 1.0)
+        data = dist.to_dict()
+        assert isinstance(data, dict)
+        assert "states" in data
+        states = data["states"]
+        assert isinstance(states, dict)
+        assert states["on"]["support"] == 2.5
+        assert states["off"]["support"] == 1.0
+
+    def test_from_dict_restores_support_values(self: Self) -> None:
+        """Ensure `from_dict` reconstructs DistributionStats with correct supports."""
+        payload = {"states": {"a": {"support": 3.14}, "b": {"support": 1.0}}}
+        dist = DistributionStats.from_dict(payload)
+        assert abs(dist.get_state_support("a") - 3.14) < 1e-12
+        assert abs(dist.get_state_support("b") - 1.0) < 1e-12

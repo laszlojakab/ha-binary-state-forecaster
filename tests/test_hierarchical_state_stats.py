@@ -117,7 +117,7 @@ class TestHierarchicalStateStatsUpdate:
         result = stats.predict(key)
         assert result is not None
         # Support should be accumulated
-        assert result.distribution.total_support() >= 10.0
+        assert result.distribution.total_support >= 10.0
 
     def test_update_with_different_states(self: Self) -> None:
         """Test updating with different states."""
@@ -259,13 +259,13 @@ class TestHierarchicalStateStatsApplyDecay:
         stats.update(key, "on", weight=100.0)
 
         result1 = stats.predict(key)
-        support1 = result1.distribution.total_support()
+        support1 = result1.distribution.total_support
 
         # Apply decay
         stats.apply_decay(0.5)
 
         result2 = stats.predict(key)
-        support2 = result2.distribution.total_support()
+        support2 = result2.distribution.total_support
 
         # Support should be reduced
         assert support2 < support1
@@ -285,8 +285,8 @@ class TestHierarchicalStateStatsApplyDecay:
         result = stats.predict(key)
         assert result is not None
         # Support should be reduced but still positive
-        assert result.distribution.total_support() < 1000.0
-        assert result.distribution.total_support() > 0
+        assert result.distribution.total_support < 1000.0
+        assert result.distribution.total_support > 0
 
     def test_apply_decay_at_all_levels(self: Self) -> None:
         """Test that decay affects all hierarchy levels."""
@@ -307,7 +307,7 @@ class TestHierarchicalStateStatsApplyDecay:
         specific_result = stats.predict(key1)
 
         # GLOBAL was updated twice (once directly, once via key1), so 200.0 -> 100.0
-        assert global_result.distribution.total_support() == 100.0
+        assert global_result.distribution.total_support == 100.0
         # Specific level has its own copy affected
         assert specific_result is not None
 
@@ -426,7 +426,7 @@ class TestHierarchicalStateStatsEdgeCases:
 
         result = stats.predict(key)
         assert result is not None
-        assert result.distribution.total_support() > 0
+        assert result.distribution.total_support > 0
 
 
 class TestHierarchicalStateStatsIntegration:
@@ -471,14 +471,14 @@ class TestHierarchicalStateStatsIntegration:
 
         # Get baseline prediction
         result1 = stats.predict(key)
-        support1 = result1.distribution.total_support()
+        support1 = result1.distribution.total_support
 
         # Apply decay
         stats.apply_decay(0.8)
 
         # Predict again
         result2 = stats.predict(key)
-        support2 = result2.distribution.total_support()
+        support2 = result2.distribution.total_support
 
         # Verify decay effect
         assert abs(support2 - support1 * 0.8) < 1e-6
@@ -532,3 +532,33 @@ class TestHierarchicalStateStatsIntegration:
 
         # Note: strict might fallback instead of returning None
         # so we just check that it's possible to get a result
+
+
+class TestHierarchicalStateStatsSerialization:
+    """Tests for HierarchicalStateStats serialization and deserialization."""
+
+    def test_to_dict_and_from_dict_roundtrip(self: Self) -> None:
+        base_hp = HyperParameters(
+            half_life=50.0, min_prune_interval=10.0, prune_enabled=True, persistence_strength=0.5
+        )
+
+        hp = HierarchicalStateStatsHyperParameters(base_hp, min_support_factor=0.01)
+        stats = HierarchicalStateStats(hp)
+
+        key = TimeKey.GLOBAL + ("hour", 14)
+        stats.update(key, "on", weight=10.0)
+        stats.update(TimeKey.GLOBAL, "off", weight=5.0)
+
+        data = stats.to_dict()
+
+        # Reconstruct using base hyper-parameters (same base used to create hp)
+        restored = HierarchicalStateStats.from_dict(data, base_hp)
+
+        # Hyper-parameter min_support should be preserved
+        assert abs(restored._hyper_parameters.min_support - hp.min_support) < 1e-12
+
+        # Restored store should contain distributions for the keys we updated
+        res = restored.predict(key)
+        assert res is not None
+        # Check that the restored distribution preserves support for 'on'
+        assert abs(res.distribution.get_state_support("on") - 10.0) < 1e-9

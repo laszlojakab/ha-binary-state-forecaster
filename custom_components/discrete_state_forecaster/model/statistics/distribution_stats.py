@@ -13,7 +13,7 @@ enabling features like decay weighting and minimum support thresholds.
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any, Final, Self, cast
 
 from custom_components.discrete_state_forecaster.model.statistics.state_stats import (
     StateStats,
@@ -31,31 +31,24 @@ class DistributionStats:
     aggregated views like probability distributions and entropy. Supports temporal
     operations like decay weighting and prune operations.
 
-    Attributes:
-        _states: Dictionary mapping each state to its associated StateStats,
-            tracking cumulative support weight for that state.
-
     Example:
         >>> dist = DistributionStats()
         >>> dist.update("on", weight=2.0)
         >>> dist.update("off", weight=1.0)
         >>> dist.distribution()
         {'on': 0.6667, 'off': 0.3333}
-        >>> dist.entropy()  # doctest: +SKIP
+        >>> dist.entropy()
         0.637
-
     """
 
-    def __init__(self: Self, states: dict[State, StateStats] | None = None) -> None:
-        """
-        Initializes a distribution.
+    _states: Final[dict[State, StateStats]] = {}
+    """Dictionary mapping each state to its cumulative support statistics."""
 
-        Args:
-          states: Optional initial state statistics. If None, starts with an empty distribution.
-        """
-        self._states: dict[State, StateStats] = {} if states is None else states
+    def __init__(self: Self) -> None:
+        """Initializes a new instance of `DistributionStats` class."""
+        self._states: dict[State, StateStats] = {}
 
-    def update(self: Self, state: State, weight: float = 1.0) -> None:
+    def update(self: Self, state: State, weight: float) -> None:
         """
         Updates support for a state by adding the given weight.
 
@@ -65,15 +58,14 @@ class DistributionStats:
 
         Args:
             state: The state to update.
-            weight: The weight (support) to add. Defaults to 1.0. Must be
-                positive or zero.
-
+            weight: The weight (support) to add. Must be non-negative.
         """
         if state not in self._states:
             self._states[state] = StateStats()
 
         self._states[state].update(weight)
 
+    @property
     def total_support(self: Self) -> float:
         """
         Calculates the total support across all states.
@@ -83,9 +75,9 @@ class DistributionStats:
                 Returns 0.0 if no states have been observed.
 
         """
-        return sum(stats.support() for stats in self._states.values())
+        return sum(stats.support for stats in self._states.values())
 
-    def support(self, state: State) -> float:
+    def get_state_support(self, state: State) -> float:
         """
         Gets the support for a specific state.
 
@@ -98,7 +90,7 @@ class DistributionStats:
 
         """
         stats = self._states.get(state)
-        return 0.0 if stats is None else stats.support()
+        return 0.0 if stats is None else stats.support
 
     def distribution(self: Self) -> dict[State, float]:
         """
@@ -113,11 +105,11 @@ class DistributionStats:
                 or total support is zero or negative.
 
         """
-        total = self.total_support()
+        total = self.total_support
         if total <= 0.0:
             return {}
 
-        return {state: stats.support() / total for state, stats in self._states.items()}
+        return {state: stats.support / total for state, stats in self._states.items()}
 
     def is_confident(self: Self, min_support: float) -> bool:
         """
@@ -127,10 +119,10 @@ class DistributionStats:
             min_support: The minimum total support threshold.
 
         Returns:
-            True if total_support() >= min_support, False otherwise.
+            True if total_support >= min_support, False otherwise.
 
         """
-        return self.total_support() >= min_support
+        return self.total_support >= min_support
 
     def active_states(self: Self, min_support: float) -> set[State]:
         """
@@ -179,8 +171,7 @@ class DistributionStats:
                 no states have been observed.
 
         """
-        dist = self.distribution()
-        return max(dist.values(), default=0.0)
+        return max(self.distribution().values(), default=0.0)
 
     def apply_decay(self: Self, factor: float) -> None:
         """
@@ -233,9 +224,12 @@ class DistributionStats:
                 support < min_state_duration are removed.
 
         """
-        self._states = {
-            s: d for s, d in self._states.items() if d.is_active(min_state_duration)
-        }
+        for key in [
+            state
+            for state, stats in self._states.items()
+            if not stats.is_active(min_state_duration)
+        ]:
+            del self._states[key]
 
     def prune_adaptive(
         self: Self,
@@ -246,7 +240,7 @@ class DistributionStats:
         Adaptively prunes states using relative and absolute thresholds.
 
         Removes states using a dynamic threshold that is the maximum of:
-        - Relative threshold: epsilon * total_support()
+        - Relative threshold: epsilon * total_support
         - Absolute threshold: absolute_min
 
         This allows the algorithm to automatically adjust pruning aggressiveness
@@ -260,7 +254,8 @@ class DistributionStats:
                 support is very high.
 
         """
-        threshold = max(self.total_support() * epsilon, absolute_min)
+        threshold = max(self.total_support * epsilon, absolute_min)
+
         self.prune(threshold)
 
     def to_dict(self: Self) -> dict[str, Any]:
@@ -280,9 +275,12 @@ class DistributionStats:
         Returns:
           A new DistributionStats instance with states initialized from data.
         """
-        return cls(
-            states={
-                s: StateStats.from_dict(stats)
-                for s, stats in data.get("states", {}).items()
-            }
-        )
+        stats = cls()
+        stats._states = {
+            s: StateStats.from_dict(stats_data)
+            for s, stats_data in cast(
+                "dict[str, dict[str, Any]]", data["states"]
+            ).items()
+        }
+
+        return stats

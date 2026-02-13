@@ -15,25 +15,27 @@ sparse by falling back to broader patterns (e.g., "afternoon" or "spring").
 
 from __future__ import annotations
 
-from typing import Any, Self
+from typing import TYPE_CHECKING, Any, Self
 
-from custom_components.discrete_state_forecaster.model.hyper_parameters import (
-    HyperParameters,
-)
-from custom_components.discrete_state_forecaster.model.state import State
 from custom_components.discrete_state_forecaster.model.statistics.distribution_stats import (
     DistributionStats,
 )
 from custom_components.discrete_state_forecaster.model.statistics.hierarchical_state_stats_hyper_parameters import (  # noqa: E501
     HierarchicalStateStatsHyperParameters,
 )
-from custom_components.discrete_state_forecaster.model.temporal.time_key import (
-    TimeKey,
-)
 
 from .contribution import Contribution
 from .keyed_distribution_store import KeyedDistributionStore
 from .prediction_result import PredictionResult
+
+if TYPE_CHECKING:
+    from custom_components.discrete_state_forecaster.model.hyper_parameters import (
+        HyperParameters,
+    )
+    from custom_components.discrete_state_forecaster.model.state import State
+    from custom_components.discrete_state_forecaster.model.temporal.time_key import (
+        TimeKey,
+    )
 
 
 class HierarchicalStateStats:
@@ -72,16 +74,21 @@ class HierarchicalStateStats:
 
     """  # noqa: E501
 
-    def __init__(self: Self, hyper_parameters: HierarchicalStateStatsHyperParameters):
+    def __init__(
+        self: Self,
+        hyper_parameters: HierarchicalStateStatsHyperParameters,
+        stats: KeyedDistributionStore | None = None,
+    ):
         """
         Initializes the hierarchical state statistics engine.
 
         Args:
             hyper_parameters: Configuration including minimum support thresholds
                 and other prediction parameters.
-
+            stats: Optional initial KeyedDistributionStore. If None, starts with an empty store.
         """
-        self._stats = KeyedDistributionStore()
+        # Allow injecting an existing KeyedDistributionStore when deserializing
+        self._stats = KeyedDistributionStore() if stats is None else stats
         self._hyper_parameters = hyper_parameters
 
     def update(
@@ -146,7 +153,7 @@ class HierarchicalStateStats:
                     Contribution(
                         key=key,
                         weight=1.0,
-                        support=specific.total_support(),
+                        support=specific.total_support,
                     ),
                 ),
             )
@@ -163,10 +170,10 @@ class HierarchicalStateStats:
             weight = 1.0 / (1.0 + level)
 
             for state, prob in stats.distribution().items():
-                aggregated.update(state, prob * stats.total_support() * weight)
+                aggregated.update(state, prob * stats.total_support * weight)
 
             contributions.append(
-                Contribution(source_key, weight, stats.total_support())
+                Contribution(source_key, weight, stats.total_support)
             )
 
             if aggregated.is_confident(self._hyper_parameters.min_support):

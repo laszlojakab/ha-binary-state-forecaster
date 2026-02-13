@@ -98,7 +98,9 @@ class BaselineDistribution:
         epsilon = float(data.get("epsilon", 1e-9))
         prune_threshold = float(data.get("prune_threshold", 1e-12))
 
-        inst = cls(half_life=half_life, epsilon=epsilon, prune_threshold=prune_threshold)
+        inst = cls(
+            half_life=half_life, epsilon=epsilon, prune_threshold=prune_threshold
+        )
 
         inst._last_ts = data.get("last_ts")
 

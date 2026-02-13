@@ -319,7 +319,7 @@ class ForecasterEngine:
 
         base_dist = prediction.distribution
         base_probs = base_dist.distribution()
-        total_support = base_dist.total_support()
+        total_support = base_dist.total_support
 
         adjusted = DistributionStats()
 
