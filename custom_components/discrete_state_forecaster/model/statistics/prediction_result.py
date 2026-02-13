@@ -1,10 +1,4 @@
-"""
-Immutable prediction result from hierarchical state statistics.
-
-This module provides `PredictionResult`, a dataclass that encapsulates the
-complete result of a prediction, including the predicted distribution and
-information about which temporal levels contributed to the prediction.
-"""
+"""Immutable prediction result from hierarchical state statistics."""
 
 import math
 from dataclasses import dataclass
@@ -38,34 +32,19 @@ class PredictionResult:
             levels that were used to form this prediction, in order of usage
             (specific level first, then ancestors). Each contribution includes
             the source key, weight applied, and support available at that level.
-
-    Example:
-        >>> from custom_components.discrete_state_forecaster.model.statistics.distribution_stats import (  # noqa: E501
-        ...     DistributionStats,
-        ... )
-        >>> from custom_components.discrete_state_forecaster.model.temporal.time_key import (
-        ...     TimeKey,
-        ... )
-        >>> from custom_components.discrete_state_forecaster.model.statistics.contribution import (
-        ...     Contribution,
-        ... )
-        >>> dist = DistributionStats()
-        >>> dist.update("on", 2.0)
-        >>> dist.update("off", 1.0)
-        >>> key = TimeKey.from_tuple((("hour", 14),))
-        >>> contrib = Contribution(key, weight=1.0, support=3.0)
-        >>> result = PredictionResult(key=key, distribution=dist, contributions=(contrib,))
-        >>> result.key == key
-        True
-        >>> result.distribution.max_probability()  # doctest: +SKIP
-        0.6667
-
-    """  # noqa: E501
+    """
 
     key: TimeKey
+    """TimeKey representing the temporal location of the prediction."""
+
     distribution: dict[State, float]
-    confidence: Confidence  # TODO: docs...
+    """Predicted probability distribution over states at the given TimeKey."""
+
+    confidence: Confidence
+    """Confidence metrics for the prediction."""
+
     contributions: tuple[Contribution, ...]
+    """Ordered tuple of contributions from temporal levels used in the prediction."""
 
     def __init__(
         self: Self,
@@ -73,13 +52,24 @@ class PredictionResult:
         distribution_stats: DistributionStats,
         contributions: tuple[Contribution, ...],
     ):
+        """
+        Initializes a instance of PredictionResult class.
+
+        Args:
+            key: The TimeKey representing the temporal location of the prediction.
+            distribution_stats: The DistributionStats object containing the
+                predicted distribution and related statistics.
+            contributions: Tuple of Contribution objects describing the temporal
+                levels that were used to form this prediction, in order of usage
+                (specific level first, then ancestors). Each contribution includes
+                the source key, weight applied, and support available at that level.
+        """
         object.__setattr__(self, "key", key)
         object.__setattr__(self, "distribution", distribution_stats.distribution)
 
         n = len(distribution_stats.distribution)
-        entropy = distribution_stats.entropy()
         max_entropy = math.log(n) if n > 1 else 1.0
-        entropy_conf = 1.0 - (entropy / max_entropy)
+        entropy_conf = 1.0 - (distribution_stats.entropy / max_entropy)
 
         object.__setattr__(
             self,
@@ -87,7 +77,7 @@ class PredictionResult:
             Confidence(
                 support=distribution_stats.total_support,
                 depth=len(contributions) - 1,
-                max_probability=distribution_stats.max_probability(),
+                max_probability=distribution_stats.max_probability,
                 entropy_confidence=entropy_conf,
             ),
         )

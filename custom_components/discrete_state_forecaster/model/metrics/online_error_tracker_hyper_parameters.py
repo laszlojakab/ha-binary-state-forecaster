@@ -1,9 +1,4 @@
-"""
-Hyper-parameters for online error tracking.
-
-This module provides configuration for the OnlineErrorTracker, controlling how
-prediction errors are tracked over time with exponential decay.
-"""
+"""Hyper-parameters for online error tracking."""
 
 from __future__ import annotations
 
@@ -23,14 +18,7 @@ class OnlineErrorTrackerHyperParameters:
     for error statistics. The error half-life controls how quickly old prediction
     errors are forgotten in favor of recent errors.
 
-    Attributes:
-        _hyper_parameters: Base hyper-parameters containing the reference half-life.
-        _half_life_factor: Multiplier applied to base half-life for error tracking.
-
     Example:
-        >>> from custom_components.discrete_state_forecaster.model.hyper_parameters import (  # noqa: E501
-        ...     HyperParameters,
-        ... )
         >>> base_hp = HyperParameters(
         ...     half_life=50.0,
         ...     min_prune_interval=10.0,
@@ -45,6 +33,12 @@ class OnlineErrorTrackerHyperParameters:
         25.0
 
     """
+
+    _hyper_parameters: Final[HyperParameters]
+    """Base hyper-parameters containing the reference half-life."""
+
+    _half_life_factor: Final[float]
+    """Multiplier applied to base half-life for error tracking."""
 
     def __init__(
         self: Self, *, hyper_parameters: HyperParameters, error_half_life_factor: float
@@ -76,12 +70,21 @@ class OnlineErrorTrackerHyperParameters:
         return self._hyper_parameters.half_life * self._half_life_factor
 
     def to_dict(self: Self) -> dict[str, Any]:
+        """Serializes the instance into a dictionary."""
         return {"half_life_factor": self._half_life_factor}
 
     @classmethod
     def from_dict(
         cls, data: dict[str, Any], hyper_parameters: HyperParameters
     ) -> OnlineErrorTrackerHyperParameters:
+        """
+        Deserializes a dictionary into an instance of OnlineErrorTrackerHyperParameters.
+
+        Args:
+            data: Dictionary containing serialized hyper-parameters.
+            hyper_parameters: Base hyper-parameters needed to reconstruct the
+                OnlineErrorTrackerHyperParameters.
+        """
         return cls(
             hyper_parameters=hyper_parameters,
             error_half_life_factor=data["half_life_factor"],

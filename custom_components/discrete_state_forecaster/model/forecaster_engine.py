@@ -349,7 +349,7 @@ class ForecasterEngine:
         # ------------------------------------------------------------------
         # CASE 2: no explicit current state → use internal tracker
         # ------------------------------------------------------------------
-        internal_current = self._state_persistence_tracker.current_state()
+        internal_current = self._state_persistence_tracker.current_state
 
         if internal_current is not None:
             timestamp = self._last_update_timestamp
@@ -401,7 +401,7 @@ class ForecasterEngine:
         if (self._last_prune_timestamp + self._hyper_parameters.min_prune_interval) > timestamp:
             return
 
-        self._stats.prune()
+        self._stats.prune() # TODO: min 20 keves lehet
         self._last_prune_timestamp = timestamp
 
     def _get_decay_factor(self: Self, duration: float) -> float:

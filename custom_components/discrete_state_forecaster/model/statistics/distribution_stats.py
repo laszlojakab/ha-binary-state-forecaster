@@ -35,10 +35,12 @@ class DistributionStats:
         >>> dist = DistributionStats()
         >>> dist.update("on", weight=2.0)
         >>> dist.update("off", weight=1.0)
-        >>> dist.distribution()
+        >>> dist.distribution
         {'on': 0.6667, 'off': 0.3333}
-        >>> dist.entropy()
+        >>> dist.entropy
         0.637
+        >>> dist.max_probability
+        0.6667
     """
 
     _states: Final[dict[State, StateStats]] = {}
@@ -47,23 +49,6 @@ class DistributionStats:
     def __init__(self: Self) -> None:
         """Initializes a new instance of `DistributionStats` class."""
         self._states: dict[State, StateStats] = {}
-
-    def update(self: Self, state: State, weight: float) -> None:
-        """
-        Updates support for a state by adding the given weight.
-
-        Creates a new StateStats entry if this state has not been observed
-        before. If the state already exists, adds the weight to its existing
-        support.
-
-        Args:
-            state: The state to update.
-            weight: The weight (support) to add. Must be non-negative.
-        """
-        if state not in self._states:
-            self._states[state] = StateStats()
-
-        self._states[state].update(weight)
 
     @property
     def total_support(self: Self) -> float:
@@ -88,14 +73,56 @@ class DistributionStats:
         Returns:
             Dictionary mapping each observed state to its probability in the
                 range [0.0, 1.0]. Returns empty dict if no observations exist
-                or total support is zero or negative.
+                or total support is zero.
 
         """
         total = self.total_support
-        if total <= 0.0:
+        if total == 0.0:
             return {}
 
         return {state: stats.support / total for state, stats in self._states.items()}
+
+    @property
+    def entropy(self: Self) -> float:
+        """
+        Calculates Shannon entropy of the probability distribution.
+
+        Entropy measures the uncertainty in the distribution. Higher entropy
+        indicates more uniform distribution (less predictability), while lower
+        entropy indicates concentration on fewer states (more predictability).
+
+        Returns:
+            Non-negative entropy value in nats. Returns 0.0 if distribution is empty.
+
+        """
+        dist = self.distribution
+        if not dist:
+            return 0.0
+
+        return -sum(p * math.log(p) for p in dist.values() if p > 0.0)
+
+    @property
+    def max_probability(self: Self) -> float:
+        """
+        Gets the maximum probability in the distribution.
+
+        Returns:
+            The highest probability value across all states. Returns 0.0 if
+                no states have been observed.
+
+        """
+        return max(self.distribution.values(), default=0.0)
+
+    @property
+    def is_empty(self: Self) -> bool:
+        """
+        Checks if the distribution has no observed states.
+
+        Returns:
+            True if no states have been updated yet, False otherwise.
+
+        """
+        return not self._states
 
     def is_confident(self: Self, min_support: float) -> bool:
         """
@@ -110,35 +137,22 @@ class DistributionStats:
         """
         return self.total_support >= min_support
 
-    def entropy(self: Self) -> float:
+    def update(self: Self, state: State, weight: float) -> None:
         """
-        Calculates Shannon entropy of the probability distribution.
+        Updates support for a state by adding the given weight.
 
-        Entropy measures the uncertainty in the distribution. Higher entropy
-        indicates more uniform distribution (less predictability), while lower
-        entropy indicates concentration on fewer states (more predictability).
+        Creates a new StateStats entry if this state has not been observed
+        before. If the state already exists, adds the weight to its existing
+        support.
 
-        Returns:
-            Non-negative entropy value in nats. Returns 0.0 if distribution is
-                empty or only one state has non-zero probability.
-
+        Args:
+            state: The state to update.
+            weight: The weight (support) to add. Must be non-negative.
         """
-        dist = self.distribution
-        if not dist:
-            return 0.0
+        if state not in self._states:
+            self._states[state] = StateStats()
 
-        return -sum(p * math.log(p) for p in dist.values() if p > 0.0)
-
-    def max_probability(self: Self) -> float:
-        """
-        Gets the maximum probability in the distribution.
-
-        Returns:
-            The highest probability value across all states. Returns 0.0 if
-                no states have been observed.
-
-        """
-        return max(self.distribution.values(), default=0.0)
+        self._states[state].update(weight)
 
     def apply_decay(self: Self, factor: float) -> None:
         """
@@ -156,29 +170,9 @@ class DistributionStats:
         for stats in self._states.values():
             stats.apply_decay(factor)
 
-    def states(self: Self) -> set[State]:
-        """
-        Gets all observed states in the distribution.
-
-        Returns:
-            Set of all states that have been updated at least once.
-
-        """
-        return set(self._states.keys())
-
-    def is_empty(self: Self) -> bool:
-        """
-        Checks if the distribution has no observed states.
-
-        Returns:
-            True if no states have been updated yet, False otherwise.
-
-        """
-        return not self._states
-
     def prune(
         self: Self,
-        min_state_duration: float,
+        min_support: float,
     ) -> None:
         """
         Removes states with support below the minimum threshold.
@@ -187,28 +181,28 @@ class DistributionStats:
         allowing removal of infrequently observed states.
 
         Args:
-            min_state_duration: The minimum support threshold. States with
-                support < min_state_duration are removed.
+            min_support: The minimum support threshold. States with
+                support < min_support are removed.
 
         """
         for key in [
             state
             for state, stats in self._states.items()
-            if not stats.is_active(min_state_duration)
+            if not stats.is_active(min_support)
         ]:
             del self._states[key]
 
     def prune_adaptive(
         self: Self,
         epsilon: float = 0.003,
-        absolute_min: float = 20.0,
+        absolute_minimum_support: float = 20.0,
     ) -> None:
         """
         Adaptively prunes states using relative and absolute thresholds.
 
         Removes states using a dynamic threshold that is the maximum of:
         - Relative threshold: epsilon * total_support
-        - Absolute threshold: absolute_min
+        - Absolute threshold: absolute_minimum_support
 
         This allows the algorithm to automatically adjust pruning aggressiveness
         based on total accumulated support while maintaining a floor.
@@ -216,12 +210,12 @@ class DistributionStats:
         Args:
             epsilon: Relative threshold factor (default 0.003). States with
                 support < epsilon * total_support are candidates for removal.
-            absolute_min: Absolute minimum support (default 20.0). Ensures
-                pruning doesn't remove frequently observed states even if total
-                support is very high.
+            absolute_minimum_support: Absolute minimum support (default 20.0).
+                Ensures pruning doesn't remove frequently observed states even
+                if total support is very high.
 
         """
-        threshold = max(self.total_support * epsilon, absolute_min)
+        threshold = max(self.total_support * epsilon, absolute_minimum_support)
 
         self.prune(threshold)
 

@@ -5,9 +5,12 @@ This module provides configuration for DurationWeightedBaseline, controlling
 the decay rate, pruning threshold, and Laplace smoothing parameter.
 """
 
-from typing import Final, Self
+from __future__ import annotations
 
-from .drift_monitor_hyper_parameters import DriftMonitorHyperParameters
+from typing import TYPE_CHECKING, Any, Final, Self
+
+if TYPE_CHECKING:
+    from .drift_monitor_hyper_parameters import DriftMonitorHyperParameters
 
 
 class DurationWeightedBaselineHyperParameters:
@@ -18,16 +21,7 @@ class DurationWeightedBaselineHyperParameters:
     duration-weighted baseline including half-life factor, pruning threshold,
     and Laplace smoothing parameter.
 
-    Attributes:
-        _hyper_parameters: Parent drift monitor configuration.
-        _half_life_factor: Multiplier applied to base half-life.
-        _prune_threshold: Minimum mass to retain a state.
-        _epsilon: Laplace smoothing parameter.
-
     Example:
-        >>> from custom_components.discrete_state_forecaster.model.hyper_parameters import (
-        ...     HyperParameters,
-        ... )
         >>> base_hp = HyperParameters(
         ...     half_life=50.0,
         ...     min_prune_interval=10.0,
@@ -43,6 +37,18 @@ class DurationWeightedBaselineHyperParameters:
         100.0
 
     """
+
+    _hyper_parameters: Final[DriftMonitorHyperParameters]
+    """Parent drift monitor configuration."""
+
+    _half_life_factor: Final[float]
+    """Multiplier applied to base half-life for baseline decay."""
+
+    _prune_threshold: Final[float]
+    """Minimum mass value below which states are pruned."""
+
+    _epsilon: Final[float]
+    """Laplace smoothing parameter added to all state probabilities."""
 
     def __init__(
         self: Self,
@@ -60,12 +66,11 @@ class DurationWeightedBaselineHyperParameters:
             half_life_factor: Multiplier for base half-life.
             prune_threshold: Minimum mass to retain a state (default 1e-6).
             epsilon: Laplace smoothing parameter (default 1e-9).
-
         """
-        self._hyper_parameters: Final = hyper_parameters
-        self._half_life_factor: Final = half_life_factor
-        self._prune_threshold: Final = prune_threshold
-        self._epsilon: Final = epsilon
+        self._hyper_parameters = hyper_parameters
+        self._half_life_factor = half_life_factor
+        self._prune_threshold = prune_threshold
+        self._epsilon = epsilon
 
     @property
     def baseline_half_life(self: Self) -> float:
@@ -99,3 +104,35 @@ class DurationWeightedBaselineHyperParameters:
 
         """
         return self._epsilon
+
+    def to_dict(self: Self) -> dict[str, Any]:
+        """
+        Serializes the instance into a dictionary.
+
+        Returns:
+            A dictionary representation of the instance, including hyper-parameters.
+        """
+        return {
+            "half_life_factor": self._half_life_factor,
+            "prune_threshold": self._prune_threshold,
+            "epsilon": self._epsilon,
+        }
+
+    @classmethod
+    def from_dict(
+        cls, data: dict[str, Any], hyper_parameters: DriftMonitorHyperParameters
+    ) -> DurationWeightedBaselineHyperParameters:
+        """
+        Deserializes an instance from a dictionary.
+
+        Args:
+            data: Dictionary containing serialized hyper-parameters.
+            hyper_parameters: Parent drift monitor configuration needed to reconstruct
+                the DurationWeightedBaselineHyperParameters.
+        """
+        return cls(
+            hyper_parameters=hyper_parameters,
+            half_life_factor=data["half_life_factor"],
+            prune_threshold=data["prune_threshold"],
+            epsilon=data["epsilon"],
+        )

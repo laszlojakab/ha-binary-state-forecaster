@@ -15,7 +15,7 @@ sparse by falling back to broader patterns (e.g., "afternoon" or "spring").
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any, Final, Self
 
 from custom_components.discrete_state_forecaster.model.statistics.distribution_stats import (
     DistributionStats,
@@ -51,33 +51,26 @@ class HierarchicalStateStats:
     The hierarchy levels correspond to different temporal granularities maintained
     by the TimeKey structure (e.g., global → season → day_of_week → hour).
 
-    Attributes:
-        _stats: KeyedDistributionStore that maps TimeKeys to their state
-            distributions at all hierarchy levels.
-        _hyper_parameters: Configuration parameters including minimum support
-            thresholds for predictions.
-
     Example:
-        >>> from custom_components.discrete_state_forecaster.model.temporal.time_key import (
-        ...     TimeKey,
-        ... )
-        >>> from custom_components.discrete_state_forecaster.model.temporal.temporal_feature import (  # noqa: E501
-        ...     TemporalFeature,
-        ... )
         >>> hp = HierarchicalStateStatsHyperParameters(min_support=10.0)
         >>> stats = HierarchicalStateStats(hp)
-        >>> key = TimeKey.GLOBAL + TemporalFeature("hour", 14)
+        >>> key = TimeKey(("hour", 14))
         >>> stats.update(key, "on", weight=1.0)
         >>> result = stats.predict(key)
         >>> result is not None
         True
 
-    """  # noqa: E501
+    """
+
+    _stats: Final[KeyedDistributionStore]
+    """Store of distributions for all temporal keys in the hierarchy."""
+
+    _hyper_parameters: Final[HierarchicalStateStatsHyperParameters]
+    """Configuration parameters including minimum support thresholds."""
 
     def __init__(
         self: Self,
         hyper_parameters: HierarchicalStateStatsHyperParameters,
-        stats: KeyedDistributionStore | None = None,
     ):
         """
         Initializes the hierarchical state statistics engine.
@@ -85,10 +78,9 @@ class HierarchicalStateStats:
         Args:
             hyper_parameters: Configuration including minimum support thresholds
                 and other prediction parameters.
-            stats: Optional initial KeyedDistributionStore. If None, starts with an empty store.
         """
         # Allow injecting an existing KeyedDistributionStore when deserializing
-        self._stats = KeyedDistributionStore() if stats is None else stats
+        self._stats = KeyedDistributionStore()
         self._hyper_parameters = hyper_parameters
 
     def update(
@@ -125,7 +117,8 @@ class HierarchicalStateStats:
         Predicts state distribution at a given temporal location.
 
         Uses a confidence-aware hierarchical fallback strategy:
-        1. First tries the specific key with min_support threshold
+        1. First tries the specific key with min_support threshold defined
+           in hyper parameters.
         2. If insufficient, iterates through ancestors with decaying weight
         3. Returns first level with sufficient confidence, or None if no level
            reaches the threshold
@@ -138,8 +131,8 @@ class HierarchicalStateStats:
             key: The TimeKey representing the temporal location to predict.
 
         Returns:
-            A PredictionResult containing the probability distribution and
-                contribution sources if confident enough, or None if no level
+            A PredictionResult containing the probability distribution, confidence
+                and contribution sources if confident enough, or None if no level
                 reaches the minimum support threshold.
 
         """
@@ -172,9 +165,7 @@ class HierarchicalStateStats:
             for state, prob in stats.distribution.items():
                 aggregated.update(state, prob * stats.total_support * weight)
 
-            contributions.append(
-                Contribution(source_key, weight, stats.total_support)
-            )
+            contributions.append(Contribution(source_key, weight, stats.total_support))
 
             if aggregated.is_confident(self._hyper_parameters.min_support):
                 break
@@ -203,7 +194,9 @@ class HierarchicalStateStats:
         """
         self._stats.apply_decay(factor)
 
-    def prune(self: Self, epsilon: float = 0.003, absolute_min: float = 20.0) -> None:
+    def prune(
+        self: Self, epsilon: float = 0.003, absolute_minimum_support: float = 20.0
+    ) -> None:
         """
         Removes infrequent states and empty distributions from the hierarchy.
 
@@ -212,18 +205,18 @@ class HierarchicalStateStats:
         usage and focuses the model on frequently-observed patterns.
 
         Args:
-            epsilon: Relative threshold factor (default 0.003). States with
+            epsilon: Relative threshold factor. States with
                 support < epsilon * total_support are candidates for removal.
-            absolute_min: Absolute minimum support (default 20.0). Ensures
+            absolute_minimum_support: Absolute minimum support. Ensures
                 frequently observed states are not removed even if total
                 support is very high.
 
         """
-        self._stats.prune(epsilon, absolute_min)
+        self._stats.prune(epsilon, absolute_minimum_support)
 
     def to_dict(self: Self) -> dict[str, Any]:
         """
-        Serializes the hyper parameters to a dictionary.
+        Serializes the instance into a dictionary.
 
         Returns:
           A dictionary representation of the hierarchical state statistics
@@ -237,9 +230,19 @@ class HierarchicalStateStats:
     def from_dict(
         cls, data: dict[str, Any], hyper_parameters: HyperParameters
     ) -> HierarchicalStateStats:
-        return cls(
+        """
+        Deserializes a dictionary into an instance of HierarchicalStateStats.
+
+        Args:
+            data: Dictionary containing serialized hierarchical state statistics.
+            hyper_parameters: The base HyperParameters instance to use for calculations.
+        """
+        stats = cls(
             hyper_parameters=HierarchicalStateStatsHyperParameters.from_dict(
                 data["hyper_parameters"], hyper_parameters
-            ),
-            stats=KeyedDistributionStore.from_dict(data["stats"]),
+            )
         )
+
+        stats._stats = KeyedDistributionStore.from_dict(data["stats"])
+
+        return stats

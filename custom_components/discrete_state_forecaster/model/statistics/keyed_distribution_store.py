@@ -91,7 +91,7 @@ class KeyedDistributionStore:
     def prune(
         self: Self,
         epsilon: float = 0.003,
-        absolute_min: float = 20.0,
+        absolute_minimum_support: float = 20.0,
     ) -> None:
         """
         Removes infrequent states from all distributions and empty entries.
@@ -103,15 +103,15 @@ class KeyedDistributionStore:
         Args:
             epsilon: Relative threshold factor (default 0.003). States with
                 support < epsilon * total_support are candidates for removal.
-            absolute_min: Absolute minimum support (default 20.0). Ensures
+            absolute_minimum_support: Absolute minimum support (default 20.0). Ensures
                 infrequently observed states are removed even if total support
                 is high.
 
         """
         for dist in list(self._store.values()):
-            dist.prune_adaptive(epsilon, absolute_min)
+            dist.prune_adaptive(epsilon, absolute_minimum_support)
 
-        self._store = {k: d for k, d in self._store.items() if not d.is_empty()}
+        self._store = {k: d for k, d in self._store.items() if not d.is_empty}
 
     def get_distribution(self, key: Hashable) -> DistributionStats | None:
         """

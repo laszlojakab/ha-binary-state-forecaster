@@ -344,7 +344,7 @@ class TestHierarchicalStateStatsPrune:
             stats.update(key, f"state_{i}", float(i + 1))
 
         # Prune with strict threshold
-        stats.prune(epsilon=0.01, absolute_min=50.0)
+        stats.prune(epsilon=0.01, absolute_minimum_support=50.0)
 
         result = stats.predict(key)
         assert result is not None
@@ -498,7 +498,7 @@ class TestHierarchicalStateStatsIntegration:
         states_before = len(result_before.distribution)
 
         # Prune
-        stats.prune(epsilon=0.003, absolute_min=20.0)
+        stats.prune(epsilon=0.003, absolute_minimum_support=20.0)
 
         # Check after pruning
         result_after = stats.predict(key)

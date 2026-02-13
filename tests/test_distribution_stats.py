@@ -19,12 +19,12 @@ class TestDistributionStatsInitialization:
         """Test creating an empty distribution."""
         dist = DistributionStats()
         assert dist.total_support == 0.0
-        assert dist.is_empty()
+        assert dist.is_empty
 
     def test_empty_states_set(self: Self) -> None:
         """Test empty distribution has no states."""
         dist = DistributionStats()
-        assert dist.states() == set()
+        assert dist.to_dict() == {"states": {}}
 
     def test_empty_distribution_dict(self: Self) -> None:
         """Test empty distribution returns empty dict."""
@@ -78,7 +78,7 @@ class TestDistributionStatsUpdate:
         dist.update("state1", 1.0)
         dist.update("state2", 1.0)
         dist.update("state3", 1.0)
-        assert len(dist.states()) == 3
+        assert len(dist.to_dict()["states"]) == 3
 
 
 class TestDistributionStatsTotalSupport:
@@ -221,13 +221,13 @@ class TestDistributionStatsEntropy:
     def test_entropy_empty_distribution(self: Self) -> None:
         """Test entropy of empty distribution."""
         dist = DistributionStats()
-        assert dist.entropy() == 0.0
+        assert dist.entropy == 0.0
 
     def test_entropy_single_state(self: Self) -> None:
         """Test entropy with single state is zero."""
         dist = DistributionStats()
         dist.update("on", 10.0)
-        assert abs(dist.entropy() - 0.0) < 1e-9
+        assert abs(dist.entropy - 0.0) < 1e-9
 
     def test_entropy_two_equal_states(self: Self) -> None:
         """Test entropy with two equal probability states."""
@@ -235,7 +235,7 @@ class TestDistributionStatsEntropy:
         dist.update("a", 1.0)
         dist.update("b", 1.0)
         # Entropy = -0.5 * ln(0.5) - 0.5 * ln(0.5) = ln(2) ≈ 0.693
-        entropy = dist.entropy()
+        entropy = dist.entropy
         assert abs(entropy - 0.693147) < 0.001
 
     def test_entropy_three_equal_states(self: Self) -> None:
@@ -245,7 +245,7 @@ class TestDistributionStatsEntropy:
         dist.update("b", 1.0)
         dist.update("c", 1.0)
         # Entropy = 3 * (-1/3 * ln(1/3)) = ln(3) ≈ 1.099
-        entropy = dist.entropy()
+        entropy = dist.entropy
         assert abs(entropy - 1.0986) < 0.01
 
     def test_entropy_non_negative(self: Self) -> None:
@@ -253,7 +253,7 @@ class TestDistributionStatsEntropy:
         dist = DistributionStats()
         for i in range(1, 11):
             dist.update(f"state_{i}", float(i))
-        assert dist.entropy() >= 0.0
+        assert dist.entropy >= 0.0
 
 
 class TestDistributionStatsMaxProbability:
@@ -262,13 +262,13 @@ class TestDistributionStatsMaxProbability:
     def test_max_probability_empty(self: Self) -> None:
         """Test max_probability on empty distribution."""
         dist = DistributionStats()
-        assert dist.max_probability() == 0.0
+        assert dist.max_probability == 0.0
 
     def test_max_probability_single_state(self: Self) -> None:
         """Test max_probability with single state is 1.0."""
         dist = DistributionStats()
         dist.update("on", 10.0)
-        assert abs(dist.max_probability() - 1.0) < 1e-9
+        assert abs(dist.max_probability - 1.0) < 1e-9
 
     def test_max_probability_multiple_states(self: Self) -> None:
         """Test max_probability with multiple states."""
@@ -277,7 +277,7 @@ class TestDistributionStatsMaxProbability:
         dist.update("b", 2.0)
         dist.update("c", 3.0)
         # b has max prob of 3/6 = 0.5
-        assert abs(dist.max_probability() - 0.5) < 1e-9
+        assert abs(dist.max_probability - 0.5) < 1e-9
 
 
 class TestDistributionStatsApplyDecay:
@@ -318,13 +318,13 @@ class TestDistributionStatsStates:
     def test_states_empty_distribution(self: Self) -> None:
         """Test states on empty distribution."""
         dist = DistributionStats()
-        assert dist.states() == set()
+        assert dist.to_dict()["states"] == {}
 
     def test_states_single_state(self: Self) -> None:
         """Test states with single state."""
         dist = DistributionStats()
         dist.update("on", 1.0)
-        assert dist.states() == {"on"}
+        assert dist.to_dict()["states"].keys() == {"on"}
 
     def test_states_multiple_states(self: Self) -> None:
         """Test states returns all observed states."""
@@ -332,7 +332,7 @@ class TestDistributionStatsStates:
         dist.update("a", 1.0)
         dist.update("b", 1.0)
         dist.update("c", 1.0)
-        assert dist.states() == {"a", "b", "c"}
+        assert dist.to_dict()["states"].keys() == {"a", "b", "c"}
 
 
 class TestDistributionStatsIsEmpty:
@@ -341,20 +341,20 @@ class TestDistributionStatsIsEmpty:
     def test_is_empty_initial(self: Self) -> None:
         """Test is_empty on newly created distribution."""
         dist = DistributionStats()
-        assert dist.is_empty()
+        assert dist.is_empty
 
     def test_is_empty_after_update(self: Self) -> None:
         """Test is_empty returns False after update."""
         dist = DistributionStats()
         dist.update("on", 1.0)
-        assert not dist.is_empty()
+        assert not dist.is_empty
 
     def test_is_empty_with_zero_weight(self: Self) -> None:
         """Test is_empty after updating with zero weight."""
         dist = DistributionStats()
         dist.update("on", 0.0)
         # Still not empty (state exists)
-        assert not dist.is_empty()
+        assert not dist.is_empty
 
 
 class TestDistributionStatsPrune:
@@ -366,20 +366,20 @@ class TestDistributionStatsPrune:
         dist.update("a", 5.0)
         dist.update("b", 15.0)
         dist.prune(10.0)
-        assert dist.states() == {"b"}
+        assert dist.to_dict()["states"].keys() == {"b"}
 
     def test_prune_keeps_at_threshold(self: Self) -> None:
         """Test prune keeps states at threshold."""
         dist = DistributionStats()
         dist.update("a", 10.0)
         dist.prune(10.0)
-        assert dist.states() == {"a"}
+        assert dist.to_dict()["states"].keys() == {"a"}
 
     def test_prune_empty_distribution(self: Self) -> None:
         """Test prune on empty distribution."""
         dist = DistributionStats()
         dist.prune(10.0)
-        assert dist.is_empty()
+        assert dist.is_empty
 
     def test_prune_all_states(self: Self) -> None:
         """Test pruning removes all states when threshold high."""
@@ -387,7 +387,7 @@ class TestDistributionStatsPrune:
         dist.update("a", 1.0)
         dist.update("b", 2.0)
         dist.prune(100.0)
-        assert dist.is_empty()
+        assert dist.is_empty
 
 
 class TestDistributionStatsPruneAdaptive:
@@ -401,11 +401,13 @@ class TestDistributionStatsPruneAdaptive:
         dist.update("c", 10.0)
         # Threshold = max(1110 * 0.003, 20.0) = max(3.33, 20) = 20.0
         dist.prune_adaptive()
+
+        state_keys = dist.to_dict()["states"].keys()
         # Only 'a' and 'b' should remain
-        assert "a" in dist.states()
-        assert "b" in dist.states()
+        assert "a" in state_keys
+        assert "b" in state_keys
         # 'c' with 10.0 should be removed
-        assert "c" not in dist.states()
+        assert "c" not in state_keys
 
     def test_prune_adaptive_custom_epsilon(self: Self) -> None:
         """Test prune_adaptive with custom epsilon."""
@@ -413,9 +415,9 @@ class TestDistributionStatsPruneAdaptive:
         for i in range(1, 11):
             dist.update(f"state_{i}", float(i * 10))
         # Total = 550, threshold = max(550 * 0.01, 20.0) = max(5.5, 20) = 20.0
-        dist.prune_adaptive(epsilon=0.01, absolute_min=20.0)
+        dist.prune_adaptive(epsilon=0.01, absolute_minimum_support=20.0)
         # States with 20+ should remain (states 2-10)
-        assert "state_1" not in dist.states()  # 10 < 20
+        assert "state_1" not in dist.to_dict()["states"]  # 10 < 20
 
     def test_prune_adaptive_custom_absolute_min(self: Self) -> None:
         """Test prune_adaptive respects absolute minimum."""
@@ -424,10 +426,11 @@ class TestDistributionStatsPruneAdaptive:
         dist.update("b", 10.0)
         # With low epsilon, threshold might be < 10
         # But absolute_min=100 forces threshold=100
-        dist.prune_adaptive(epsilon=0.001, absolute_min=100.0)
+        dist.prune_adaptive(epsilon=0.001, absolute_minimum_support=100.0)
+        state_keys = dist.to_dict()["states"].keys()
         # Only 'a' should remain (1000 >= 100)
-        assert "a" in dist.states()
-        assert "b" not in dist.states()
+        assert "a" in state_keys
+        assert "b" not in state_keys
 
 
 class TestDistributionStatsIntegration:
@@ -446,7 +449,7 @@ class TestDistributionStatsIntegration:
 
         # Prune and check
         dist.prune(10.0)
-        assert dist.states() == {"on", "off"}
+        assert dist.to_dict()["states"].keys() == {"on", "off"}
 
     def test_workflow_decay_then_stable(self: Self) -> None:
         """Test decay followed by getting stable distribution."""

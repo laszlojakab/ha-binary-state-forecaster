@@ -9,18 +9,19 @@ This helps predictions favor the current state when it's expected to persist.
 from __future__ import annotations
 
 import math
-from typing import Any, Final, Self
-
-from custom_components.discrete_state_forecaster.model.hyper_parameters import (
-    HyperParameters,
-)
-from custom_components.discrete_state_forecaster.model.state import (
-    State,
-)
+from typing import TYPE_CHECKING, Any, Final, Self
 
 from .state_persistence_tracker_hyper_parameters import (
     StatePersistenceTrackerHyperParameters,
 )
+
+if TYPE_CHECKING:
+    from custom_components.discrete_state_forecaster.model.hyper_parameters import (
+        HyperParameters,
+    )
+    from custom_components.discrete_state_forecaster.model.state import (
+        State,
+    )
 
 
 class StatePersistenceTracker:
@@ -40,9 +41,6 @@ class StatePersistenceTracker:
         _current_state_start: Timestamp when current state started, or None.
 
     Example:
-        >>> from custom_components.discrete_state_forecaster.model.hyper_parameters import (
-        ...     HyperParameters,
-        ... )
         >>> base_hp = HyperParameters(
         ...     half_life=50.0,
         ...     min_prune_interval=10.0,
@@ -57,8 +55,22 @@ class StatePersistenceTracker:
         >>> tracker.update("on", 100.0)
         >>> tracker.current_state()
         'on'
-
     """
+
+    _hyper_parameters: Final[StatePersistenceTrackerHyperParameters]
+    """Configuration controlling decay behavior."""
+
+    _mean_duration: Final[dict[State, float]] = {}
+    """Exponentially weighted mean duration for each observed state."""
+
+    _last_ts: float | None = None
+    """Timestamp of last update, or None if never updated."""
+
+    _current_state: State | None = None
+    """Currently active state, or None if no state observed yet."""
+
+    _current_state_start: float | None = None
+    """Timestamp when current state started, or None if no state active."""
 
     def __init__(
         self: Self, hyper_parameters: StatePersistenceTrackerHyperParameters
@@ -68,17 +80,12 @@ class StatePersistenceTracker:
 
         Args:
             hyper_parameters: Configuration controlling decay behavior.
-
         """
         self._hyper_parameters: Final = hyper_parameters
-        self._mean_duration: dict[State, float] = {}
-        self._last_ts: float | None = None
-        self._current_state: State | None = None
-        self._current_state_start: float | None = None
 
     def update(self: Self, state: State, timestamp: float) -> None:
         """
-        Update tracker with new state observation.
+        Updates tracker with new state observation.
 
         When state changes, records the duration of the previous state and
         updates its mean duration using exponential weighting. The first
@@ -87,7 +94,6 @@ class StatePersistenceTracker:
         Args:
             state: The observed state.
             timestamp: Current timestamp.
-
         """
         if self._current_state is None:
             self._current_state = state
@@ -111,6 +117,7 @@ class StatePersistenceTracker:
             self._current_state_start = timestamp
             self._last_ts = timestamp
 
+    @property
     def current_state(self: Self) -> State | None:
         """
         Get the currently active state.
@@ -187,6 +194,13 @@ class StatePersistenceTracker:
         return math.exp(-ratio)
 
     def to_dict(self: Self) -> dict[str, Any]:
+        """
+        Serializes the instance into a dictionary.
+
+        Returns:
+            A dictionary representation of the instance, including hyper-parameters
+            and current state information.
+        """
         return {
             "hyper_parameters": self._hyper_parameters.to_dict(),
             "mean_duration": self._mean_duration,
@@ -199,14 +213,25 @@ class StatePersistenceTracker:
     def from_dict(
         cls, data: dict[str, Any], hyper_parameters: HyperParameters
     ) -> StatePersistenceTracker:
+        """
+        Deserializes an instance from a dictionary.
+
+        Args:
+            data: Dictionary containing serialized instance data.
+            hyper_parameters: Base hyper-parameters needed to reconstruct the
+                StatePersistenceTrackerHyperParameters.
+
+        Returns:
+            A new StatePersistenceTracker instance initialized from the provided data.
+        """
         hyper_parameters = StatePersistenceTrackerHyperParameters.from_dict(
             data["hyper_parameters"], hyper_parameters
         )
 
         tracker = cls(hyper_parameters=hyper_parameters)
-        tracker._mean_duration = data.get("mean_duration", {})
-        tracker._last_ts = data.get("last_ts")
-        tracker._current_state = data.get("current_state")
-        tracker._current_state_start = data.get("current_state_start")
+        tracker._mean_duration = data["mean_duration"]
+        tracker._last_ts = data["last_ts"]
+        tracker._current_state = data["current_state"]
+        tracker._current_state_start = data["current_state_start"]
 
         return tracker

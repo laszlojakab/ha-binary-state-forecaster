@@ -23,14 +23,7 @@ class StatePersistenceTrackerHyperParameters:
     for persistence duration statistics. The persistence half-life controls
     how quickly old duration observations are forgotten.
 
-    Attributes:
-        _hyper_parameters: Base hyper-parameters.
-        _persistence_half_life_factor: Multiplier applied to base half-life.
-
     Example:
-        >>> from custom_components.discrete_state_forecaster.model.hyper_parameters import (
-        ...     HyperParameters,
-        ... )
         >>> base_hp = HyperParameters(
         ...     half_life=50.0,
         ...     min_prune_interval=10.0,
@@ -46,6 +39,12 @@ class StatePersistenceTrackerHyperParameters:
 
     """
 
+    _hyper_parameters: Final[HyperParameters]
+    """Base hyper-parameters containing the reference half-life."""
+
+    _persistence_half_life_factor: Final[float]
+    """Multiplier applied to base half-life for persistence tracking."""
+
     def __init__(
         self: Self,
         *,
@@ -58,7 +57,6 @@ class StatePersistenceTrackerHyperParameters:
         Args:
             hyper_parameters: Base hyper-parameters providing reference half-life.
             persistence_half_life_factor: Multiplier for base half-life.
-
         """
         self._hyper_parameters: Final = hyper_parameters
         self._persistence_half_life_factor: Final = persistence_half_life_factor
@@ -75,6 +73,7 @@ class StatePersistenceTrackerHyperParameters:
         return self._hyper_parameters.half_life * self._persistence_half_life_factor
 
     def to_dict(self: Self) -> dict[str, Any]:
+        """Serializes the instance into a dictionary."""
         return {
             "persistence_half_life_factor": self._persistence_half_life_factor,
         }
@@ -83,6 +82,14 @@ class StatePersistenceTrackerHyperParameters:
     def from_dict(
         cls, data: dict[str, Any], hyper_parameters: HyperParameters
     ) -> StatePersistenceTrackerHyperParameters:
+        """
+        Deserializes an instance from a dictionary.
+
+        Args:
+            data: Dictionary containing serialized hyper-parameters.
+            hyper_parameters: Base hyper-parameters needed to reconstruct the
+                StatePersistenceTrackerHyperParameters.
+        """
         return cls(
             hyper_parameters=hyper_parameters,
             persistence_half_life_factor=data["persistence_half_life_factor"],

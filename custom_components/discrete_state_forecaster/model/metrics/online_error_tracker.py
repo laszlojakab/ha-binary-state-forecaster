@@ -1,28 +1,18 @@
-"""
-Online prediction error tracking using exponential decay.
-
-This module provides OnlineErrorTracker, which maintains running statistics of
-prediction errors using negative log-likelihood as the error metric. Statistics
-are updated with exponential decay to give more weight to recent errors.
-"""
+"""Online prediction error tracking using exponential decay."""
 
 from __future__ import annotations
 
 import math
 from typing import TYPE_CHECKING, Any, Final, Self
 
-from custom_components.discrete_state_forecaster.model.hyper_parameters import (
-    HyperParameters,
-)
-
 from .online_error_tracker_hyper_parameters import OnlineErrorTrackerHyperParameters
 
 if TYPE_CHECKING:
+    from custom_components.discrete_state_forecaster.model.hyper_parameters import (
+        HyperParameters,
+    )
     from custom_components.discrete_state_forecaster.model.state import (
         State,
-    )
-    from custom_components.discrete_state_forecaster.model.statistics.distribution_stats import (
-        DistributionStats,
     )
 
 
@@ -44,9 +34,6 @@ class OnlineErrorTracker:
         _last_ts: Timestamp of last update, or None if never updated.
 
     Example:
-        >>> from custom_components.discrete_state_forecaster.model.hyper_parameters import (  # noqa: E501
-        ...     HyperParameters,
-        ... )
         >>> base_hp = HyperParameters(
         ...     half_life=50.0,
         ...     min_prune_interval=10.0,
@@ -67,6 +54,15 @@ class OnlineErrorTracker:
 
     """
 
+    _hyper_parameters: Final[OnlineErrorTrackerHyperParameters]
+    """Configuration controlling error decay and tracking."""
+    _mean: float = 0.0
+    """Current mean of negative log-likelihood errors."""
+    _var: float = 0.0
+    """Current variance of negative log-likelihood errors."""
+    _last_ts: float | None = None
+    """Timestamp of last update, or None if never updated."""
+
     def __init__(
         self: Self,
         hyper_parameters: OnlineErrorTrackerHyperParameters,
@@ -76,12 +72,8 @@ class OnlineErrorTracker:
 
         Args:
             hyper_parameters: Configuration controlling error decay and tracking.
-
         """
-        self._hyper_parameters: Final = hyper_parameters
-        self._mean: float = 0.0
-        self._var: float = 0.0
-        self._last_ts: float | None = None
+        self._hyper_parameters = hyper_parameters
 
     def update(
         self: Self,
@@ -135,7 +127,6 @@ class OnlineErrorTracker:
         Returns:
             Mean negative log-likelihood of predictions. Lower values indicate
                 better prediction performance on average.
-
         """
         return self._mean
 
@@ -152,17 +143,31 @@ class OnlineErrorTracker:
         return math.sqrt(max(self._var, 1e-12))
 
     def to_dict(self: Self) -> dict[str, Any]:
+        """
+        Serialize the error tracker state to a dictionary.
+
+        Returns:
+            A dictionary containing the hyper-parameters and current error statistics.
+        """
         return {
+            "hyper_parameters": self._hyper_parameters.to_dict(),
             "mean": self._mean,
             "var": self._var,
             "last_ts": self._last_ts,
-            "hyper_parameters": self._hyper_parameters.to_dict(),
         }
 
     @classmethod
     def from_dict(
         cls, data: dict[str, Any], hyper_parameters: HyperParameters
     ) -> OnlineErrorTracker:
+        """
+        Deserialize an OnlineErrorTracker from a dictionary.
+
+        Args:
+            data: Dictionary containing the serialized state of the error tracker.
+            hyper_parameters: Base hyper-parameters needed to reconstruct the
+                OnlineErrorTrackerHyperParameters.
+        """
         tracker = cls(
             hyper_parameters=OnlineErrorTrackerHyperParameters.from_dict(
                 data["hyper_parameters"], hyper_parameters
@@ -171,4 +176,5 @@ class OnlineErrorTracker:
         tracker._mean = data.get("mean", 0.0)
         tracker._var = data.get("var", 0.0)
         tracker._last_ts = data.get("last_ts")
+
         return tracker

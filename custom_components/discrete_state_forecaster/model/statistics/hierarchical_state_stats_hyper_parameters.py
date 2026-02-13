@@ -1,11 +1,4 @@
-"""
-Configuration parameters for hierarchical state statistics.
-
-This module provides `HierarchicalStateStatsHyperParameters`, a configuration
-class that encapsulates parameters controlling the behavior of the hierarchical
-prediction engine, particularly the minimum support thresholds that determine
-prediction confidence.
-"""
+"""Configuration parameters for hierarchical state statistics."""
 
 from __future__ import annotations
 
@@ -31,23 +24,19 @@ class HierarchicalStateStatsHyperParameters:
     more conservative (requiring more data), while lower thresholds make them
     more permissive.
 
-    Attributes:
-        _hyper_parameters: The base hyper parameters containing global
-            configuration like half_life for decay calculations.
-        _min_support_factor: Scaling factor applied to half_life to compute
-            the actual minimum support threshold. Defaults to 1.0 (use half_life
-            directly).
-
     Example:
-        >>> from custom_components.discrete_state_forecaster.model.hyper_parameters import (
-        ...     HyperParameters,
-        ... )
         >>> base_hp = HyperParameters(half_life=50.0)
         >>> hp = HierarchicalStateStatsHyperParameters(base_hp, min_support_factor=0.5)
         >>> hp.min_support
         25.0
 
     """
+
+    _hyper_parameters: Final[HyperParameters]
+    """Base hyper parameters containing global configuration values."""
+
+    _min_support_factor: Final[float]
+    """Scaling factor for minimum support threshold calculation."""
 
     def __init__(
         self: Self, hyper_parameters: HyperParameters, min_support_factor: float = 1.0
@@ -85,7 +74,7 @@ class HierarchicalStateStatsHyperParameters:
 
     def to_dict(self: Self) -> dict[str, Any]:
         """
-        Serializes the hyper parameters to a dictionary.
+        Returns a JSON-serializable representation of the instance.
 
         Returns:
           A dictionary containing the minimum support threshold.
@@ -104,7 +93,8 @@ class HierarchicalStateStatsHyperParameters:
           hyper_parameters: The base HyperParameters instance to use for calculations.
 
         Returns:
-          An instance of HierarchicalStateStatsHyperParameters initialized with the provided minimum support threshold and base hyper parameters.
+          An instance of HierarchicalStateStatsHyperParameters initialized with the provided
+          minimum support threshold and base hyper parameters.
         """
         return cls(
             hyper_parameters=hyper_parameters,

@@ -17,6 +17,24 @@ class StateStats:
 
     Support is accumulated as observations are made and can be decayed
     over time to emphasize recent observations.
+
+    Example:
+        >>> stats = StateStats()
+        >>> stats.update(2.0)
+        >>> stats.support
+        2.0
+        >>> stats.is_active(1.0)
+        True
+        >>> stats.apply_decay(0.5)
+        >>> stats.support
+        1.0
+        >>> stats.is_active(1.0)
+        True
+        >>> stats.apply_decay(0.5)
+        >>> stats.support
+        0.5
+        >>> stats.is_active(1.0)
+        False
     """
 
     _support: float = 0.0

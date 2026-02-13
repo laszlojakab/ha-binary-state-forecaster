@@ -155,12 +155,13 @@ class TestKeyedDistributionStorePrune:
         store = KeyedDistributionStore()
         store.update("key1", "a", 5.0)
         store.update("key1", "b", 15.0)
-        store.prune(epsilon=0.003, absolute_min=10.0)
+        store.prune(epsilon=0.003, absolute_minimum_support=10.0)
 
         dist = store.get_distribution("key1")
+        state_keys = dist.to_dict()["states"].keys()
         # 'a' with 5.0 should be removed (< 10.0)
-        assert "a" not in dist.states()
-        assert "b" in dist.states()
+        assert "a" not in state_keys
+        assert "b" in state_keys
 
     def test_prune_removes_empty_distributions(self: Self) -> None:
         """Test prune removes keys with empty distributions."""
@@ -169,7 +170,7 @@ class TestKeyedDistributionStorePrune:
         store.update("key2", "b", 1000.0)
 
         # After pruning, key1 should be removed (all states < 20)
-        store.prune(epsilon=0.003, absolute_min=20.0)
+        store.prune(epsilon=0.003, absolute_minimum_support=20.0)
 
         assert store.get_distribution("key1") is None
         assert store.get_distribution("key2") is not None
@@ -187,11 +188,12 @@ class TestKeyedDistributionStorePrune:
         store.update("key1", "b", 1.0)  # 0.1% of total
 
         # With epsilon=0.001, threshold = max(101 * 0.001, 20) = 20
-        store.prune(epsilon=0.001, absolute_min=20.0)
+        store.prune(epsilon=0.001, absolute_minimum_support=20.0)
 
         dist = store.get_distribution("key1")
-        assert "a" in dist.states()
-        assert "b" not in dist.states()
+        state_keys = dist.to_dict()["states"].keys()
+        assert "a" in state_keys
+        assert "b" not in state_keys
 
     def test_prune_with_high_epsilon(self: Self) -> None:
         """Test prune with high epsilon value."""
@@ -200,11 +202,12 @@ class TestKeyedDistributionStorePrune:
         store.update("key1", "b", 100.0)
 
         # With epsilon=0.1, threshold = max(1100 * 0.1, 20) = 110
-        store.prune(epsilon=0.1, absolute_min=20.0)
+        store.prune(epsilon=0.1, absolute_minimum_support=20.0)
 
         dist = store.get_distribution("key1")
-        assert "a" in dist.states()
-        assert "b" not in dist.states()
+        state_keys = dist.to_dict()["states"].keys()
+        assert "a" in state_keys
+        assert "b" not in state_keys
 
 
 class TestKeyedDistributionStoreAggregate:
@@ -345,7 +348,8 @@ class TestKeyedDistributionStoreEdgeCases:
             store.update("key1", f"state_{i}", 1.0)
 
         dist = store.get_distribution("key1")
-        assert len(dist.states()) == 100
+        state_keys = dist.to_dict()["states"].keys()
+        assert len(state_keys) == 100
 
 
 class TestKeyedDistributionStoreIntegration:
@@ -376,13 +380,14 @@ class TestKeyedDistributionStoreIntegration:
         store.update("key2", "state", 100.0)
 
         # Prune with absolute_min=20
-        store.prune(epsilon=0.003, absolute_min=20.0)
+        store.prune(epsilon=0.003, absolute_minimum_support=20.0)
 
         # key1's "rare" should be removed
         key1_dist = store.get_distribution("key1")
         assert key1_dist is not None
-        assert "rare" not in key1_dist.states()
-        assert "frequent" in key1_dist.states()
+        state_keys = key1_dist.to_dict()["states"].keys()
+        assert "rare" not in state_keys
+        assert "frequent" in state_keys
 
     def test_many_updates_then_aggregate(self: Self) -> None:
         """Test many updates followed by aggregation."""
