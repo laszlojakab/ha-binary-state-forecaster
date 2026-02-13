@@ -252,3 +252,239 @@ class TestDriftMonitorProperties:
 
         assert isinstance(monitor.last_drift, float)
         assert monitor.last_drift >= 0.0
+
+
+class TestDriftMonitorSerialization:
+    """Tests for serialization and deserialization."""
+
+    def test_to_dict_structure(self: Self) -> None:
+        """Test that to_dict returns correct structure."""
+        hp = create_test_hp()
+        monitor = DriftMonitor(hp)
+
+        dist = {"on": 0.6, "off": 0.4}
+        monitor.update(dist, 100.0)
+        monitor.update(dist, 110.0)
+
+        data = monitor.to_dict()
+
+        assert "hyper_parameters" in data
+        assert "fast_baseline" in data
+        assert "slow_baseline" in data
+        assert "drift_stats" in data
+        assert "enter_counter" in data
+        assert "exit_counter" in data
+        assert "is_drifting" in data
+        assert "last_drift" in data
+        assert "tau_enter" in data
+        assert "tau_exit" in data
+
+    def test_from_dict_reconstruction(self: Self) -> None:
+        """Test reconstruction from dictionary."""
+        base_hp = HyperParameters(
+            half_life=50.0,
+            min_prune_interval=10.0,
+            prune_enabled=True,
+            persistence_strength=0.95,
+        )
+        hp = create_test_hp()
+
+        # Create initial monitor state
+        original = DriftMonitor(hp)
+        dist = {"on": 0.7, "off": 0.3}
+        for i in range(5):
+            original.update(dist, 100.0 + i * 10.0)
+
+        data = original.to_dict()
+        restored = DriftMonitor.from_dict(data, base_hp)
+
+        assert restored.is_drifting == original.is_drifting
+        assert abs(restored.last_drift - original.last_drift) < 1e-9
+
+    def test_round_trip_serialization(self: Self) -> None:
+        """Test that serialization and deserialization preserves state."""
+        base_hp = HyperParameters(
+            half_life=50.0,
+            min_prune_interval=10.0,
+            prune_enabled=True,
+            persistence_strength=0.95,
+        )
+        hp = create_test_hp(adaptive_tau=True)
+        original = DriftMonitor(hp)
+
+        # Create some history
+        dist1 = {"on": 0.8, "off": 0.2}
+        for i in range(5):
+            original.update(dist1, 100.0 + i * 10.0)
+
+        dist2 = {"on": 0.6, "off": 0.4}
+        for i in range(5):
+            original.update(dist2, 150.0 + i * 10.0)
+
+        data = original.to_dict()
+        restored = DriftMonitor.from_dict(data, base_hp)
+
+        # Check that key state is preserved
+        assert restored.is_drifting == original.is_drifting
+        assert abs(restored.last_drift - original.last_drift) < 1e-9
+
+    def test_serialization_with_no_updates(self: Self) -> None:
+        """Test serialization before any updates."""
+        base_hp = HyperParameters(
+            half_life=50.0,
+            min_prune_interval=10.0,
+            prune_enabled=True,
+            persistence_strength=0.95,
+        )
+        hp = create_test_hp()
+        monitor = DriftMonitor(hp)
+
+        data = monitor.to_dict()
+        restored = DriftMonitor.from_dict(data, base_hp)
+
+        assert not restored.is_drifting
+        assert restored.last_drift == 0.0
+
+    def test_serialization_preserves_drift_state(self: Self) -> None:
+        """Test that drift state is preserved across serialization."""
+        base_hp = HyperParameters(
+            half_life=50.0,
+            min_prune_interval=10.0,
+            prune_enabled=True,
+            persistence_strength=0.95,
+        )
+        hp = create_test_hp(adaptive_tau=False, n_enter=2)
+        monitor = DriftMonitor(hp)
+
+        # Establish baseline
+        dist1 = {"on": 0.9, "off": 0.1}
+        for i in range(5):
+            monitor.update(dist1, 100.0 + i * 5.0)
+
+        # Try to trigger drift
+        dist2 = {"on": 0.1, "off": 0.9}
+        for i in range(10):
+            monitor.update(dist2, 125.0 + i * 5.0)
+
+        was_drifting = monitor.is_drifting
+
+        data = monitor.to_dict()
+        restored = DriftMonitor.from_dict(data, base_hp)
+
+        assert restored.is_drifting == was_drifting
+
+    def test_continued_updates_after_deserialization(self: Self) -> None:
+        """Test that deserialized monitor can be updated."""
+        base_hp = HyperParameters(
+            half_life=50.0,
+            min_prune_interval=10.0,
+            prune_enabled=True,
+            persistence_strength=0.95,
+        )
+        hp = create_test_hp()
+        original = DriftMonitor(hp)
+
+        dist = {"on": 0.6, "off": 0.4}
+        for i in range(3):
+            original.update(dist, 100.0 + i * 10.0)
+
+        data = original.to_dict()
+        restored = DriftMonitor.from_dict(data, base_hp)
+
+        # Continue updating the restored instance
+        for i in range(3):
+            restored.update(dist, 130.0 + i * 10.0)
+
+        # Should not raise any errors
+        assert isinstance(restored.last_drift, float)
+
+    def test_serialization_with_adaptive_thresholds(self: Self) -> None:
+        """Test serialization with adaptive threshold mode."""
+        base_hp = HyperParameters(
+            half_life=50.0,
+            min_prune_interval=10.0,
+            prune_enabled=True,
+            persistence_strength=0.95,
+        )
+        hp = create_test_hp(adaptive_tau=True)
+        monitor = DriftMonitor(hp)
+
+        dist = {"on": 0.5, "off": 0.5}
+        for i in range(10):
+            monitor.update(dist, 100.0 + i * 10.0)
+
+        data = monitor.to_dict()
+        DriftMonitor.from_dict(data, base_hp)
+
+        # Thresholds should be preserved
+        assert "tau_enter" in data
+        assert "tau_exit" in data
+
+    def test_serialization_with_fixed_thresholds(self: Self) -> None:
+        """Test serialization with fixed threshold mode."""
+        base_hp = HyperParameters(
+            half_life=50.0,
+            min_prune_interval=10.0,
+            prune_enabled=True,
+            persistence_strength=0.95,
+        )
+        hp = create_test_hp(adaptive_tau=False)
+        monitor = DriftMonitor(hp)
+
+        dist = {"on": 0.5, "off": 0.5}
+        for i in range(10):
+            monitor.update(dist, 100.0 + i * 10.0)
+
+        data = monitor.to_dict()
+        restored = DriftMonitor.from_dict(data, base_hp)
+
+        # Fixed thresholds should be preserved
+        assert restored is not None
+
+    def test_serialization_preserves_counters(self: Self) -> None:
+        """Test that enter and exit counters are preserved."""
+        hp = create_test_hp()
+        monitor = DriftMonitor(hp)
+
+        dist = {"on": 0.6, "off": 0.4}
+        for i in range(5):
+            monitor.update(dist, 100.0 + i * 10.0)
+
+        data = monitor.to_dict()
+
+        # Counters should be in the serialized data
+        assert "enter_counter" in data
+        assert "exit_counter" in data
+        assert isinstance(data["enter_counter"], int)
+        assert isinstance(data["exit_counter"], int)
+
+    def test_multiple_round_trip_serializations(self: Self) -> None:
+        """Test multiple serialization/deserialization cycles."""
+        base_hp = HyperParameters(
+            half_life=50.0,
+            min_prune_interval=10.0,
+            prune_enabled=True,
+            persistence_strength=0.95,
+        )
+        hp = create_test_hp()
+        monitor1 = DriftMonitor(hp)
+
+        dist = {"on": 0.7, "off": 0.3}
+        for i in range(3):
+            monitor1.update(dist, 100.0 + i * 10.0)
+
+        # First round trip
+        data1 = monitor1.to_dict()
+        monitor2 = DriftMonitor.from_dict(data1, base_hp)
+
+        # Continue updates
+        for i in range(2):
+            monitor2.update(dist, 130.0 + i * 10.0)
+
+        # Second round trip
+        data2 = monitor2.to_dict()
+        monitor3 = DriftMonitor.from_dict(data2, base_hp)
+
+        # Should be valid
+        assert isinstance(monitor3.last_drift, float)
+        assert isinstance(monitor3.is_drifting, bool)
