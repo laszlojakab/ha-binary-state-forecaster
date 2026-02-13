@@ -4,10 +4,12 @@ Hyper-parameters for drift statistics tracking.
 This module provides configuration for DriftStats, controlling the decay rate
 used when computing exponentially weighted drift statistics.
 """
+from __future__ import annotations
 
-from typing import Final, Self
+from typing import TYPE_CHECKING, Final, Self
 
-from .drift_monitor_hyper_parameters import DriftMonitorHyperParameters
+if TYPE_CHECKING:
+    from .drift_monitor_hyper_parameters import DriftMonitorHyperParameters
 
 
 class DriftStatsHyperParameters:
@@ -18,14 +20,7 @@ class DriftStatsHyperParameters:
     the half-life for drift statistics. The drift half-life controls how
     quickly old drift measurements are forgotten.
 
-    Attributes:
-        _hyper_parameters: Parent drift monitor configuration.
-        _half_life_factor: Multiplier applied to base half-life.
-
     Example:
-        >>> from custom_components.discrete_state_forecaster.model.hyper_parameters import (
-        ...     HyperParameters,
-        ... )
         >>> base_hp = HyperParameters(
         ...     half_life=50.0,
         ...     min_prune_interval=10.0,
@@ -41,6 +36,12 @@ class DriftStatsHyperParameters:
         100.0
 
     """
+
+    _hyper_parameters: Final[DriftMonitorHyperParameters]
+    """Parent drift monitor configuration."""
+
+    _half_life_factor: Final[float]
+    """Multiplier applied to base half-life for drift statistics decay."""
 
     def __init__(
         self: Self,
@@ -69,3 +70,34 @@ class DriftStatsHyperParameters:
 
         """
         return self._hyper_parameters.half_life * self._half_life_factor
+
+    def to_dict(self: Self) -> dict[str, float]:
+        """
+        Serialize hyper-parameters to a dictionary.
+
+        Returns:
+            A dictionary containing the half-life factor for drift statistics.
+        """
+        return {"half_life_factor": self._half_life_factor}
+
+    @classmethod
+    def from_dict(
+        cls,
+        data: dict[str, float],
+        hyper_parameters: DriftMonitorHyperParameters,
+    ) -> DriftStatsHyperParameters:
+        """
+        Create an instance from a dictionary.
+
+        Args:
+            data: Dictionary containing the half_life_factor value.
+            hyper_parameters: Parent drift monitor configuration providing the base
+                half-life value used to compute the drift half-life.
+
+        Returns:
+            A new DriftStatsHyperParameters instance.
+        """
+        return cls(
+            hyper_parameters=hyper_parameters,
+            half_life_factor=data["half_life_factor"],
+        )

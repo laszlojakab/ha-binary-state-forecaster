@@ -7,7 +7,7 @@ adaptive thresholds for drift detection.
 """
 
 import math
-from typing import Final, Self
+from typing import Any, Final, Self
 
 from .drift_stats_hyper_parameters import DriftStatsHyperParameters
 
@@ -20,17 +20,7 @@ class DriftStats:
     to recent observations. Used to establish adaptive thresholds for drift
     detection based on historical drift patterns.
 
-    Attributes:
-        _hyper_parameters: Configuration controlling decay rate.
-        _mean: Current mean of drift values.
-        _var: Current variance of drift values.
-        _last_ts: Timestamp of last update, or None if never updated.
-
     Example:
-        >>> from custom_components.discrete_state_forecaster.model.hyper_parameters import (
-        ...     HyperParameters,
-        ... )
-        >>> from .drift_monitor_hyper_parameters import DriftMonitorHyperParameters
         >>> base_hp = HyperParameters(
         ...     half_life=50.0,
         ...     min_prune_interval=10.0,
@@ -48,6 +38,18 @@ class DriftStats:
         0.1
 
     """
+
+    _hyper_parameters: Final[DriftStatsHyperParameters]
+    """Configuration controlling decay behavior."""
+
+    _mean: float
+    """Current mean of drift values."""
+
+    _var: float
+    """Current variance of drift values."""
+
+    _last_ts: float | None
+    """Timestamp of last update, or None if never updated."""
 
     def __init__(
         self: Self,
@@ -127,3 +129,42 @@ class DriftStats:
 
         """
         return self._var
+
+    def to_dict(self: Self) -> dict[str, Any]:
+        """
+        Serialize the drift statistics to a dictionary.
+
+        Returns:
+            A dictionary containing hyper-parameters, mean, variance,
+            and the timestamp of the last update.
+        """
+        return {
+            "hyper_parameters": self._hyper_parameters.to_dict(),
+            "mean": self._mean,
+            "var": self._var,
+            "last_ts": self._last_ts,
+        }
+
+    @classmethod
+    def from_dict(
+        cls,
+        data: dict[str, Any],
+        hyper_parameters: DriftStatsHyperParameters,
+    ) -> Self:
+        """
+        Deserialize drift statistics from a dictionary.
+
+        Args:
+            data: Dictionary containing serialized statistics including
+                mean, variance, and last timestamp.
+            hyper_parameters: Hyper-parameters to use for the reconstructed instance.
+
+        Returns:
+            A new DriftStats instance initialized with the provided data,
+            with all internal state restored.
+        """
+        stats = cls(hyper_parameters=hyper_parameters)
+        stats._mean = data["mean"]
+        stats._var = data["var"]
+        stats._last_ts = data["last_ts"]
+        return stats

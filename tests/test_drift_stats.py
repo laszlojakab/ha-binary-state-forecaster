@@ -11,13 +11,13 @@ from typing import Self
 from custom_components.discrete_state_forecaster.model.hyper_parameters import (
     HyperParameters,
 )
-from custom_components.discrete_state_forecaster.model.learning.drift_monitor_hyper_parameters import (
+from custom_components.discrete_state_forecaster.model.learning.drift_monitor_hyper_parameters import (  # noqa: E501
     DriftMonitorHyperParameters,
 )
 from custom_components.discrete_state_forecaster.model.learning.drift_stats import (
     DriftStats,
 )
-from custom_components.discrete_state_forecaster.model.learning.drift_stats_hyper_parameters import (
+from custom_components.discrete_state_forecaster.model.learning.drift_stats_hyper_parameters import (  # noqa: E501
     DriftStatsHyperParameters,
 )
 
@@ -222,3 +222,133 @@ class TestDriftStatsEdgeCases:
 
         # After long decay, new value should dominate
         assert abs(stats.mean - 0.8) < 0.1
+
+
+class TestDriftStatsSerialization:
+    """Tests for serialization and deserialization."""
+
+    def test_to_dict_structure(self: Self) -> None:
+        """Test that to_dict returns correct structure."""
+        hp = create_test_hp()
+        stats = DriftStats(hp)
+
+        stats.update(0.5, 100.0)
+        stats.update(0.3, 110.0)
+
+        data = stats.to_dict()
+
+        assert "hyper_parameters" in data
+        assert "mean" in data
+        assert "var" in data
+        assert "last_ts" in data
+        assert isinstance(data["hyper_parameters"], dict)
+
+    def test_from_dict_reconstruction(self: Self) -> None:
+        """Test reconstruction from dictionary."""
+        hp = create_test_hp()
+        data = {
+            "hyper_parameters": hp.to_dict(),
+            "mean": 0.42,
+            "var": 0.05,
+            "last_ts": 200.0,
+        }
+
+        stats = DriftStats.from_dict(data, hp)
+
+        assert stats.mean == 0.42
+        assert stats.var == 0.05
+
+    def test_round_trip_serialization(self: Self) -> None:
+        """Test that serialization and deserialization preserves state."""
+        hp = create_test_hp()
+        original = DriftStats(hp)
+
+        original.update(0.3, 100.0)
+        original.update(0.5, 120.0)
+        original.update(0.4, 140.0)
+
+        data = original.to_dict()
+        restored = DriftStats.from_dict(data, hp)
+
+        assert abs(restored.mean - original.mean) < 1e-9
+        assert abs(restored.var - original.var) < 1e-9
+        assert abs(restored.std - original.std) < 1e-9
+
+    def test_serialization_with_no_updates(self: Self) -> None:
+        """Test serialization before any updates."""
+        hp = create_test_hp()
+        stats = DriftStats(hp)
+
+        data = stats.to_dict()
+        restored = DriftStats.from_dict(data, hp)
+
+        assert restored.mean == 0.0
+        assert restored.var == 0.0
+
+    def test_serialization_after_first_update(self: Self) -> None:
+        """Test serialization after single update."""
+        hp = create_test_hp()
+        original = DriftStats(hp)
+        original.update(0.75, 100.0)
+
+        data = original.to_dict()
+        restored = DriftStats.from_dict(data, hp)
+
+        assert restored.mean == 0.75
+        assert restored.var == 0.0
+
+    def test_serialization_preserves_statistics(self: Self) -> None:
+        """Test that serialization preserves all statistics accurately."""
+        hp = create_test_hp()
+        original = DriftStats(hp)
+
+        # Add varying values to create non-trivial statistics
+        values = [0.1, 0.5, 0.2, 0.8, 0.3, 0.6]
+        for i, v in enumerate(values):
+            original.update(v, 100.0 + i * 10.0)
+
+        data = original.to_dict()
+        restored = DriftStats.from_dict(data, hp)
+
+        # All statistics should match
+        assert abs(restored.mean - original.mean) < 1e-12
+        assert abs(restored.var - original.var) < 1e-12
+        assert abs(restored.std - original.std) < 1e-12
+
+    def test_continued_updates_after_deserialization(self: Self) -> None:
+        """Test that deserialized stats can be updated."""
+        hp = create_test_hp()
+        original = DriftStats(hp)
+
+        original.update(0.5, 100.0)
+        original.update(0.6, 110.0)
+
+        data = original.to_dict()
+        restored = DriftStats.from_dict(data, hp)
+
+        # Continue updating the restored instance
+        restored.update(0.7, 120.0)
+
+        assert restored.mean > 0.0
+        assert restored.var >= 0.0
+
+    def test_deserialization_with_different_hyper_parameters(self: Self) -> None:
+        """Test deserialization with different hyper-parameters."""
+        hp1 = create_test_hp(half_life_factor=1.0)
+        hp2 = create_test_hp(half_life_factor=2.0)
+
+        stats = DriftStats(hp1)
+        stats.update(0.5, 100.0)
+        stats.update(0.6, 110.0)
+
+        data = stats.to_dict()
+
+        # Restore with different hyper-parameters
+        restored = DriftStats.from_dict(data, hp2)
+
+        # Statistical values should be preserved
+        assert abs(restored.mean - stats.mean) < 1e-9
+        assert abs(restored.var - stats.var) < 1e-9
+
+        # But future updates will use new hyper-parameters
+        # (different decay rates)
