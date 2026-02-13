@@ -10,10 +10,10 @@ from typing import Self
 from custom_components.discrete_state_forecaster.model.hyper_parameters import (
     HyperParameters,
 )
-from custom_components.discrete_state_forecaster.model.learning.drift_monitor_hyper_parameters import (
+from custom_components.discrete_state_forecaster.model.learning.drift_monitor_hyper_parameters import (  # noqa: E501
     DriftMonitorHyperParameters,
 )
-from custom_components.discrete_state_forecaster.model.learning.drift_stats_hyper_parameters import (
+from custom_components.discrete_state_forecaster.model.learning.drift_stats_hyper_parameters import (  # noqa: E501
     DriftStatsHyperParameters,
 )
 
@@ -103,13 +103,13 @@ class TestDriftStatsHyperParametersDriftHalfLife:
             hyper_parameters=drift_hp,
             half_life_factor=2.0,
         )
-        
+
         # Initial value
         assert hp.drift_half_life == 100.0
-        
+
         # Update base half-life
         base_hp.update(half_life=100.0)
-        
+
         # Drift half-life should reflect the change
         assert hp.drift_half_life == 200.0
 
@@ -121,7 +121,7 @@ class TestDriftStatsHyperParametersDriftHalfLife:
             (25.0, 4.0, 100.0),
             (75.0, 2.0, 150.0),
         ]
-        
+
         for base_half_life, factor, expected in test_cases:
             drift_hp = create_drift_monitor_hp(half_life=base_half_life)
             hp = DriftStatsHyperParameters(
@@ -141,9 +141,9 @@ class TestDriftStatsHyperParametersSerialization:
             hyper_parameters=drift_hp,
             half_life_factor=1.5,
         )
-        
+
         data = hp.to_dict()
-        
+
         assert "half_life_factor" in data
         assert data["half_life_factor"] == 1.5
 
@@ -154,9 +154,9 @@ class TestDriftStatsHyperParametersSerialization:
             hyper_parameters=drift_hp,
             half_life_factor=2.0,
         )
-        
+
         data = hp.to_dict()
-        
+
         assert len(data) == 1
         assert "half_life_factor" in data
 
@@ -164,9 +164,9 @@ class TestDriftStatsHyperParametersSerialization:
         """Test deserialization from dictionary."""
         drift_hp = create_drift_monitor_hp(half_life=60.0)
         data = {"half_life_factor": 2.5}
-        
+
         hp = DriftStatsHyperParameters.from_dict(data, drift_hp)
-        
+
         assert hp.drift_half_life == 150.0
 
     def test_round_trip_serialization(self: Self) -> None:
@@ -176,10 +176,10 @@ class TestDriftStatsHyperParametersSerialization:
             hyper_parameters=drift_hp,
             half_life_factor=1.8,
         )
-        
+
         data = original_hp.to_dict()
         restored_hp = DriftStatsHyperParameters.from_dict(data, drift_hp)
-        
+
         assert restored_hp.drift_half_life == original_hp.drift_half_life
 
     def test_serialization_with_zero_factor(self: Self) -> None:
@@ -189,10 +189,10 @@ class TestDriftStatsHyperParametersSerialization:
             hyper_parameters=drift_hp,
             half_life_factor=0.0,
         )
-        
+
         data = hp.to_dict()
         restored_hp = DriftStatsHyperParameters.from_dict(data, drift_hp)
-        
+
         assert restored_hp.drift_half_life == 0.0
 
     def test_serialization_with_large_factor(self: Self) -> None:
@@ -202,10 +202,10 @@ class TestDriftStatsHyperParametersSerialization:
             hyper_parameters=drift_hp,
             half_life_factor=100.0,
         )
-        
+
         data = hp.to_dict()
         restored_hp = DriftStatsHyperParameters.from_dict(data, drift_hp)
-        
+
         assert restored_hp.drift_half_life == 1000.0
 
     def test_serialization_with_fractional_factor(self: Self) -> None:
@@ -215,10 +215,10 @@ class TestDriftStatsHyperParametersSerialization:
             hyper_parameters=drift_hp,
             half_life_factor=0.25,
         )
-        
+
         data = hp.to_dict()
         restored_hp = DriftStatsHyperParameters.from_dict(data, drift_hp)
-        
+
         assert restored_hp.drift_half_life == 20.0
 
     def test_multiple_round_trips(self: Self) -> None:
@@ -228,14 +228,14 @@ class TestDriftStatsHyperParametersSerialization:
             hyper_parameters=drift_hp,
             half_life_factor=3.0,
         )
-        
+
         # First round trip
         data1 = original_hp.to_dict()
         hp1 = DriftStatsHyperParameters.from_dict(data1, drift_hp)
-        
+
         # Second round trip
         data2 = hp1.to_dict()
         hp2 = DriftStatsHyperParameters.from_dict(data2, drift_hp)
-        
+
         assert hp2.drift_half_life == original_hp.drift_half_life
         assert data1 == data2
