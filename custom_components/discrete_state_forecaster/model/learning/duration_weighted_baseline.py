@@ -12,6 +12,13 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING, Any, Final, Self
 
+from .duration_weighted_baseline_parameters import (
+    DurationWeightedBaselineParameters,
+)
+from .duration_weighted_baseline_runtime_parameters import (
+    DurationWeightedBaselineRuntimeParameters,
+)
+
 if TYPE_CHECKING:
     from custom_components.discrete_state_forecaster.model.state import (
         State,
@@ -41,9 +48,9 @@ class DurationWeightedBaseline:
         >>> drift_hp = DriftMonitorHyperParameters(hyper_parameters=base_hp)
         >>> hp = DurationWeightedBaselineHyperParameters(
         ...     hyper_parameters=drift_hp,
-        ...     half_life_factor=1.0,
         ... )
-        >>> baseline = DurationWeightedBaseline(hp)
+        >>> rp = DurationWeightedBaselineRuntimeParameters(half_life_factor=1.0)
+        >>> baseline = DurationWeightedBaseline(hp, rp)
         >>> dist = {"on": 0.7, "off": 0.3}
         >>> baseline.update(dist, 100.0)
         >>> baseline.update(dist, 105.0)
@@ -52,8 +59,8 @@ class DurationWeightedBaseline:
         True
     """
 
-    _hyper_parameters: Final[DurationWeightedBaselineHyperParameters]
-    """Configuration controlling decay and smoothing."""
+    _parameters: Final[DurationWeightedBaselineParameters]
+    """Combined parameters for baseline behavior."""
 
     _mass: dict[State, float]
     """Accumulated mass for each state."""
@@ -64,15 +71,19 @@ class DurationWeightedBaseline:
     def __init__(
         self: Self,
         hyper_parameters: DurationWeightedBaselineHyperParameters,
+        runtime_parameters: DurationWeightedBaselineRuntimeParameters,
     ) -> None:
         """
         Initialize duration-weighted baseline tracker.
 
         Args:
             hyper_parameters: Configuration controlling decay and smoothing.
-
+            runtime_parameters: Runtime parameters for baseline behavior.
         """
-        self._hyper_parameters = hyper_parameters
+        self._parameters = DurationWeightedBaselineParameters(
+            hyper_parameters=hyper_parameters,
+            runtime_parameters=runtime_parameters,
+        )
         self._mass = {}
         self._last_ts = None
 
@@ -102,11 +113,11 @@ class DurationWeightedBaseline:
             return
 
         # 1. decay old mass
-        lambda_ = math.log(2.0) / (self._hyper_parameters.baseline_half_life)
+        lambda_ = math.log(2.0) / (self._parameters.baseline_half_life)
         decay = math.exp(-lambda_ * dt)
         for s in list(self._mass.keys()):
             self._mass[s] *= decay
-            if self._mass[s] < self._hyper_parameters.prune_threshold:
+            if self._mass[s] < self._parameters.prune_threshold:
                 del self._mass[s]
 
         # 2. integrate new distribution over dt
@@ -130,11 +141,10 @@ class DurationWeightedBaseline:
             return {}
 
         num_states = len(self._mass)
-        denom = total + self._hyper_parameters.epsilon * num_states
+        denom = total + self._parameters.epsilon * num_states
 
         return {
-            s: (m + self._hyper_parameters.epsilon) / denom
-            for s, m in self._mass.items()
+            s: (m + self._parameters.epsilon) / denom for s, m in self._mass.items()
         }
 
     def total_mass(self: Self) -> float:
@@ -157,7 +167,6 @@ class DurationWeightedBaseline:
 
         """
         return {
-            "hyper_parameters": self._hyper_parameters.to_dict(),
             "mass": dict(self._mass),
             "last_ts": self._last_ts,
         }
@@ -167,6 +176,7 @@ class DurationWeightedBaseline:
         cls,
         data: dict[str, Any],
         hyper_parameters: DurationWeightedBaselineHyperParameters,
+        runtime_parameters: DurationWeightedBaselineRuntimeParameters,
     ) -> DurationWeightedBaseline:
         """
         Deserialize baseline state from a dictionary.
@@ -175,12 +185,15 @@ class DurationWeightedBaseline:
             data: Dictionary containing serialized state including mass dict
                 and last_ts timestamp.
             hyper_parameters: Hyper-parameters to use for the reconstructed instance.
+            runtime_parameters: Runtime parameters to use for the reconstructed instance.
 
         Returns:
             A DurationWeightedBaseline instance initialized with the provided data,
             with all internal state restored.
         """
-        instance = cls(hyper_parameters=hyper_parameters)
+        instance = cls(
+            hyper_parameters=hyper_parameters, runtime_parameters=runtime_parameters
+        )
         instance._mass = dict(data["mass"])
         instance._last_ts = data["last_ts"]
         return instance

@@ -12,6 +12,9 @@ from typing import Any, Final, Self
 from custom_components.discrete_state_forecaster.model.hyper_parameters import (
     HyperParameters,
 )
+from custom_components.discrete_state_forecaster.model.learning.duration_weighted_baseline_runtime_parameters import (
+    DurationWeightedBaselineRuntimeParameters,
+)
 from custom_components.discrete_state_forecaster.model.state import (
     State,
 )
@@ -19,6 +22,7 @@ from custom_components.discrete_state_forecaster.model.state import (
 from .drift_monitor_hyper_parameters import DriftMonitorHyperParameters
 from .drift_stats import DriftStats
 from .drift_stats_hyper_parameters import DriftStatsHyperParameters
+from .drift_stats_runtime_parameters import DriftStatsRuntimeParameters
 from .duration_weighted_baseline import DurationWeightedBaseline
 from .duration_weighted_baseline_hyper_parameters import (
     DurationWeightedBaselineHyperParameters,
@@ -94,25 +98,31 @@ class DriftMonitor:
         self._fast_baseline = DurationWeightedBaseline(
             DurationWeightedBaselineHyperParameters(
                 hyper_parameters=hyper_parameters,
+            ),
+            DurationWeightedBaselineRuntimeParameters(  # TODO: get from runtime params
                 half_life_factor=hyper_parameters.fast_half_life_factor,
                 prune_threshold=hyper_parameters.fast_prune_threshold,
                 epsilon=hyper_parameters.fast_epsilon,
-            )
+            ),
         )
         self._slow_baseline = DurationWeightedBaseline(
             DurationWeightedBaselineHyperParameters(
                 hyper_parameters=hyper_parameters,
+            ),
+            DurationWeightedBaselineRuntimeParameters(  # TODO: get from runtime params
                 half_life_factor=hyper_parameters.slow_half_life_factor,
                 prune_threshold=hyper_parameters.slow_prune_threshold,
                 epsilon=hyper_parameters.slow_epsilon,
-            )
+            ),
         )
 
         self._drift_stats = DriftStats(
             DriftStatsHyperParameters(
                 hyper_parameters=hyper_parameters,
+            ),
+            DriftStatsRuntimeParameters(  # TODO: get from runtime params
                 half_life_factor=hyper_parameters.drift_half_life_factor,
-            )
+            ),
         )
 
         self._enter_counter = 0
@@ -277,27 +287,24 @@ class DriftMonitor:
             A new DriftMonitor instance initialized with the provided data, with
             all internal state restored.
         """
-        hyper_parameters = DriftMonitorHyperParameters.from_dict(
+        drift_hyper_parameters = DriftMonitorHyperParameters.from_dict(
             data["hyper_parameters"], hyper_parameters
         )
-        monitor = cls(hyper_parameters=hyper_parameters)
+        monitor = cls(hyper_parameters=drift_hyper_parameters)
         monitor._fast_baseline = DurationWeightedBaseline.from_dict(
             data["fast_baseline"],
-            DurationWeightedBaselineHyperParameters.from_dict(
-                data["fast_baseline"]["hyper_parameters"], hyper_parameters
-            ),
+            DurationWeightedBaselineHyperParameters(drift_hyper_parameters),
+            # TODO: pass runtime parameters
         )
         monitor._slow_baseline = DurationWeightedBaseline.from_dict(
             data["slow_baseline"],
-            DurationWeightedBaselineHyperParameters.from_dict(
-                data["slow_baseline"]["hyper_parameters"], hyper_parameters
-            ),
+            DurationWeightedBaselineHyperParameters(drift_hyper_parameters),
+            # TODO: pass runtime parameters
         )
         monitor._drift_stats = DriftStats.from_dict(
             data["drift_stats"],
-            DriftStatsHyperParameters.from_dict(
-                data["drift_stats"]["hyper_parameters"], hyper_parameters
-            ),
+            DriftStatsHyperParameters(drift_hyper_parameters),
+            # TODO: pass runtime parameters
         )
         monitor._enter_counter = data["enter_counter"]
         monitor._exit_counter = data["exit_counter"]

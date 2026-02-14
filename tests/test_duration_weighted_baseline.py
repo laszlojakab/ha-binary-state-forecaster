@@ -18,11 +18,12 @@ from custom_components.discrete_state_forecaster.model.learning.duration_weighte
 from custom_components.discrete_state_forecaster.model.learning.duration_weighted_baseline_hyper_parameters import (  # noqa: E501
     DurationWeightedBaselineHyperParameters,
 )
+from custom_components.discrete_state_forecaster.model.learning.duration_weighted_baseline_runtime_parameters import (
+    DurationWeightedBaselineRuntimeParameters,
+)
 
 
-def create_test_hp(
-    half_life_factor: float = 1.0,
-) -> DurationWeightedBaselineHyperParameters:
+def create_test_hp() -> DurationWeightedBaselineHyperParameters:
     """Create test hyper-parameters."""
     base_hp = HyperParameters(
         half_life=50.0,
@@ -31,9 +32,19 @@ def create_test_hp(
         persistence_strength=0.95,
     )
     drift_hp = DriftMonitorHyperParameters(hyper_parameters=base_hp)
-    return DurationWeightedBaselineHyperParameters(
-        hyper_parameters=drift_hp,
+    return DurationWeightedBaselineHyperParameters(hyper_parameters=drift_hp)
+
+
+def create_test_rp(
+    half_life_factor: float = 1.0,
+    prune_threshold: float = 0.01,
+    epsilon: float = 1e-6,
+) -> DurationWeightedBaselineRuntimeParameters:
+    """Create test runtime parameters."""
+    return DurationWeightedBaselineRuntimeParameters(
         half_life_factor=half_life_factor,
+        prune_threshold=prune_threshold,
+        epsilon=epsilon,
     )
 
 
@@ -43,14 +54,16 @@ class TestDurationWeightedBaselineInitialization:
     def test_create_default(self: Self) -> None:
         """Test creating with default configuration."""
         hp = create_test_hp()
-        baseline = DurationWeightedBaseline(hp)
+        rp = create_test_rp()
+        baseline = DurationWeightedBaseline(hp, rp)
         assert baseline.distribution() == {}
         assert baseline.total_mass() == 0.0
 
     def test_initial_empty_distribution(self: Self) -> None:
         """Test that initial distribution is empty."""
         hp = create_test_hp()
-        baseline = DurationWeightedBaseline(hp)
+        rp = create_test_rp()
+        baseline = DurationWeightedBaseline(hp, rp)
         assert baseline.distribution() == {}
 
 
@@ -60,7 +73,8 @@ class TestDurationWeightedBaselineUpdate:
     def test_first_update_sets_timestamp(self: Self) -> None:
         """Test that first update only sets timestamp."""
         hp = create_test_hp()
-        baseline = DurationWeightedBaseline(hp)
+        rp = create_test_rp()
+        baseline = DurationWeightedBaseline(hp, rp)
 
         dist = {"on": 0.6, "off": 0.4}
         baseline.update(dist, 100.0)
@@ -71,7 +85,8 @@ class TestDurationWeightedBaselineUpdate:
     def test_second_update_accumulates_mass(self: Self) -> None:
         """Test that second update accumulates mass."""
         hp = create_test_hp()
-        baseline = DurationWeightedBaseline(hp)
+        rp = create_test_rp()
+        baseline = DurationWeightedBaseline(hp, rp)
 
         dist = {"on": 0.6, "off": 0.4}
         baseline.update(dist, 100.0)
@@ -83,7 +98,8 @@ class TestDurationWeightedBaselineUpdate:
     def test_mass_integration_over_time(self: Self) -> None:
         """Test that mass is integrated over time duration."""
         hp = create_test_hp()
-        baseline = DurationWeightedBaseline(hp)
+        rp = create_test_rp()
+        baseline = DurationWeightedBaseline(hp, rp)
 
         dist = {"on": 0.5, "off": 0.5}
         baseline.update(dist, 100.0)
@@ -101,7 +117,8 @@ class TestDurationWeightedBaselineUpdate:
     def test_update_with_zero_time_delta(self: Self) -> None:
         """Test that zero time delta is ignored."""
         hp = create_test_hp()
-        baseline = DurationWeightedBaseline(hp)
+        rp = create_test_rp()
+        baseline = DurationWeightedBaseline(hp, rp)
 
         dist = {"on": 0.6, "off": 0.4}
         baseline.update(dist, 100.0)
@@ -117,7 +134,8 @@ class TestDurationWeightedBaselineUpdate:
     def test_update_with_negative_time_delta(self: Self) -> None:
         """Test that negative time delta is ignored."""
         hp = create_test_hp()
-        baseline = DurationWeightedBaseline(hp)
+        rp = create_test_rp()
+        baseline = DurationWeightedBaseline(hp, rp)
 
         dist = {"on": 0.6, "off": 0.4}
         baseline.update(dist, 100.0)
@@ -136,8 +154,9 @@ class TestDurationWeightedBaselineDecay:
 
     def test_decay_reduces_old_mass(self: Self) -> None:
         """Test that old mass decays over time."""
-        hp = create_test_hp(half_life_factor=1.0)
-        baseline = DurationWeightedBaseline(hp)
+        hp = create_test_hp()
+        rp = create_test_rp(half_life_factor=0.5)  # Faster decay for testing
+        baseline = DurationWeightedBaseline(hp, rp)
 
         baseline.update({"on": 1.0}, 100.0)
         baseline.update({"on": 1.0}, 110.0)
@@ -152,8 +171,9 @@ class TestDurationWeightedBaselineDecay:
 
     def test_pruning_removes_small_mass(self: Self) -> None:
         """Test that very small mass values are pruned."""
-        hp = create_test_hp(half_life_factor=0.1)  # Fast decay
-        baseline = DurationWeightedBaseline(hp)
+        hp = create_test_hp()
+        rp = create_test_rp(half_life_factor=0.1)  # Fast decay
+        baseline = DurationWeightedBaseline(hp, rp)
 
         baseline.update({"on": 1.0}, 100.0)
         baseline.update({"on": 1.0}, 105.0)
@@ -173,7 +193,8 @@ class TestDurationWeightedBaselineDistribution:
     def test_distribution_sums_to_one(self: Self) -> None:
         """Test that distribution sums to approximately 1.0."""
         hp = create_test_hp()
-        baseline = DurationWeightedBaseline(hp)
+        rp = create_test_rp()
+        baseline = DurationWeightedBaseline(hp, rp)
 
         dist = {"on": 0.6, "off": 0.4}
         baseline.update(dist, 100.0)
@@ -188,7 +209,8 @@ class TestDurationWeightedBaselineDistribution:
     def test_distribution_with_laplace_smoothing(self: Self) -> None:
         """Test that Laplace smoothing prevents zero probabilities for seen states."""
         hp = create_test_hp()
-        baseline = DurationWeightedBaseline(hp)
+        rp = create_test_rp()
+        baseline = DurationWeightedBaseline(hp, rp)
 
         # Both states appear but with different probabilities
         baseline.update({"on": 0.9, "off": 0.1}, 100.0)
@@ -201,7 +223,8 @@ class TestDurationWeightedBaselineDistribution:
     def test_empty_distribution_at_start(self: Self) -> None:
         """Test that distribution is empty before accumulating mass."""
         hp = create_test_hp()
-        baseline = DurationWeightedBaseline(hp)
+        rp = create_test_rp()
+        baseline = DurationWeightedBaseline(hp, rp)
 
         baseline.update({"on": 0.5, "off": 0.5}, 100.0)
 
@@ -216,7 +239,8 @@ class TestDurationWeightedBaselineTotalMass:
     def test_total_mass_increases_with_updates(self: Self) -> None:
         """Test that total mass increases with updates."""
         hp = create_test_hp()
-        baseline = DurationWeightedBaseline(hp)
+        rp = create_test_rp()
+        baseline = DurationWeightedBaseline(hp, rp)
 
         baseline.update({"on": 0.5, "off": 0.5}, 100.0)
         baseline.update({"on": 0.5, "off": 0.5}, 110.0)
@@ -232,7 +256,8 @@ class TestDurationWeightedBaselineTotalMass:
     def test_total_mass_zero_at_start(self: Self) -> None:
         """Test that total mass is zero at start."""
         hp = create_test_hp()
-        baseline = DurationWeightedBaseline(hp)
+        rp = create_test_rp()
+        baseline = DurationWeightedBaseline(hp, rp)
 
         assert baseline.total_mass() == 0.0
 
@@ -243,7 +268,8 @@ class TestDurationWeightedBaselineEdgeCases:
     def test_single_state(self: Self) -> None:
         """Test with single state."""
         hp = create_test_hp()
-        baseline = DurationWeightedBaseline(hp)
+        rp = create_test_rp()
+        baseline = DurationWeightedBaseline(hp, rp)
 
         baseline.update({"on": 1.0}, 100.0)
         baseline.update({"on": 1.0}, 110.0)
@@ -254,7 +280,8 @@ class TestDurationWeightedBaselineEdgeCases:
     def test_many_states(self: Self) -> None:
         """Test with many states."""
         hp = create_test_hp()
-        baseline = DurationWeightedBaseline(hp)
+        rp = create_test_rp()
+        baseline = DurationWeightedBaseline(hp, rp)
 
         dist = {f"state{i}": 1.0 / 10 for i in range(10)}
         baseline.update(dist, 100.0)
@@ -267,7 +294,8 @@ class TestDurationWeightedBaselineEdgeCases:
     def test_varying_distributions(self: Self) -> None:
         """Test with varying distributions over time."""
         hp = create_test_hp()
-        baseline = DurationWeightedBaseline(hp)
+        rp = create_test_rp()
+        baseline = DurationWeightedBaseline(hp, rp)
 
         baseline.update({"on": 0.8, "off": 0.2}, 100.0)
         baseline.update({"on": 0.8, "off": 0.2}, 110.0)
@@ -291,8 +319,9 @@ class TestDurationWeightedBaselineInstanceIsolation:
     def test_instances_dont_share_mass(self: Self) -> None:
         """Test that multiple instances don't share mass dictionary."""
         hp = create_test_hp()
-        baseline1 = DurationWeightedBaseline(hp)
-        baseline2 = DurationWeightedBaseline(hp)
+        rp = create_test_rp()
+        baseline1 = DurationWeightedBaseline(hp, rp)
+        baseline2 = DurationWeightedBaseline(hp, rp)
 
         baseline1.update({"on": 1.0}, 100.0)
         baseline1.update({"on": 1.0}, 110.0)
@@ -312,8 +341,9 @@ class TestDurationWeightedBaselineInstanceIsolation:
     def test_instances_dont_share_timestamp(self: Self) -> None:
         """Test that instances have independent timestamps."""
         hp = create_test_hp()
-        baseline1 = DurationWeightedBaseline(hp)
-        baseline2 = DurationWeightedBaseline(hp)
+        rp = create_test_rp()
+        baseline1 = DurationWeightedBaseline(hp, rp)
+        baseline2 = DurationWeightedBaseline(hp, rp)
 
         baseline1.update({"on": 1.0}, 100.0)
         baseline1.update({"on": 1.0}, 150.0)
@@ -331,7 +361,8 @@ class TestDurationWeightedBaselineInstanceIsolation:
     def test_multiple_instances_independent_updates(self: Self) -> None:
         """Test that updates to one instance don't affect others."""
         hp = create_test_hp()
-        baselines = [DurationWeightedBaseline(hp) for _ in range(3)]
+        rp = create_test_rp()
+        baselines = [DurationWeightedBaseline(hp, rp) for _ in range(3)]
 
         for i, baseline in enumerate(baselines):
             state = f"state{i}"
@@ -352,14 +383,14 @@ class TestDurationWeightedBaselineSerialization:
     def test_to_dict_structure(self: Self) -> None:
         """Test that to_dict returns correct structure."""
         hp = create_test_hp()
-        baseline = DurationWeightedBaseline(hp)
+        rp = create_test_rp()
+        baseline = DurationWeightedBaseline(hp, rp)
 
         baseline.update({"on": 0.6, "off": 0.4}, 100.0)
         baseline.update({"on": 0.6, "off": 0.4}, 110.0)
 
         data = baseline.to_dict()
 
-        assert "hyper_parameters" in data
         assert "mass" in data
         assert "last_ts" in data
         assert isinstance(data["mass"], dict)
@@ -367,13 +398,13 @@ class TestDurationWeightedBaselineSerialization:
     def test_from_dict_reconstruction(self: Self) -> None:
         """Test reconstruction from dictionary."""
         hp = create_test_hp()
+        rp = create_test_rp()
         data = {
-            "hyper_parameters": hp.to_dict(),
             "mass": {"on": 100.0, "off": 50.0},
             "last_ts": 200.0,
         }
 
-        baseline = DurationWeightedBaseline.from_dict(data, hp)
+        baseline = DurationWeightedBaseline.from_dict(data, hp, rp)
 
         assert baseline.total_mass() == 150.0
         dist = baseline.distribution()
@@ -383,14 +414,15 @@ class TestDurationWeightedBaselineSerialization:
     def test_round_trip_serialization(self: Self) -> None:
         """Test that serialization and deserialization preserves state."""
         hp = create_test_hp()
-        original = DurationWeightedBaseline(hp)
+        rp = create_test_rp()
+        original = DurationWeightedBaseline(hp, rp)
 
         original.update({"on": 0.7, "off": 0.3}, 100.0)
         original.update({"on": 0.7, "off": 0.3}, 120.0)
         original.update({"on": 0.6, "off": 0.4}, 140.0)
 
         data = original.to_dict()
-        restored = DurationWeightedBaseline.from_dict(data, hp)
+        restored = DurationWeightedBaseline.from_dict(data, hp, rp)
 
         assert abs(restored.total_mass() - original.total_mass()) < 1e-9
 
@@ -403,10 +435,11 @@ class TestDurationWeightedBaselineSerialization:
     def test_serialization_with_no_updates(self: Self) -> None:
         """Test serialization before any updates."""
         hp = create_test_hp()
-        baseline = DurationWeightedBaseline(hp)
+        rp = create_test_rp()
+        baseline = DurationWeightedBaseline(hp, rp)
 
         data = baseline.to_dict()
-        restored = DurationWeightedBaseline.from_dict(data, hp)
+        restored = DurationWeightedBaseline.from_dict(data, hp, rp)
 
         assert restored.total_mass() == 0.0
         assert restored.distribution() == {}
@@ -414,7 +447,8 @@ class TestDurationWeightedBaselineSerialization:
     def test_serialization_preserves_mass_dict(self: Self) -> None:
         """Test that serialization creates a copy of mass dict."""
         hp = create_test_hp()
-        baseline = DurationWeightedBaseline(hp)
+        rp = create_test_rp()
+        baseline = DurationWeightedBaseline(hp, rp)
 
         baseline.update({"on": 1.0}, 100.0)
         baseline.update({"on": 1.0}, 110.0)
@@ -432,13 +466,13 @@ class TestDurationWeightedBaselineSerialization:
     def test_deserialization_creates_copy(self: Self) -> None:
         """Test that deserialization creates independent copy."""
         hp = create_test_hp()
+        rp = create_test_rp()
         data = {
-            "hyper_parameters": hp.to_dict(),
             "mass": {"on": 100.0},
             "last_ts": 200.0,
         }
 
-        baseline = DurationWeightedBaseline.from_dict(data, hp)
+        baseline = DurationWeightedBaseline.from_dict(data, hp, rp)
 
         # Modify the source dict
         data["mass"]["on"] = 999.0

@@ -10,6 +10,8 @@ import math
 from typing import Any, Final, Self
 
 from .drift_stats_hyper_parameters import DriftStatsHyperParameters
+from .drift_stats_parameters import DriftStatsParameters
+from .drift_stats_runtime_parameters import DriftStatsRuntimeParameters
 
 
 class DriftStats:
@@ -39,7 +41,7 @@ class DriftStats:
 
     """
 
-    _hyper_parameters: Final[DriftStatsHyperParameters]
+    _parameters: Final[DriftStatsParameters]
     """Configuration controlling decay behavior."""
 
     _mean: float
@@ -54,15 +56,20 @@ class DriftStats:
     def __init__(
         self: Self,
         hyper_parameters: DriftStatsHyperParameters,
+        runtime_parameters: DriftStatsRuntimeParameters,
     ) -> None:
         """
         Initialize drift statistics tracker.
 
         Args:
             hyper_parameters: Configuration controlling decay behavior.
-
+            runtime_parameters: Runtime parameters for drift statistics.
         """
-        self._hyper_parameters: Final = hyper_parameters
+        self._parameters: Final = DriftStatsParameters(
+            hyper_parameters=hyper_parameters,
+            runtime_parameters=runtime_parameters,
+        )
+
         self._mean = 0.0
         self._var = 0.0
         self._last_ts: float | None = None
@@ -89,7 +96,7 @@ class DriftStats:
         if dt <= 0:
             return
 
-        lambda_ = math.log(2) / (self._hyper_parameters.drift_half_life)
+        lambda_ = math.log(2) / (self._parameters.drift_half_life)
         decay = math.exp(-lambda_ * dt)
         diff = x - self._mean
 
@@ -139,7 +146,6 @@ class DriftStats:
             and the timestamp of the last update.
         """
         return {
-            "hyper_parameters": self._hyper_parameters.to_dict(),
             "mean": self._mean,
             "var": self._var,
             "last_ts": self._last_ts,
@@ -150,6 +156,7 @@ class DriftStats:
         cls,
         data: dict[str, Any],
         hyper_parameters: DriftStatsHyperParameters,
+        runtime_parameters: DriftStatsRuntimeParameters,
     ) -> Self:
         """
         Deserialize drift statistics from a dictionary.
@@ -158,12 +165,15 @@ class DriftStats:
             data: Dictionary containing serialized statistics including
                 mean, variance, and last timestamp.
             hyper_parameters: Hyper-parameters to use for the reconstructed instance.
+            runtime_parameters: Runtime parameters to use for the reconstructed instance.
 
         Returns:
             A new DriftStats instance initialized with the provided data,
             with all internal state restored.
         """
-        stats = cls(hyper_parameters=hyper_parameters)
+        stats = cls(
+            hyper_parameters=hyper_parameters, runtime_parameters=runtime_parameters
+        )
         stats._mean = data["mean"]
         stats._var = data["var"]
         stats._last_ts = data["last_ts"]
