@@ -62,81 +62,80 @@ from .forecaster_engine_runtime_parameters import (
 )
 from .state import State
 
+# @dataclass(frozen=True)
+# class ForecasterEngineParameters:
+#     """
+#     Parameters for configuring the ForecasterEngine.
 
-@dataclass(frozen=True)
-class ForecasterEngineParameters:
-    """
-    Parameters for configuring the ForecasterEngine.
+#     This dataclass contains all hyperparameters used to configure the behavior
+#     of the forecasting engine, including decay rates, drift detection thresholds,
+#     and persistence modeling.
 
-    This dataclass contains all hyperparameters used to configure the behavior
-    of the forecasting engine, including decay rates, drift detection thresholds,
-    and persistence modeling.
+#     Typical relationships:
+#         half_life        ≈ typical_change
+#         fast_half_life   ≈ 1-2  typical_change
+#         slow_half_life   ≈ 10-30 x typical_change
+#         drift_half_life  ≈ 1.5 x slow_half_life
+#         min_support      ≈ 5-10 x typical_change
 
-    Typical relationships:
-        half_life        ≈ typical_change
-        fast_half_life   ≈ 1-2  typical_change
-        slow_half_life   ≈ 10-30 x typical_change
-        drift_half_life  ≈ 1.5 x slow_half_life
-        min_support      ≈ 5-10 x typical_change
+#     Attributes:
+#         half_life: Base half-life for exponential decay (in seconds). Controls how
+#             quickly historical observations lose influence.
+#         slow_half_life_factor: Multiplier for slow baseline tracking (typically 20).
+#         slow_epsilon: Small value to prevent numerical issues in slow tracker.
+#         slow_prune_threshold: Threshold below which slow tracker entries are pruned.
+#         fast_half_life_factor: Multiplier for fast baseline tracking (typically 1.5).
+#         fast_epsilon: Small value to prevent numerical issues in fast tracker.
+#         fast_prune_threshold: Threshold below which fast tracker entries are pruned.
+#         drift_half_life_factor: Multiplier for drift detection baseline (typically 30).
+#         tau_enter: Threshold for entering drift state.
+#         tau_exit: Threshold for exiting drift state.
+#         adaptive_tau: Whether to use adaptive thresholds for drift detection.
+#         n_enter: Number of consecutive detections needed to enter drift state.
+#         n_exit: Number of consecutive stable readings needed to exit drift state.
+#         short_term_error_half_life_factor: Multiplier for short-term error tracking
+#             (typically 4, for 2-4 x base_half_life, enables quick reaction).
+#         long_term_error_half_life_factor: Multiplier for long-term error tracking
+#             (typically 40, for 20-50 x base_half_life, provides stable reference).
+#         persistence_half_life_factor: Multiplier for state persistence tracking.
+#         min_prune_interval_factor: Multiplier for minimum interval between prune
+#             operations (typically 5-10 x base_half_life).
+#         persistence_strength: Weight for persistence boost (0.0 to 1.0).
+#         min_support_factor: Multiplier for minimum support threshold.
+#     """
 
-    Attributes:
-        half_life: Base half-life for exponential decay (in seconds). Controls how
-            quickly historical observations lose influence.
-        slow_half_life_factor: Multiplier for slow baseline tracking (typically 20).
-        slow_epsilon: Small value to prevent numerical issues in slow tracker.
-        slow_prune_threshold: Threshold below which slow tracker entries are pruned.
-        fast_half_life_factor: Multiplier for fast baseline tracking (typically 1.5).
-        fast_epsilon: Small value to prevent numerical issues in fast tracker.
-        fast_prune_threshold: Threshold below which fast tracker entries are pruned.
-        drift_half_life_factor: Multiplier for drift detection baseline (typically 30).
-        tau_enter: Threshold for entering drift state.
-        tau_exit: Threshold for exiting drift state.
-        adaptive_tau: Whether to use adaptive thresholds for drift detection.
-        n_enter: Number of consecutive detections needed to enter drift state.
-        n_exit: Number of consecutive stable readings needed to exit drift state.
-        short_term_error_half_life_factor: Multiplier for short-term error tracking
-            (typically 4, for 2-4 x base_half_life, enables quick reaction).
-        long_term_error_half_life_factor: Multiplier for long-term error tracking
-            (typically 40, for 20-50 x base_half_life, provides stable reference).
-        persistence_half_life_factor: Multiplier for state persistence tracking.
-        min_prune_interval_factor: Multiplier for minimum interval between prune
-            operations (typically 5-10 x base_half_life).
-        persistence_strength: Weight for persistence boost (0.0 to 1.0).
-        min_support_factor: Multiplier for minimum support threshold.
-    """
-
-    half_life: float = 3600.0
-    # # T = tipikus változási idő
-    # # | Tracker          | Half-life       | Miért             |
-    # # | ---------------- | --------------- | ----------------- |
-    # # | short_term_error | **~ 2-4 x T**   | gyors reakció     |
-    # # | long_term_error  | **~ 20-50 x T** | stabil referencia |
-    # # 5-10 x base_half_life
-    # #######
-    # # half_life        ≈ typical_change
-    # # fast_half_life   ≈ 1-2 x typical_change
-    # # slow_half_life   ≈ 10-30 x typical_change
-    # # drift_half_life  ≈ 1.5 x slow_half_life
-    # slow_half_life_factor: float = 20
-    # slow_epsilon: float = 1e-9
-    # slow_prune_threshold: float = 1e-6
-    # fast_half_life_factor: float = 1.5
-    # fast_epsilon: float = 1e-9
-    # fast_prune_threshold: float = 1e-6
-    # drift_half_life_factor: float = 30
-    # tau_enter: float = 0.1
-    # tau_exit: float = 0.05
-    # adaptive_tau: bool = True
-    # n_enter: int = 3
-    # n_exit: int = 5
-    # short_term_error_half_life_factor: float = 4
-    # long_term_error_half_life_factor: float = 40
-    # persistence_half_life_factor: float = 5.0
-    # # min_prune_interval ≈ 5-10 x base_half_life
-    # min_prune_interval_factor: float = 5.0
-    persistence_strength: float = 0.5
-    # # min_support ≈ 5-10 x typical_change
-    # min_support_factor: float = 7.5
+#     half_life: float = 3600.0
+#     # # T = tipikus változási idő
+#     # # | Tracker          | Half-life       | Miért             |
+#     # # | ---------------- | --------------- | ----------------- |
+#     # # | short_term_error | **~ 2-4 x T**   | gyors reakció     |
+#     # # | long_term_error  | **~ 20-50 x T** | stabil referencia |
+#     # # 5-10 x base_half_life
+#     # #######
+#     # # half_life        ≈ typical_change
+#     # # fast_half_life   ≈ 1-2 x typical_change
+#     # # slow_half_life   ≈ 10-30 x typical_change
+#     # # drift_half_life  ≈ 1.5 x slow_half_life
+#     # slow_half_life_factor: float = 20
+#     # slow_epsilon: float = 1e-9
+#     # slow_prune_threshold: float = 1e-6
+#     # fast_half_life_factor: float = 1.5
+#     # fast_epsilon: float = 1e-9
+#     # fast_prune_threshold: float = 1e-6
+#     # drift_half_life_factor: float = 30
+#     # tau_enter: float = 0.1
+#     # tau_exit: float = 0.05
+#     # adaptive_tau: bool = True
+#     # n_enter: int = 3
+#     # n_exit: int = 5
+#     # short_term_error_half_life_factor: float = 4
+#     # long_term_error_half_life_factor: float = 40
+#     # persistence_half_life_factor: float = 5.0
+#     # # min_prune_interval ≈ 5-10 x base_half_life
+#     # min_prune_interval_factor: float = 5.0
+#     persistence_strength: float = 0.5
+#     # # min_support ≈ 5-10 x typical_change
+#     # min_support_factor: float = 7.5
 
 
 class ForecasterEngine:
@@ -164,21 +163,18 @@ class ForecasterEngine:
 
     def __init__(
         self: Self,
-        parameters: ForecasterEngineParameters,
-        # hyper_parameters: ForecasterEngineHyperParameters,
-        runtime_parameters: ForecasterEngineRuntimeParameters,
+        parameters: ForecasterEngineRuntimeParameters,
     ) -> None:
         """
         Initializes the forecaster engine.
 
         Args:
-            parameters: Configuration parameters for the forecaster.
-            runtime_parameters: Runtime parameters that can be adjusted during execution.
+            parameters: Runtime parameters for configuring the engine's behavior.
         """
         self._hyper_parameters = ForecasterEngineHyperParameters(
             half_life=parameters.half_life,
             min_prune_interval=parameters.half_life
-            * runtime_parameters.min_prune_interval_factor,
+            * parameters.min_prune_interval_factor,
             prune_enabled=True,
             persistence_strength=parameters.persistence_strength,
         )
@@ -186,7 +182,7 @@ class ForecasterEngine:
             HierarchicalStateStatsHyperParameters(
                 hyper_parameters=self._hyper_parameters,
             ),
-            runtime_parameters.hierarchical_state_stats,
+            parameters.hierarchical_state_stats,
         )
 
         # Drift monitor detects concept drifts in GLOBAL distribution.
@@ -194,26 +190,26 @@ class ForecasterEngine:
             DriftMonitorHyperParameters(
                 hyper_parameters=self._hyper_parameters,
             ),
-            runtime_parameters.drift_monitor,
+            parameters.drift_monitor,
         )
         self._short_term_error_tracker: Final = OnlineErrorTracker(
             OnlineErrorTrackerHyperParameters(
                 hyper_parameters=self._hyper_parameters,
             ),
-            runtime_parameters.short_term_error_tracker,
+            parameters.short_term_error_tracker,
         )
         self._long_term_error_tracker: Final = OnlineErrorTracker(
             OnlineErrorTrackerHyperParameters(
                 hyper_parameters=self._hyper_parameters,
             ),
-            runtime_parameters.long_term_error_tracker,
+            parameters.long_term_error_tracker,
         )
 
         self._state_persistence_tracker: Final = StatePersistenceTracker(
             StatePersistenceTrackerHyperParameters(
                 hyper_parameters=self._hyper_parameters,
             ),
-            runtime_parameters.state_persistence_tracker,
+            parameters.state_persistence_tracker,
         )
 
         self._hyper_parameter_controller: Final = HyperParameterController(

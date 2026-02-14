@@ -12,10 +12,6 @@ import pytest
 
 from custom_components.discrete_state_forecaster.model.forecaster_engine import (
     ForecasterEngine,
-    ForecasterEngineParameters,
-)
-from custom_components.discrete_state_forecaster.model.forecaster_engine_hyper_parameters import (
-    ForecasterEngineHyperParameters,
 )
 from custom_components.discrete_state_forecaster.model.forecaster_engine_runtime_parameters import (
     ForecasterEngineRuntimeParameters,
@@ -49,25 +45,19 @@ def create_test_engine(
     min_prune_interval_factor: float = 5.0,
 ) -> ForecasterEngine:
     """Create a test forecaster engine with specified parameters."""
-    params = ForecasterEngineParameters(
-        half_life=half_life,
-        persistence_strength=persistence_strength,
+    return ForecasterEngine(
+        create_test_parameters(
+            min_prune_interval_factor=min_prune_interval_factor,
+            half_life=half_life,
+            persistence_strength=persistence_strength,
+        )
     )
 
-    rp = create_test_rp(min_prune_interval_factor=min_prune_interval_factor)
 
-    # hp = ForecasterEngineHyperParameters(
-    #     half_life=half_life,
-    #     min_prune_interval=parameters.half_life * parameters.min_prune_interval_factor,
-    #     prune_enabled=True,
-    #     persistence_strength=parameters.persistence_strength,
-    # )
-
-    return ForecasterEngine(params, rp)
-
-
-def create_test_rp(
+def create_test_parameters(
     min_prune_interval_factor: float = 5.0,
+    half_life: float = 100.0,
+    persistence_strength: float = 0.5,
 ) -> ForecasterEngineRuntimeParameters:
     """Create test runtime parameters with default values."""
     return ForecasterEngineRuntimeParameters(
@@ -102,18 +92,13 @@ def create_test_rp(
             n_exit=5,
         ),
         min_prune_interval_factor=min_prune_interval_factor,
+        half_life=half_life,
+        persistence_strength=persistence_strength,
     )
 
 
 class TestForecasterEngineInitialization:
     """Tests for ForecasterEngine initialization."""
-
-    def test_create_default_engine(self: Self) -> None:
-        """Test creating engine with default parameters."""
-        params = ForecasterEngineParameters()
-        rp = create_test_rp()
-        engine = ForecasterEngine(params, rp)
-        assert engine is not None
 
     def test_initial_state(self: Self) -> None:
         """Test that engine starts with no data."""
@@ -349,7 +334,7 @@ class TestForecasterEngineDecay:
     def test_get_decay_factor_two_half_lives(self: Self) -> None:
         """Test that two half-lives give decay factor of 0.25."""
         engine = create_test_engine(half_life=100.0)
-        decay = engine._get_decay_factor(200.0)  # noqa: SLF001
+        decay = engine._get_decay_factor(200.0)
         assert abs(decay - 0.25) < 1e-9
 
     def test_decay_applied_in_updates(self: Self) -> None:
@@ -375,9 +360,8 @@ class TestForecasterEnginePruning:
 
     def test_pruning_respects_min_interval(self: Self) -> None:
         """Test that pruning only occurs after min interval."""
-        params = ForecasterEngineParameters(half_life=100.0)
-        rp = create_test_rp(min_prune_interval_factor=5.0)
-        engine = ForecasterEngine(params, rp)
+        rp = create_test_parameters(half_life=100, min_prune_interval_factor=5.0)
+        engine = ForecasterEngine(rp)
         key = TimeKey.GLOBAL
 
         # Multiple updates within the prune interval
