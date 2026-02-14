@@ -118,10 +118,12 @@ class DriftMonitor:
         )
         self._runtime_parameters = runtime_parameters
 
-        self._enter_counter = 0
-        self._exit_counter = 0
-        self._is_drifting = False
+        self._enter_counter: int = 0
+        self._exit_counter: int = 0
+        self._is_drifting: bool = False
         self._last_drift: float = 0.0
+        self._adaptive_tau_enter: float = runtime_parameters.tau_enter
+        self._adaptive_tau_exit: float = runtime_parameters.tau_exit
 
     @property
     def is_drifting(self: Self) -> bool:
@@ -144,6 +146,34 @@ class DriftMonitor:
 
         """
         return self._last_drift
+
+    @property
+    def _tau_enter(self: Self) -> float:
+        """
+        Get the current entry threshold for drift detection.
+
+        Returns:
+            The entry threshold, either static or adaptive based on runtime parameters.
+        """
+        return (
+            self._runtime_parameters.tau_enter
+            if not self._runtime_parameters.adaptive_tau
+            else self._adaptive_tau_enter
+        )
+
+    @property
+    def _tau_exit(self: Self) -> float:
+        """
+        Get the current exit threshold for drift detection.
+
+        Returns:
+            The exit threshold, either static or adaptive based on runtime parameters.
+        """
+        return (
+            self._runtime_parameters.tau_exit
+            if not self._runtime_parameters.adaptive_tau
+            else self._adaptive_tau_exit
+        )
 
     def update(self: Self, dist: dict[State, float], timestamp: float) -> None:
         """
@@ -169,16 +199,12 @@ class DriftMonitor:
             self._drift_stats.update(drift, timestamp)
 
             if self._parameters.adaptive_tau:
-                self._runtime_parameters.tau_enter = (
-                    self._drift_stats.mean + 3.0 * self._drift_stats.std
-                )
-                self._runtime_parameters.tau_exit = (
-                    self._drift_stats.mean + 1.5 * self._drift_stats.std
-                )
+                self._adaptive_tau_enter = self._drift_stats.mean + 3.0 * self._drift_stats.std
+                self._adaptive_tau_exit = self._drift_stats.mean + 1.5 * self._drift_stats.std
 
             # Entry logic: if the drift exceeds the entry threshold for n_enter consecutive updates,
             # we enter drifting state
-            if drift >= self._runtime_parameters.tau_enter:
+            if drift >= self._tau_enter:
                 self._enter_counter += 1
                 if self._enter_counter >= self._parameters.n_enter:
                     self._is_drifting = True
@@ -186,7 +212,7 @@ class DriftMonitor:
             else:
                 self._enter_counter = 0
 
-        elif drift <= self._runtime_parameters.tau_exit:
+        elif drift <= self._tau_exit:
             # Exit logic: if the drift goes below the exit threshold for n_exit consecutive updates,
             # we exit drifting state
             self._exit_counter += 1
@@ -285,7 +311,9 @@ class DriftMonitor:
             A new DriftMonitor instance initialized with the provided data, with
             all internal state restored.
         """
-        monitor = cls(hyper_parameters=hyper_parameters, runtime_parameters=runtime_parameters)
+        monitor = cls(
+            hyper_parameters=hyper_parameters, runtime_parameters=runtime_parameters
+        )
         monitor._fast_baseline = DurationWeightedBaseline.from_dict(
             data["fast_baseline"],
             DurationWeightedBaselineHyperParameters(hyper_parameters),

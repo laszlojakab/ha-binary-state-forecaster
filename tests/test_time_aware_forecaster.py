@@ -133,9 +133,7 @@ def runtime_params(
     engine_runtime_params: ForecasterEngineRuntimeParameters,
 ) -> RuntimeParameters:
     """Fixture providing default RuntimeParameters."""
-    return RuntimeParameters(
-        engine=engine_runtime_params, min_prune_interval_factor=5.0
-    )
+    return RuntimeParameters(engine=engine_runtime_params)
 
 
 @pytest.fixture

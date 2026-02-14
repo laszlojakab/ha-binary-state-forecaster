@@ -281,14 +281,14 @@ class ForecasterEngine:
                 prediction.distribution, state, timestamp
             )
 
+        # Update state persistence tracker
+        self._state_persistence_tracker.update(state, timestamp)
+
         self._hyper_parameter_controller.update(
             is_drifting=self._drift_monitor.is_drifting,
             short_term_error=self._short_term_error_tracker.mean,
             long_term_error=self._long_term_error_tracker.mean,
         )
-
-        # Update state persistence tracker
-        self._state_persistence_tracker.update(state, timestamp)
 
         self._last_update_timestamp = timestamp
 

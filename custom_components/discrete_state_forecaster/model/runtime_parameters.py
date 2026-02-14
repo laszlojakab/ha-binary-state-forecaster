@@ -17,9 +17,3 @@ class RuntimeParameters:
 
     engine: ForecasterEngineRuntimeParameters
     """Runtime parameters for the ForecasterEngine, including decay rates and drift detection."""
-
-    min_prune_interval_factor: float = 5.0
-    """
-    Multiplier for minimum interval between prune operations
-    (typically 5-10 x base_half_life).
-    """
