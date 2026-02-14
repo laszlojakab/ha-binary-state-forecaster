@@ -8,9 +8,6 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from custom_components.discrete_state_forecaster.model.forecaster_engine import (
-    ForecasterEngineParameters,
-)
 from custom_components.discrete_state_forecaster.model.forecaster_engine_runtime_parameters import (
     ForecasterEngineRuntimeParameters,
 )
@@ -39,7 +36,6 @@ from custom_components.discrete_state_forecaster.model.temporal.time_key import 
 from custom_components.discrete_state_forecaster.model.time_aware_forecaster import (
     StructuralParameters,
     TimeAwareForecaster,
-    TimeAwareForecasterParameters,
 )
 
 
@@ -63,23 +59,6 @@ class MockTimeIndexer:
 def mock_indexer() -> MockTimeIndexer:
     """Fixture providing a mock time indexer."""
     return MockTimeIndexer()
-
-
-@pytest.fixture
-def engine_params() -> ForecasterEngineParameters:
-    """Fixture providing default ForecasterEngineParameters."""
-    # Use lower min_support_factor for faster test convergence
-    return ForecasterEngineParameters()
-
-
-@pytest.fixture
-def time_aware_params(
-    engine_params: ForecasterEngineParameters,
-) -> TimeAwareForecasterParameters:
-    """Fixture providing TimeAwareForecasterParameters."""
-    return TimeAwareForecasterParameters(
-        forecaster_engine_parameters=engine_params,
-    )
 
 
 @pytest.fixture
@@ -125,6 +104,8 @@ def engine_runtime_params() -> ForecasterEngineRuntimeParameters:
             n_exit=5,
         ),
         min_prune_interval_factor=5.0,
+        persistence_strength=0.5,
+        half_life=3600.0
     )
 
 
@@ -139,11 +120,10 @@ def runtime_params(
 @pytest.fixture
 def forecaster(
     structural_params: StructuralParameters,
-    time_aware_params: TimeAwareForecasterParameters,
     runtime_params: RuntimeParameters,
 ) -> TimeAwareForecaster:
     """Fixture providing a TimeAwareForecaster instance."""
-    return TimeAwareForecaster(structural_params, runtime_params, time_aware_params)
+    return TimeAwareForecaster(structural_params, runtime_params)
 
 
 # --- TimeAwareForecaster Initialization Tests ---
@@ -151,13 +131,10 @@ def forecaster(
 
 def test_forecaster_initialization_creates_engine(
     structural_params: StructuralParameters,
-    time_aware_params: TimeAwareForecasterParameters,
     runtime_params: RuntimeParameters,
 ) -> None:
     """Test that initialization creates ForecasterEngine."""
-    forecaster = TimeAwareForecaster(
-        structural_params, runtime_params, time_aware_params
-    )
+    forecaster = TimeAwareForecaster(structural_params, runtime_params)
     # Engine should be created
     assert forecaster._engine is not None
     assert hasattr(forecaster._engine, "_stats")
@@ -406,14 +383,10 @@ async def test_predict_interval_respects_resolution(
 async def test_predict_interval_with_boundary_support(
     structural_params: StructuralParameters,
     runtime_params: RuntimeParameters,
-    time_aware_params: TimeAwareForecasterParameters,
 ) -> None:
     """Test predict_interval with an indexer that supports boundaries."""
     # Create forecaster with boundary-supporting indexer
-    params = TimeAwareForecasterParameters(
-        forecaster_engine_parameters=time_aware_params.forecaster_engine_parameters,
-    )
-    forecaster = TimeAwareForecaster(structural_params, runtime_params, params)
+    forecaster = TimeAwareForecaster(structural_params, runtime_params)
 
     base_time = datetime(2024, 1, 15, 14, 0, 0, tzinfo=UTC)
     for i in range(30):

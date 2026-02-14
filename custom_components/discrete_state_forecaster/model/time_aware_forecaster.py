@@ -15,10 +15,7 @@ from custom_components.discrete_state_forecaster.model.statistics.prediction_res
     PredictionResult,
 )
 
-from .forecaster_engine import (
-    ForecasterEngine,
-    ForecasterEngineParameters,
-)
+from .forecaster_engine import ForecasterEngine
 from .runtime_parameters import RuntimeParameters
 from .state import (
     State,
@@ -26,23 +23,6 @@ from .state import (
 from .structural_parameters import (
     StructuralParameters,
 )
-
-
-@dataclass(frozen=True)
-class TimeAwareForecasterParameters:
-    """
-    Parameters for TimeAwareForecaster.
-
-    Contains both temporal indexing configuration and forecaster engine parameters.
-
-    Attributes:
-        forecaster_engine_parameters: Configuration for the underlying ForecasterEngine.
-            Controls decay rates, drift detection, persistence modeling, etc.
-    """
-
-    forecaster_engine_parameters: ForecasterEngineParameters = (
-        ForecasterEngineParameters()
-    )
 
 
 class TimeAwareForecaster:
@@ -72,7 +52,6 @@ class TimeAwareForecaster:
         self: Self,
         structural_parameters: StructuralParameters,
         runtime_parameters: RuntimeParameters,
-        parameters: TimeAwareForecasterParameters,
     ) -> None:
         """
         Initializes the time-aware forecaster.
@@ -82,7 +61,6 @@ class TimeAwareForecaster:
             parameters: Configuration parameters including the forecaster engine parameters.
         """
         self._engine: Final = ForecasterEngine(
-            parameters.forecaster_engine_parameters,
             parameters=runtime_parameters.engine,
         )
         self._runtime_parameters: Final = runtime_parameters

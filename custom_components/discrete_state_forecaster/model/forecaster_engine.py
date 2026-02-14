@@ -1,7 +1,8 @@
+from __future__ import annotations
+
 import math
-from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Final, Self
+from typing import Any, Final, Self
 
 from custom_components.discrete_state_forecaster.model.forecaster_engine_hyper_parameters import (
     ForecasterEngineHyperParameters,
@@ -12,12 +13,6 @@ from custom_components.discrete_state_forecaster.model.learning.drift_monitor im
 )
 from custom_components.discrete_state_forecaster.model.learning.drift_monitor_runtime_parameters import (
     DriftMonitorRuntimeParameters,
-)
-from custom_components.discrete_state_forecaster.model.learning.drift_stats_runtime_parameters import (
-    DriftStatsRuntimeParameters,
-)
-from custom_components.discrete_state_forecaster.model.learning.duration_weighted_baseline_runtime_parameters import (
-    DurationWeightedBaselineRuntimeParameters,
 )
 from custom_components.discrete_state_forecaster.model.learning.hyper_parameter_controller import (
     HyperParameterController,
@@ -178,6 +173,7 @@ class ForecasterEngine:
             prune_enabled=True,
             persistence_strength=parameters.persistence_strength,
         )
+
         self._stats: Final = HierarchicalStateStats(
             HierarchicalStateStatsHyperParameters(
                 hyper_parameters=self._hyper_parameters,
@@ -284,6 +280,11 @@ class ForecasterEngine:
             is_drifting=self._drift_monitor.is_drifting,
             short_term_error=self._short_term_error_tracker.mean,
             long_term_error=self._long_term_error_tracker.mean,
+            entropy_confidence=(
+                global_prediction.confidence.entropy_confidence
+                if global_prediction
+                else None
+            ),
         )
 
         self._last_update_timestamp = timestamp
@@ -408,6 +409,71 @@ class ForecasterEngine:
         # CASE 3: no persistence information → return base prediction
         # ------------------------------------------------------------------
         return prediction
+
+    def to_dict(self) -> dict[str, Any]:
+        """
+        Serializes the forecaster engine to a dictionary for persistence.
+
+        Returns:
+            A dictionary representation of the forecaster engine, including
+            hyperparameters, statistics, drift monitor state, error trackers,
+            and state persistence tracker state.
+        """
+        return {
+            "hyper_parameters": self._hyper_parameters.to_dict(),
+            "stats": self._stats.to_dict(),
+            "drift_monitor": self._drift_monitor.to_dict(),
+            "short_term_error_tracker": self._short_term_error_tracker.to_dict(),
+            "long_term_error_tracker": self._long_term_error_tracker.to_dict(),
+            "state_persistence_tracker": self._state_persistence_tracker.to_dict(),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> ForecasterEngine:
+        """
+        Deserializes a ForecasterEngine from a dictionary.
+
+        Args:
+            data: A dictionary representation of the forecaster engine.
+
+        Returns:
+            A ForecasterEngine instance reconstructed from the provided dictionary.
+        """
+        hyper_parameters = ForecasterEngineHyperParameters.from_dict(
+            data["hyper_parameters"]
+        )
+        stats = HierarchicalStateStats.from_dict(data["stats"], hyper_parameters)
+        drift_monitor = DriftMonitor.from_dict(data["drift_monitor"], hyper_parameters)
+        short_term_error_tracker = OnlineErrorTracker.from_dict(
+            data["short_term_error_tracker"], hyper_parameters
+        )
+        long_term_error_tracker = OnlineErrorTracker.from_dict(
+            data["long_term_error_tracker"], hyper_parameters
+        )
+        state_persistence_tracker = StatePersistenceTracker.from_dict(
+            data["state_persistence_tracker"], hyper_parameters
+        )
+
+        # Create a runtime parameters object with the deserialized components
+        runtime_parameters = ForecasterEngineRuntimeParameters(
+            half_life=hyper_parameters.half_life,
+            min_prune_interval_factor=hyper_parameters.min_prune_interval
+            / hyper_parameters.half_life,
+            persistence_strength=hyper_parameters.persistence_strength,
+            hierarchical_state_stats=HierarchicalStateStatsRuntimeParameters(stats),
+            drift_monitor=DriftMonitorRuntimeParameters(drift_monitor),
+            short_term_error_tracker=OnlineErrorTrackerRuntimeParameters(
+                short_term_error_tracker
+            ),
+            long_term_error_tracker=OnlineErrorTrackerRuntimeParameters(
+                long_term_error_tracker
+            ),
+            state_persistence_tracker=StatePersistenceTrackerRuntimeParameters(
+                state_persistence_tracker
+            ),
+        )
+
+        return cls(runtime_parameters)
 
     def _prune(self: Self, timestamp: float) -> None:
         """

@@ -124,6 +124,7 @@ class HyperParameterController:
         is_drifting: bool,
         short_term_error: float | None,
         long_term_error: float | None,
+        entropy_confidence: float | None,
     ) -> None:
         """
         Update adaptation mode and adjust hyper-parameters.
@@ -136,6 +137,7 @@ class HyperParameterController:
             is_drifting: Whether concept drift is currently detected.
             short_term_error: Recent prediction error (or None if unavailable).
             long_term_error: Historical prediction error (or None if unavailable).
+            entropy_confidence: Confidence level from entropy (or None if unavailable).
 
         """
         error_worsening = (
@@ -144,13 +146,15 @@ class HyperParameterController:
             and short_term_error > long_term_error * 1.1
         )
 
+        low_confidence = entropy_confidence is not None and entropy_confidence < 0.4
+
         # ----- Mode decision -----
 
         if is_drifting and error_worsening:
             self._mode = AdaptationMode.CONCEPT_DRIFT
         elif is_drifting:
             self._mode = AdaptationMode.DRIFTING_OK
-        elif error_worsening:
+        elif error_worsening or low_confidence:
             self._mode = AdaptationMode.MODEL_DEGRADING
         else:
             self._mode = AdaptationMode.STABLE
@@ -191,7 +195,9 @@ class HyperParameterController:
         half_life = math.exp(self._log_half_life)
 
         # ---- persistence derived from half-life ----
-        ratio = (half_life - self._min_half_life) / (self._max_half_life - self._min_half_life)
+        ratio = (half_life - self._min_half_life) / (
+            self._max_half_life - self._min_half_life
+        )
         ratio = max(0.0, min(1.0, ratio))
 
         persistence_strength = 0.2 + 0.8 * ratio
