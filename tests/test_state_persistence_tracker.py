@@ -17,11 +17,13 @@ from custom_components.discrete_state_forecaster.model.learning.state_persistenc
 from custom_components.discrete_state_forecaster.model.learning.state_persistence_tracker_hyper_parameters import (  # noqa: E501
     StatePersistenceTrackerHyperParameters,
 )
+from custom_components.discrete_state_forecaster.model.learning.state_persistence_tracker_runtime_parameters import (
+    StatePersistenceTrackerRuntimeParameters,
+)
 
 
 def create_test_hp(
     half_life: float = 50.0,
-    persistence_half_life_factor: float = 1.0,
 ) -> StatePersistenceTrackerHyperParameters:
     """Create test hyper-parameters."""
     base_hp = HyperParameters(
@@ -32,6 +34,14 @@ def create_test_hp(
     )
     return StatePersistenceTrackerHyperParameters(
         hyper_parameters=base_hp,
+    )
+
+
+def create_test_rp(
+    persistence_half_life_factor: float = 1.0,
+) -> StatePersistenceTrackerRuntimeParameters:
+    """Create test runtime parameters."""
+    return StatePersistenceTrackerRuntimeParameters(
         persistence_half_life_factor=persistence_half_life_factor,
     )
 
@@ -42,7 +52,8 @@ class TestStatePersistenceTrackerInitialization:
     def test_create_default(self: Self) -> None:
         """Test creating tracker with default configuration."""
         hp = create_test_hp()
-        tracker = StatePersistenceTracker(hp)
+        rp = create_test_rp()
+        tracker = StatePersistenceTracker(hp, rp)
 
         assert tracker.current_state is None
         assert tracker.current_duration(100.0) == 0.0
@@ -50,8 +61,9 @@ class TestStatePersistenceTrackerInitialization:
     def test_instance_isolation(self: Self) -> None:
         """Test that multiple instances don't share state."""
         hp = create_test_hp()
-        tracker1 = StatePersistenceTracker(hp)
-        tracker2 = StatePersistenceTracker(hp)
+        rp = create_test_rp()
+        tracker1 = StatePersistenceTracker(hp, rp)
+        tracker2 = StatePersistenceTracker(hp, rp)
 
         tracker1.update("on", 100.0)
         tracker2.update("off", 100.0)
@@ -63,8 +75,9 @@ class TestStatePersistenceTrackerInitialization:
     def test_mean_duration_isolation(self: Self) -> None:
         """Test that mean duration dicts are not shared between instances."""
         hp = create_test_hp()
-        tracker1 = StatePersistenceTracker(hp)
-        tracker2 = StatePersistenceTracker(hp)
+        rp = create_test_rp()
+        tracker1 = StatePersistenceTracker(hp, rp)
+        tracker2 = StatePersistenceTracker(hp, rp)
 
         tracker1.update("on", 100.0)
         tracker1.update("off", 200.0)
@@ -80,7 +93,8 @@ class TestStatePersistenceTrackerUpdate:
     def test_first_update(self: Self) -> None:
         """Test first update sets current state."""
         hp = create_test_hp()
-        tracker = StatePersistenceTracker(hp)
+        rp = create_test_rp()
+        tracker = StatePersistenceTracker(hp, rp)
 
         tracker.update("on", 100.0)
 
@@ -90,7 +104,8 @@ class TestStatePersistenceTrackerUpdate:
     def test_same_state_update(self: Self) -> None:
         """Test that updating with same state doesn't record duration."""
         hp = create_test_hp()
-        tracker = StatePersistenceTracker(hp)
+        rp = create_test_rp()
+        tracker = StatePersistenceTracker(hp, rp)
 
         tracker.update("on", 100.0)
         tracker.update("on", 150.0)
@@ -103,7 +118,8 @@ class TestStatePersistenceTrackerUpdate:
     def test_state_change_records_duration(self: Self) -> None:
         """Test that state change records duration of previous state."""
         hp = create_test_hp()
-        tracker = StatePersistenceTracker(hp)
+        rp = create_test_rp()
+        tracker = StatePersistenceTracker(hp, rp)
 
         tracker.update("on", 100.0)
         tracker.update("off", 200.0)  # "on" lasted 100 time units
@@ -115,7 +131,8 @@ class TestStatePersistenceTrackerUpdate:
     def test_multiple_state_changes(self: Self) -> None:
         """Test multiple state changes update mean durations."""
         hp = create_test_hp()
-        tracker = StatePersistenceTracker(hp)
+        rp = create_test_rp()
+        tracker = StatePersistenceTracker(hp, rp)
 
         tracker.update("on", 100.0)
         tracker.update("off", 200.0)  # "on" lasted 100
@@ -129,7 +146,8 @@ class TestStatePersistenceTrackerUpdate:
     def test_exponential_weighting(self: Self) -> None:
         """Test that durations are exponentially weighted."""
         hp = create_test_hp(half_life=50.0)
-        tracker = StatePersistenceTracker(hp)
+        rp = create_test_rp()
+        tracker = StatePersistenceTracker(hp, rp)
 
         # First observation
         tracker.update("on", 0.0)
@@ -153,14 +171,16 @@ class TestStatePersistenceTrackerCurrentState:
     def test_no_state_initially(self: Self) -> None:
         """Test that current_state is None initially."""
         hp = create_test_hp()
-        tracker = StatePersistenceTracker(hp)
+        rp = create_test_rp()
+        tracker = StatePersistenceTracker(hp, rp)
 
         assert tracker.current_state is None
 
     def test_current_state_after_update(self: Self) -> None:
         """Test current_state reflects latest update."""
         hp = create_test_hp()
-        tracker = StatePersistenceTracker(hp)
+        rp = create_test_rp()
+        tracker = StatePersistenceTracker(hp, rp)
 
         tracker.update("on", 100.0)
         assert tracker.current_state == "on"
@@ -175,14 +195,16 @@ class TestStatePersistenceTrackerCurrentDuration:
     def test_zero_when_no_state(self: Self) -> None:
         """Test current_duration returns 0.0 when no state active."""
         hp = create_test_hp()
-        tracker = StatePersistenceTracker(hp)
+        rp = create_test_rp()
+        tracker = StatePersistenceTracker(hp, rp)
 
         assert tracker.current_duration(100.0) == 0.0
 
     def test_duration_calculation(self: Self) -> None:
         """Test current_duration calculates correctly."""
         hp = create_test_hp()
-        tracker = StatePersistenceTracker(hp)
+        rp = create_test_rp()
+        tracker = StatePersistenceTracker(hp, rp)
 
         tracker.update("on", 100.0)
 
@@ -193,7 +215,8 @@ class TestStatePersistenceTrackerCurrentDuration:
     def test_duration_resets_on_state_change(self: Self) -> None:
         """Test duration resets when state changes."""
         hp = create_test_hp()
-        tracker = StatePersistenceTracker(hp)
+        rp = create_test_rp()
+        tracker = StatePersistenceTracker(hp, rp)
 
         tracker.update("on", 100.0)
         assert tracker.current_duration(200.0) == 100.0
@@ -205,7 +228,8 @@ class TestStatePersistenceTrackerCurrentDuration:
     def test_duration_never_negative(self: Self) -> None:
         """Test current_duration handles backwards time."""
         hp = create_test_hp()
-        tracker = StatePersistenceTracker(hp)
+        rp = create_test_rp()
+        tracker = StatePersistenceTracker(hp, rp)
 
         tracker.update("on", 100.0)
 
@@ -219,7 +243,8 @@ class TestStatePersistenceTrackerExpectedDuration:
     def test_default_for_unseen_state(self: Self) -> None:
         """Test expected_duration returns default for unseen states."""
         hp = create_test_hp()
-        tracker = StatePersistenceTracker(hp)
+        rp = create_test_rp()
+        tracker = StatePersistenceTracker(hp, rp)
 
         assert tracker.expected_duration("unknown") == 60.0
         assert tracker.expected_duration("unknown", 123.0) == 123.0
@@ -227,7 +252,8 @@ class TestStatePersistenceTrackerExpectedDuration:
     def test_expected_duration_after_observation(self: Self) -> None:
         """Test expected_duration returns mean after observations."""
         hp = create_test_hp()
-        tracker = StatePersistenceTracker(hp)
+        rp = create_test_rp()
+        tracker = StatePersistenceTracker(hp, rp)
 
         tracker.update("on", 0.0)
         tracker.update("off", 100.0)
@@ -238,7 +264,8 @@ class TestStatePersistenceTrackerExpectedDuration:
     def test_expected_duration_multiple_states(self: Self) -> None:
         """Test expected_duration tracks different states independently."""
         hp = create_test_hp()
-        tracker = StatePersistenceTracker(hp)
+        rp = create_test_rp()
+        tracker = StatePersistenceTracker(hp, rp)
 
         tracker.update("on", 0.0)
         tracker.update("off", 100.0)  # "on" lasted 100
@@ -257,7 +284,8 @@ class TestStatePersistenceTrackerPersistenceBoost:
     def test_zero_for_different_state(self: Self) -> None:
         """Test persistence_boost returns 0 for non-current state."""
         hp = create_test_hp()
-        tracker = StatePersistenceTracker(hp)
+        rp = create_test_rp()
+        tracker = StatePersistenceTracker(hp, rp)
 
         tracker.update("on", 100.0)
 
@@ -266,7 +294,8 @@ class TestStatePersistenceTrackerPersistenceBoost:
     def test_max_at_start(self: Self) -> None:
         """Test persistence_boost is highest when state just started."""
         hp = create_test_hp()
-        tracker = StatePersistenceTracker(hp)
+        rp = create_test_rp()
+        tracker = StatePersistenceTracker(hp, rp)
 
         tracker.update("on", 100.0)
 
@@ -276,7 +305,8 @@ class TestStatePersistenceTrackerPersistenceBoost:
     def test_decreases_with_time(self: Self) -> None:
         """Test persistence_boost decreases as state duration increases."""
         hp = create_test_hp()
-        tracker = StatePersistenceTracker(hp)
+        rp = create_test_rp()
+        tracker = StatePersistenceTracker(hp, rp)
 
         tracker.update("on", 0.0)
         tracker.update("off", 100.0)  # Establish expected duration of 100
@@ -293,7 +323,8 @@ class TestStatePersistenceTrackerPersistenceBoost:
     def test_hazard_decay_formula(self: Self) -> None:
         """Test persistence_boost uses correct hazard-style decay."""
         hp = create_test_hp()
-        tracker = StatePersistenceTracker(hp)
+        rp = create_test_rp()
+        tracker = StatePersistenceTracker(hp, rp)
 
         tracker.update("on", 0.0)
         tracker.update("off", 100.0)  # "on" expected duration = 100
@@ -312,7 +343,8 @@ class TestStatePersistenceTrackerPersistenceBoost:
     def test_boost_with_custom_default(self: Self) -> None:
         """Test persistence_boost uses custom default for unseen states."""
         hp = create_test_hp()
-        tracker = StatePersistenceTracker(hp)
+        rp = create_test_rp()
+        tracker = StatePersistenceTracker(hp, rp)
 
         tracker.update("new_state", 100.0)
 
@@ -325,7 +357,8 @@ class TestStatePersistenceTrackerPersistenceBoost:
     def test_boost_handles_very_short_expected(self: Self) -> None:
         """Test persistence_boost handles near-zero expected durations."""
         hp = create_test_hp()
-        tracker = StatePersistenceTracker(hp)
+        rp = create_test_rp()
+        tracker = StatePersistenceTracker(hp, rp)
 
         tracker.update("on", 100.0)
 
@@ -340,14 +373,14 @@ class TestStatePersistenceTrackerSerialization:
     def test_to_dict(self: Self) -> None:
         """Test serialization to dictionary."""
         hp = create_test_hp()
-        tracker = StatePersistenceTracker(hp)
+        rp = create_test_rp()
+        tracker = StatePersistenceTracker(hp, rp)
 
         tracker.update("on", 100.0)
         tracker.update("off", 200.0)
 
         data = tracker.to_dict()
 
-        assert "hyper_parameters" in data
         assert "mean_duration" in data
         assert "last_ts" in data
         assert "current_state" in data
@@ -355,22 +388,17 @@ class TestStatePersistenceTrackerSerialization:
 
     def test_from_dict(self: Self) -> None:
         """Test deserialization from dictionary."""
-        base_hp = HyperParameters(
-            half_life=50.0,
-            min_prune_interval=10.0,
-            prune_enabled=True,
-            persistence_strength=0.95,
-        )
+        hp = create_test_hp()
+        rp = create_test_rp()
 
         data = {
-            "hyper_parameters": {"persistence_half_life_factor": 2.0},
             "mean_duration": {"on": 100.0, "off": 50.0},
             "last_ts": 300.0,
             "current_state": "off",
             "current_state_start": 200.0,
         }
 
-        tracker = StatePersistenceTracker.from_dict(data, base_hp)
+        tracker = StatePersistenceTracker.from_dict(data, hp, rp)
 
         assert tracker.current_state == "off"
         assert tracker.expected_duration("on") == 100.0
@@ -379,8 +407,9 @@ class TestStatePersistenceTrackerSerialization:
 
     def test_round_trip_serialization(self: Self) -> None:
         """Test that serialization and deserialization preserves state."""
-        hp = create_test_hp(half_life=60.0, persistence_half_life_factor=1.5)
-        original = StatePersistenceTracker(hp)
+        hp = create_test_hp(half_life=60.0)
+        rp = create_test_rp(persistence_half_life_factor=1.5)
+        original = StatePersistenceTracker(hp, rp)
 
         original.update("on", 100.0)
         original.update("off", 200.0)
@@ -388,13 +417,7 @@ class TestStatePersistenceTrackerSerialization:
 
         data = original.to_dict()
 
-        base_hp = HyperParameters(
-            half_life=60.0,
-            min_prune_interval=10.0,
-            prune_enabled=True,
-            persistence_strength=0.95,
-        )
-        restored = StatePersistenceTracker.from_dict(data, base_hp)
+        restored = StatePersistenceTracker.from_dict(data, hp, rp)
 
         assert restored.current_state == original.current_state
         assert restored.current_duration(250.0) == original.current_duration(250.0)
@@ -404,17 +427,12 @@ class TestStatePersistenceTrackerSerialization:
     def test_serialization_with_no_state(self: Self) -> None:
         """Test serialization of tracker with no observations."""
         hp = create_test_hp()
-        tracker = StatePersistenceTracker(hp)
+        rp = create_test_rp()
+        tracker = StatePersistenceTracker(hp, rp)
 
         data = tracker.to_dict()
 
-        base_hp = HyperParameters(
-            half_life=50.0,
-            min_prune_interval=10.0,
-            prune_enabled=True,
-            persistence_strength=0.95,
-        )
-        restored = StatePersistenceTracker.from_dict(data, base_hp)
+        restored = StatePersistenceTracker.from_dict(data, hp, rp)
 
         assert restored.current_state is None
         assert restored.current_duration(100.0) == 0.0
@@ -422,7 +440,8 @@ class TestStatePersistenceTrackerSerialization:
     def test_serialization_preserves_mean_duration_dict(self: Self) -> None:
         """Test that serialization creates a copy of mean_duration dict."""
         hp = create_test_hp()
-        tracker = StatePersistenceTracker(hp)
+        rp = create_test_rp()
+        tracker = StatePersistenceTracker(hp, rp)
 
         tracker.update("on", 100.0)
         tracker.update("off", 200.0)

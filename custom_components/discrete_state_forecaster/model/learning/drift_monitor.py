@@ -9,11 +9,11 @@ diverge significantly, it indicates that the underlying data patterns are changi
 import math
 from typing import Any, Final, Self
 
-from custom_components.discrete_state_forecaster.model.hyper_parameters import (
-    HyperParameters,
+from custom_components.discrete_state_forecaster.model.learning.drift_monitor_parameters import (
+    DriftMonitorParameters,
 )
-from custom_components.discrete_state_forecaster.model.learning.duration_weighted_baseline_runtime_parameters import (
-    DurationWeightedBaselineRuntimeParameters,
+from custom_components.discrete_state_forecaster.model.learning.drift_monitor_runtime_parameters import (  # noqa: E501
+    DriftMonitorRuntimeParameters,
 )
 from custom_components.discrete_state_forecaster.model.state import (
     State,
@@ -22,7 +22,6 @@ from custom_components.discrete_state_forecaster.model.state import (
 from .drift_monitor_hyper_parameters import DriftMonitorHyperParameters
 from .drift_stats import DriftStats
 from .drift_stats_hyper_parameters import DriftStatsHyperParameters
-from .drift_stats_runtime_parameters import DriftStatsRuntimeParameters
 from .duration_weighted_baseline import DurationWeightedBaseline
 from .duration_weighted_baseline_hyper_parameters import (
     DurationWeightedBaselineHyperParameters,
@@ -53,8 +52,11 @@ class DriftMonitor:
 
     """
 
-    _hyper_parameters: Final[DriftMonitorHyperParameters]
+    _parameters: Final[DriftMonitorParameters]
     """Configuration for drift detection."""
+
+    _runtime_parameters: Final[DriftMonitorRuntimeParameters]
+    """Runtime parameters for drift detection."""
 
     _fast_baseline: Final[DurationWeightedBaseline]
     """Quickly adapting baseline for recent patterns."""
@@ -77,60 +79,49 @@ class DriftMonitor:
     _last_drift: float
     """Most recent drift magnitude."""
 
-    _tau_enter: float
-    """Current threshold for entering drift state."""
-
-    _tau_exit: float
-    """Current threshold for exiting drift state."""
-
     def __init__(
         self: Self,
         hyper_parameters: DriftMonitorHyperParameters,
+        runtime_parameters: DriftMonitorRuntimeParameters,
     ) -> None:
         """
         Initialize drift monitor with dual baselines.
 
         Args:
-            hyper_parameters: Configuration controlling drift detection behavior.
+            hyper_parameters: Configuration for drift detection, including half-life and adaptive
+            threshold settings.
+            runtime_parameters: Runtime parameters containing dynamic configuration values.
 
         """
-        self._hyper_parameters = hyper_parameters
+        self._parameters = DriftMonitorParameters(
+            hyper_parameters=hyper_parameters,
+            runtime_parameters=runtime_parameters,
+        )
         self._fast_baseline = DurationWeightedBaseline(
             DurationWeightedBaselineHyperParameters(
                 hyper_parameters=hyper_parameters,
             ),
-            DurationWeightedBaselineRuntimeParameters(  # TODO: get from runtime params
-                half_life_factor=hyper_parameters.fast_half_life_factor,
-                prune_threshold=hyper_parameters.fast_prune_threshold,
-                epsilon=hyper_parameters.fast_epsilon,
-            ),
+            runtime_parameters=runtime_parameters.fast_baseline,
         )
         self._slow_baseline = DurationWeightedBaseline(
             DurationWeightedBaselineHyperParameters(
                 hyper_parameters=hyper_parameters,
             ),
-            DurationWeightedBaselineRuntimeParameters(  # TODO: get from runtime params
-                half_life_factor=hyper_parameters.slow_half_life_factor,
-                prune_threshold=hyper_parameters.slow_prune_threshold,
-                epsilon=hyper_parameters.slow_epsilon,
-            ),
+            runtime_parameters=runtime_parameters.slow_baseline,
         )
 
         self._drift_stats = DriftStats(
             DriftStatsHyperParameters(
                 hyper_parameters=hyper_parameters,
             ),
-            DriftStatsRuntimeParameters(  # TODO: get from runtime params
-                half_life_factor=hyper_parameters.drift_half_life_factor,
-            ),
+            runtime_parameters=runtime_parameters.drift_stats,
         )
+        self._runtime_parameters = runtime_parameters
 
         self._enter_counter = 0
         self._exit_counter = 0
         self._is_drifting = False
         self._last_drift: float = 0.0
-        self._tau_enter = hyper_parameters.tau_enter
-        self._tau_exit = hyper_parameters.tau_exit
 
     @property
     def is_drifting(self: Self) -> bool:
@@ -177,25 +168,29 @@ class DriftMonitor:
         if not self._is_drifting:
             self._drift_stats.update(drift, timestamp)
 
-            if self._hyper_parameters.adaptive_tau:
-                self._tau_enter = self._drift_stats.mean + 3.0 * self._drift_stats.std
-                self._tau_exit = self._drift_stats.mean + 1.5 * self._drift_stats.std
+            if self._parameters.adaptive_tau:
+                self._runtime_parameters.tau_enter = (
+                    self._drift_stats.mean + 3.0 * self._drift_stats.std
+                )
+                self._runtime_parameters.tau_exit = (
+                    self._drift_stats.mean + 1.5 * self._drift_stats.std
+                )
 
             # Entry logic: if the drift exceeds the entry threshold for n_enter consecutive updates,
             # we enter drifting state
-            if drift >= self._tau_enter:
+            if drift >= self._runtime_parameters.tau_enter:
                 self._enter_counter += 1
-                if self._enter_counter >= self._hyper_parameters.n_enter:
+                if self._enter_counter >= self._parameters.n_enter:
                     self._is_drifting = True
                     self._exit_counter = 0
             else:
                 self._enter_counter = 0
 
-        elif drift <= self._tau_exit:
+        elif drift <= self._runtime_parameters.tau_exit:
             # Exit logic: if the drift goes below the exit threshold for n_exit consecutive updates,
             # we exit drifting state
             self._exit_counter += 1
-            if self._exit_counter >= self._hyper_parameters.n_exit:
+            if self._exit_counter >= self._parameters.n_exit:
                 self._is_drifting = False
                 self._enter_counter = 0
         else:
@@ -261,7 +256,6 @@ class DriftMonitor:
 
         """
         return {
-            "hyper_parameters": self._hyper_parameters.to_dict(),
             "fast_baseline": self._fast_baseline.to_dict(),
             "slow_baseline": self._slow_baseline.to_dict(),
             "drift_stats": self._drift_stats.to_dict(),
@@ -269,12 +263,15 @@ class DriftMonitor:
             "exit_counter": self._exit_counter,
             "is_drifting": self._is_drifting,
             "last_drift": self._last_drift,
-            "tau_enter": self._tau_enter,
-            "tau_exit": self._tau_exit,
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any], hyper_parameters: HyperParameters) -> Self:
+    def from_dict(
+        cls,
+        data: dict[str, Any],
+        hyper_parameters: DriftMonitorHyperParameters,
+        runtime_parameters: DriftMonitorRuntimeParameters,
+    ) -> Self:
         """
         Deserialize a DriftMonitor from a dictionary.
 
@@ -282,35 +279,31 @@ class DriftMonitor:
             data: Dictionary containing all necessary information to reconstruct
                 the DriftMonitor, including hyper-parameters, baselines, and statistics.
             hyper_parameters: External hyper-parameters to use for reconstruction.
+            runtime_parameters: Runtime parameters to use for reconstruction.
 
         Returns:
             A new DriftMonitor instance initialized with the provided data, with
             all internal state restored.
         """
-        drift_hyper_parameters = DriftMonitorHyperParameters.from_dict(
-            data["hyper_parameters"], hyper_parameters
-        )
-        monitor = cls(hyper_parameters=drift_hyper_parameters)
+        monitor = cls(hyper_parameters=hyper_parameters, runtime_parameters=runtime_parameters)
         monitor._fast_baseline = DurationWeightedBaseline.from_dict(
             data["fast_baseline"],
-            DurationWeightedBaselineHyperParameters(drift_hyper_parameters),
-            # TODO: pass runtime parameters
+            DurationWeightedBaselineHyperParameters(hyper_parameters),
+            runtime_parameters=runtime_parameters.fast_baseline,
         )
         monitor._slow_baseline = DurationWeightedBaseline.from_dict(
             data["slow_baseline"],
-            DurationWeightedBaselineHyperParameters(drift_hyper_parameters),
-            # TODO: pass runtime parameters
+            DurationWeightedBaselineHyperParameters(hyper_parameters),
+            runtime_parameters=runtime_parameters.slow_baseline,
         )
         monitor._drift_stats = DriftStats.from_dict(
             data["drift_stats"],
-            DriftStatsHyperParameters(drift_hyper_parameters),
-            # TODO: pass runtime parameters
+            DriftStatsHyperParameters(hyper_parameters),
+            runtime_parameters=runtime_parameters.drift_stats,
         )
         monitor._enter_counter = data["enter_counter"]
         monitor._exit_counter = data["exit_counter"]
         monitor._is_drifting = data["is_drifting"]
         monitor._last_drift = data["last_drift"]
-        monitor._tau_enter = data["tau_enter"]
-        monitor._tau_exit = data["tau_exit"]
 
         return monitor

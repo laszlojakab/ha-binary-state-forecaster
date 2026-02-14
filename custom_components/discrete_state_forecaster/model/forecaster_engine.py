@@ -10,6 +10,15 @@ from custom_components.discrete_state_forecaster.model.learning.drift_monitor im
     DriftMonitor,
     DriftMonitorHyperParameters,
 )
+from custom_components.discrete_state_forecaster.model.learning.drift_monitor_runtime_parameters import (
+    DriftMonitorRuntimeParameters,
+)
+from custom_components.discrete_state_forecaster.model.learning.drift_stats_runtime_parameters import (
+    DriftStatsRuntimeParameters,
+)
+from custom_components.discrete_state_forecaster.model.learning.duration_weighted_baseline_runtime_parameters import (
+    DurationWeightedBaselineRuntimeParameters,
+)
 from custom_components.discrete_state_forecaster.model.learning.hyper_parameter_controller import (
     HyperParameterController,
 )
@@ -17,9 +26,17 @@ from custom_components.discrete_state_forecaster.model.learning.state_persistenc
     StatePersistenceTracker,
     StatePersistenceTrackerHyperParameters,
 )
+from custom_components.discrete_state_forecaster.model.learning.state_persistence_tracker_runtime_parameters import (
+    StatePersistenceTrackerRuntimeParameters,
+)
 from custom_components.discrete_state_forecaster.model.metrics.online_error_tracker import (
     OnlineErrorTracker,
+)
+from custom_components.discrete_state_forecaster.model.metrics.online_error_tracker_hyper_parameters import (
     OnlineErrorTrackerHyperParameters,
+)
+from custom_components.discrete_state_forecaster.model.metrics.online_error_tracker_runtime_parameters import (
+    OnlineErrorTrackerRuntimeParameters,
 )
 from custom_components.discrete_state_forecaster.model.statistics.distribution_stats import (
     DistributionStats,
@@ -40,6 +57,9 @@ from custom_components.discrete_state_forecaster.model.temporal.time_key import 
     TimeKey,
 )
 
+from .forecaster_engine_runtime_parameters import (
+    ForecasterEngineRuntimeParameters,
+)
 from .state import State
 
 
@@ -145,12 +165,14 @@ class ForecasterEngine:
     def __init__(
         self: Self,
         parameters: ForecasterEngineParameters,
+        runtime_parameters: ForecasterEngineRuntimeParameters,
     ) -> None:
         """
         Initializes the forecaster engine.
 
         Args:
             parameters: Configuration parameters for the forecaster.
+            runtime_parameters: Runtime parameters that can be adjusted during execution.
         """
         self._hyper_parameters = HyperParameters(
             half_life=parameters.half_life,
@@ -163,47 +185,34 @@ class ForecasterEngine:
             HierarchicalStateStatsHyperParameters(
                 hyper_parameters=self._hyper_parameters,
             ),
-            HierarchicalStateStatsRuntimeParameters(
-                min_support_factor=parameters.min_support_factor,
-            ),
+            runtime_parameters.hierarchical_state_stats,
         )
 
         # Drift monitor detects concept drifts in GLOBAL distribution.
         self._drift_monitor: Final = DriftMonitor(
             DriftMonitorHyperParameters(
                 hyper_parameters=self._hyper_parameters,
-                slow_half_life_factor=parameters.slow_half_life_factor,
-                slow_epsilon=parameters.slow_epsilon,
-                slow_prune_threshold=parameters.slow_prune_threshold,
-                fast_half_life_factor=parameters.fast_half_life_factor,
-                fast_epsilon=parameters.fast_epsilon,
-                fast_prune_threshold=parameters.fast_prune_threshold,
-                drift_half_life_factor=parameters.drift_half_life_factor,
-                tau_enter=parameters.tau_enter,
-                tau_exit=parameters.tau_exit,
-                adaptive_tau=parameters.adaptive_tau,
-                n_enter=parameters.n_enter,
-                n_exit=parameters.n_exit,
-            )
+            ),
+            runtime_parameters.drift_monitor,
         )
         self._short_term_error_tracker: Final = OnlineErrorTracker(
-            hyper_parameters=OnlineErrorTrackerHyperParameters(
+            OnlineErrorTrackerHyperParameters(
                 hyper_parameters=self._hyper_parameters,
-                error_half_life_factor=parameters.short_term_error_half_life_factor,
-            )
+            ),
+            runtime_parameters.short_term_error_tracker,
         )
         self._long_term_error_tracker: Final = OnlineErrorTracker(
-            hyper_parameters=OnlineErrorTrackerHyperParameters(
+            OnlineErrorTrackerHyperParameters(
                 hyper_parameters=self._hyper_parameters,
-                error_half_life_factor=parameters.long_term_error_half_life_factor,
             ),
+            runtime_parameters.long_term_error_tracker,
         )
 
         self._state_persistence_tracker: Final = StatePersistenceTracker(
             StatePersistenceTrackerHyperParameters(
                 hyper_parameters=self._hyper_parameters,
-                persistence_half_life_factor=parameters.persistence_half_life_factor,
-            )
+            ),
+            runtime_parameters.state_persistence_tracker,
         )
 
         self._hyper_parameter_controller: Final = HyperParameterController(

@@ -14,6 +14,12 @@ from typing import TYPE_CHECKING, Any, Final, Self
 from .state_persistence_tracker_hyper_parameters import (
     StatePersistenceTrackerHyperParameters,
 )
+from .state_persistence_tracker_parameters import (
+    StatePersistenceTrackerParameters,
+)
+from .state_persistence_tracker_runtime_parameters import (
+    StatePersistenceTrackerRuntimeParameters,
+)
 
 if TYPE_CHECKING:
     from custom_components.discrete_state_forecaster.model.hyper_parameters import (
@@ -50,7 +56,7 @@ class StatePersistenceTracker:
         'on'
     """
 
-    _hyper_parameters: Final[StatePersistenceTrackerHyperParameters]
+    _parameters: Final[StatePersistenceTrackerParameters]
     """Configuration controlling decay behavior."""
 
     _mean_duration: Final[dict[State, float]]
@@ -66,15 +72,21 @@ class StatePersistenceTracker:
     """Timestamp when current state started, or None if no state active."""
 
     def __init__(
-        self: Self, hyper_parameters: StatePersistenceTrackerHyperParameters
+        self: Self,
+        hyper_parameters: StatePersistenceTrackerHyperParameters,
+        runtime_parameters: StatePersistenceTrackerRuntimeParameters,
     ) -> None:
         """
         Initialize state persistence tracker.
 
         Args:
             hyper_parameters: Configuration controlling decay behavior.
+            runtime_parameters: Runtime parameters for the tracker.
         """
-        self._hyper_parameters: Final = hyper_parameters
+        self._parameters: Final = StatePersistenceTrackerParameters(
+            hyper_parameters=hyper_parameters,
+            runtime_parameters=runtime_parameters,
+        )
         self._mean_duration: dict[State, float] = {}
         self._last_ts: float | None = None
         self._current_state: State | None = None
@@ -103,7 +115,7 @@ class StatePersistenceTracker:
 
             prev = self._mean_duration.get(self._current_state, duration)
             dt = timestamp - self._last_ts if self._last_ts else 0.0
-            _lambda = math.log(2.0) / self._hyper_parameters.persistence_half_life
+            _lambda = math.log(2.0) / self._parameters.persistence_half_life
             decay = math.exp(-_lambda * dt)
 
             self._mean_duration[self._current_state] = (
@@ -200,7 +212,6 @@ class StatePersistenceTracker:
             current state, and current state start time.
         """
         return {
-            "hyper_parameters": self._hyper_parameters.to_dict(),
             "mean_duration": dict(self._mean_duration),
             "last_ts": self._last_ts,
             "current_state": self._current_state,
@@ -209,7 +220,10 @@ class StatePersistenceTracker:
 
     @classmethod
     def from_dict(
-        cls, data: dict[str, Any], hyper_parameters: HyperParameters
+        cls,
+        data: dict[str, Any],
+        hyper_parameters: StatePersistenceTrackerHyperParameters,
+        runtime_parameters: StatePersistenceTrackerRuntimeParameters,
     ) -> StatePersistenceTracker:
         """
         Deserialize an instance from a dictionary.
@@ -218,18 +232,14 @@ class StatePersistenceTracker:
             data: Dictionary containing serialized instance data including
                 hyper_parameters, mean_duration, last_ts, current_state,
                 and current_state_start.
-            hyper_parameters: Base hyper-parameters needed to reconstruct the
-                StatePersistenceTrackerHyperParameters.
+            hyper_parameters: Hyper-parameters needed to reconstruct the instance.
+            runtime_parameters: Runtime parameters needed to reconstruct the instance.
 
         Returns:
             A new StatePersistenceTracker instance initialized from the provided
             data with all internal state restored.
         """
-        tracker_hp = StatePersistenceTrackerHyperParameters.from_dict(
-            data["hyper_parameters"], hyper_parameters
-        )
-
-        tracker = cls(hyper_parameters=tracker_hp)
+        tracker = cls(hyper_parameters, runtime_parameters)
         tracker._mean_duration = dict(data["mean_duration"])
         tracker._last_ts = data["last_ts"]
         tracker._current_state = data["current_state"]

@@ -11,14 +11,35 @@ import pytest
 from custom_components.discrete_state_forecaster.model.forecaster_engine import (
     ForecasterEngineParameters,
 )
+from custom_components.discrete_state_forecaster.model.forecaster_engine_runtime_parameters import (
+    ForecasterEngineRuntimeParameters,
+)
+from custom_components.discrete_state_forecaster.model.learning.drift_monitor_runtime_parameters import (
+    DriftMonitorRuntimeParameters,
+)
+from custom_components.discrete_state_forecaster.model.learning.drift_stats_runtime_parameters import (
+    DriftStatsRuntimeParameters,
+)
+from custom_components.discrete_state_forecaster.model.learning.duration_weighted_baseline_runtime_parameters import (
+    DurationWeightedBaselineRuntimeParameters,
+)
+from custom_components.discrete_state_forecaster.model.learning.state_persistence_tracker_runtime_parameters import (
+    StatePersistenceTrackerRuntimeParameters,
+)
+from custom_components.discrete_state_forecaster.model.metrics.online_error_tracker_runtime_parameters import (
+    OnlineErrorTrackerRuntimeParameters,
+)
 from custom_components.discrete_state_forecaster.model.runtime_parameters import (
     RuntimeParameters,
 )
+from custom_components.discrete_state_forecaster.model.statistics.hierarchical_state_stats_runtime_parameters import (
+    HierarchicalStateStatsRuntimeParameters,
+)
 from custom_components.discrete_state_forecaster.model.temporal.time_key import TimeKey
 from custom_components.discrete_state_forecaster.model.time_aware_forecaster import (
+    StructuralParameters,
     TimeAwareForecaster,
     TimeAwareForecasterParameters,
-    StructuralParameters,
 )
 
 
@@ -70,9 +91,50 @@ def structural_params(
 
 
 @pytest.fixture
-def runtime_params() -> RuntimeParameters:
+def engine_runtime_params() -> ForecasterEngineRuntimeParameters:
+    """Fixture providing default ForecasterEngineRuntimeParameters."""
+    return ForecasterEngineRuntimeParameters(
+        hierarchical_state_stats=HierarchicalStateStatsRuntimeParameters(
+            min_support_factor=0.5  # Use lower value for faster test convergence
+        ),
+        short_term_error_tracker=OnlineErrorTrackerRuntimeParameters(
+            error_half_life_factor=4.0
+        ),
+        long_term_error_tracker=OnlineErrorTrackerRuntimeParameters(
+            error_half_life_factor=40.0
+        ),
+        state_persistence_tracker=StatePersistenceTrackerRuntimeParameters(
+            persistence_half_life_factor=5
+        ),
+        drift_monitor=DriftMonitorRuntimeParameters(
+            slow_baseline=DurationWeightedBaselineRuntimeParameters(
+                half_life_factor=20.0,
+                prune_threshold=1e-6,
+                epsilon=1e-9,
+            ),
+            fast_baseline=DurationWeightedBaselineRuntimeParameters(
+                half_life_factor=1.5,
+                prune_threshold=1e-6,
+                epsilon=1e-9,
+            ),
+            drift_stats=DriftStatsRuntimeParameters(half_life_factor=30.0),
+            tau_enter=0.1,
+            tau_exit=0.05,
+            adaptive_tau=True,
+            n_enter=3,
+            n_exit=5,
+        ),
+    )
+
+
+@pytest.fixture
+def runtime_params(
+    engine_runtime_params: ForecasterEngineRuntimeParameters,
+) -> RuntimeParameters:
     """Fixture providing default RuntimeParameters."""
-    return RuntimeParameters()
+    return RuntimeParameters(
+        engine=engine_runtime_params, min_prune_interval_factor=5.0
+    )
 
 
 @pytest.fixture

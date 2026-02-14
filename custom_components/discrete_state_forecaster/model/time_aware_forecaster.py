@@ -81,7 +81,10 @@ class TimeAwareForecaster:
             structural_parameters: Structural parameters including the time indexer.
             parameters: Configuration parameters including the forecaster engine parameters.
         """
-        self._engine: Final = ForecasterEngine(parameters.forecaster_engine_parameters)
+        self._engine: Final = ForecasterEngine(
+            parameters.forecaster_engine_parameters,
+            runtime_parameters=runtime_parameters.engine,
+        )
         self._runtime_parameters: Final = runtime_parameters
         self._structural_parameters: Final = structural_parameters
 
