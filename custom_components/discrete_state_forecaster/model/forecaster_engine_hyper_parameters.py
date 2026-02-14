@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Self
 
 
-class HyperParameters:
+class ForecasterEngineHyperParameters:
     def __init__(
         self: Self,
         half_life: float,
@@ -73,7 +73,7 @@ class HyperParameters:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> HyperParameters:
+    def from_dict(cls, data: dict[str, Any]) -> ForecasterEngineHyperParameters:
         parameters = cls(
             half_life=data["half_life"],
             min_prune_interval=data["min_prune_interval"],

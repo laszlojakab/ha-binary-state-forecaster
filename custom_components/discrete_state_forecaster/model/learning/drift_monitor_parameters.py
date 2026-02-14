@@ -8,8 +8,8 @@ drift is detected through comparison of fast and slow baseline distributions.
 from dataclasses import dataclass
 from typing import Final, Self
 
-from custom_components.discrete_state_forecaster.model.hyper_parameters import (
-    HyperParameters,
+from custom_components.discrete_state_forecaster.model.forecaster_engine_hyper_parameters import (
+    ForecasterEngineHyperParameters,
 )
 from custom_components.discrete_state_forecaster.model.learning.drift_monitor_runtime_parameters import (
     DriftMonitorRuntimeParameters,
@@ -27,7 +27,7 @@ class DriftMonitorParameters:
     drift thresholds, and adaptive threshold adjustment.
     """
 
-    hyper_parameters: Final[HyperParameters]
+    hyper_parameters: Final[ForecasterEngineHyperParameters]
     """Base hyper-parameters providing the half-life value used for baselines."""
 
     runtime_parameters: Final[DriftMonitorRuntimeParameters]

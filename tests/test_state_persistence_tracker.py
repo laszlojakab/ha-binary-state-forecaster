@@ -8,8 +8,8 @@ persistence boost computation.
 import math
 from typing import Self
 
-from custom_components.discrete_state_forecaster.model.hyper_parameters import (
-    HyperParameters,
+from custom_components.discrete_state_forecaster.model.forecaster_engine_hyper_parameters import (
+    ForecasterEngineHyperParameters,
 )
 from custom_components.discrete_state_forecaster.model.learning.state_persistence_tracker import (
     StatePersistenceTracker,
@@ -26,7 +26,7 @@ def create_test_hp(
     half_life: float = 50.0,
 ) -> StatePersistenceTrackerHyperParameters:
     """Create test hyper-parameters."""
-    base_hp = HyperParameters(
+    base_hp = ForecasterEngineHyperParameters(
         half_life=half_life,
         min_prune_interval=10.0,
         prune_enabled=True,

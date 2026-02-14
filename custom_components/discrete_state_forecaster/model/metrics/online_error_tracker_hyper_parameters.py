@@ -5,8 +5,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Final, Self
 
 if TYPE_CHECKING:
-    from custom_components.discrete_state_forecaster.model.hyper_parameters import (
-        HyperParameters,
+    from custom_components.discrete_state_forecaster.model.forecaster_engine_hyper_parameters import (
+        ForecasterEngineHyperParameters,
     )
 
 
@@ -18,10 +18,10 @@ class OnlineErrorTrackerHyperParameters:
     of the hierarchical state statistics.
     """
 
-    _hyper_parameters: Final[HyperParameters]
+    _hyper_parameters: Final[ForecasterEngineHyperParameters]
     """Base hyper-parameters containing the reference half-life."""
 
-    def __init__(self: Self, hyper_parameters: HyperParameters) -> None:
+    def __init__(self: Self, hyper_parameters: ForecasterEngineHyperParameters) -> None:
         """
         Initialize error tracker hyper-parameters.
 

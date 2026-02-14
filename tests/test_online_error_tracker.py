@@ -8,8 +8,8 @@ error tracking, exponential decay, and statistical calculations.
 import math
 from typing import Self
 
-from custom_components.discrete_state_forecaster.model.hyper_parameters import (
-    HyperParameters,
+from custom_components.discrete_state_forecaster.model.forecaster_engine_hyper_parameters import (
+    ForecasterEngineHyperParameters,
 )
 from custom_components.discrete_state_forecaster.model.metrics.online_error_tracker import (
     OnlineErrorTracker,
@@ -27,7 +27,7 @@ from custom_components.discrete_state_forecaster.model.statistics.distribution_s
 
 def create_test_hp() -> OnlineErrorTrackerHyperParameters:
     """Create OnlineErrorTrackerHyperParameters for testing purposes."""
-    base_hp = HyperParameters(
+    base_hp = ForecasterEngineHyperParameters(
         half_life=50.0,
         min_prune_interval=10.0,
         prune_enabled=True,
@@ -469,7 +469,7 @@ class TestOnlineErrorTrackerSerialization:
         assert set(["mean", "var", "last_ts"]).issubset(set(data.keys()))
 
     def test_from_dict_restores_tracker_state(self: Self) -> None:
-        base_hp = HyperParameters(
+        base_hp = ForecasterEngineHyperParameters(
             half_life=60.0,
             min_prune_interval=10.0,
             prune_enabled=True,

@@ -3,8 +3,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Final, Self
 
-from custom_components.discrete_state_forecaster.model.hyper_parameters import (
-    HyperParameters,
+from custom_components.discrete_state_forecaster.model.forecaster_engine_hyper_parameters import (
+    ForecasterEngineHyperParameters,
 )
 from custom_components.discrete_state_forecaster.model.learning.drift_monitor import (
     DriftMonitor,
@@ -165,6 +165,7 @@ class ForecasterEngine:
     def __init__(
         self: Self,
         parameters: ForecasterEngineParameters,
+        # hyper_parameters: ForecasterEngineHyperParameters,
         runtime_parameters: ForecasterEngineRuntimeParameters,
     ) -> None:
         """
@@ -174,10 +175,10 @@ class ForecasterEngine:
             parameters: Configuration parameters for the forecaster.
             runtime_parameters: Runtime parameters that can be adjusted during execution.
         """
-        self._hyper_parameters = HyperParameters(
+        self._hyper_parameters = ForecasterEngineHyperParameters(
             half_life=parameters.half_life,
             min_prune_interval=parameters.half_life
-            * parameters.min_prune_interval_factor,
+            * runtime_parameters.min_prune_interval_factor,
             prune_enabled=True,
             persistence_strength=parameters.persistence_strength,
         )

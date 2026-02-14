@@ -124,6 +124,7 @@ def engine_runtime_params() -> ForecasterEngineRuntimeParameters:
             n_enter=3,
             n_exit=5,
         ),
+        min_prune_interval_factor=5.0,
     )
 
 

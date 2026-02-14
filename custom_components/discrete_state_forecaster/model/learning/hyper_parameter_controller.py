@@ -11,8 +11,8 @@ import math
 from enum import Enum, auto
 from typing import Final, Self
 
-from custom_components.discrete_state_forecaster.model.hyper_parameters import (
-    HyperParameters,
+from custom_components.discrete_state_forecaster.model.forecaster_engine_hyper_parameters import (
+    ForecasterEngineHyperParameters,
 )
 
 
@@ -72,7 +72,7 @@ class HyperParameterController:
     def __init__(
         self: Self,
         *,
-        hyper_parameters: HyperParameters,
+        hyper_parameters: ForecasterEngineHyperParameters,
         base_half_life: float,
         min_half_life: float = 60.0,
         max_half_life: float = 3600.0 * 48,
@@ -97,7 +97,7 @@ class HyperParameterController:
         self._mode = AdaptationMode.STABLE
 
     @property
-    def hyper_parameters(self: Self) -> HyperParameters:
+    def hyper_parameters(self: Self) -> ForecasterEngineHyperParameters:
         """
         Get the managed hyper-parameters object.
 

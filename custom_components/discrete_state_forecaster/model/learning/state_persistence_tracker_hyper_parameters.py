@@ -5,20 +5,20 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Final, Self
 
 if TYPE_CHECKING:
-    from custom_components.discrete_state_forecaster.model.hyper_parameters import (
-        HyperParameters,
+    from custom_components.discrete_state_forecaster.model.forecaster_engine_hyper_parameters import (
+        ForecasterEngineHyperParameters,
     )
 
 
 class StatePersistenceTrackerHyperParameters:
     """Hyper-parameters for state persistence tracking behavior."""
 
-    _hyper_parameters: Final[HyperParameters]
+    _hyper_parameters: Final[ForecasterEngineHyperParameters]
     """Base hyper-parameters containing the reference half-life."""
 
     def __init__(
         self: Self,
-        hyper_parameters: HyperParameters,
+        hyper_parameters: ForecasterEngineHyperParameters,
     ) -> None:
         """
         Initialize state persistence tracker hyper-parameters.

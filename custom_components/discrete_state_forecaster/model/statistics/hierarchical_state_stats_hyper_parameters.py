@@ -5,8 +5,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Final, Self
 
 if TYPE_CHECKING:
-    from custom_components.discrete_state_forecaster.model.hyper_parameters import (
-        HyperParameters,
+    from custom_components.discrete_state_forecaster.model.forecaster_engine_hyper_parameters import (
+        ForecasterEngineHyperParameters,
     )
 
 
@@ -18,10 +18,10 @@ class HierarchicalStateStatsHyperParameters:
     of the hierarchical state statistics.
     """
 
-    _hyper_parameters: Final[HyperParameters]
+    _hyper_parameters: Final[ForecasterEngineHyperParameters]
     """Base hyper parameters containing global configuration values."""
 
-    def __init__(self: Self, hyper_parameters: HyperParameters):
+    def __init__(self: Self, hyper_parameters: ForecasterEngineHyperParameters):
         """
         Initializes hierarchical state statistics configuration.
 

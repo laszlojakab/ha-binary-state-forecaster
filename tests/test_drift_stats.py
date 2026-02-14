@@ -8,8 +8,8 @@ for adaptive drift thresholds.
 import math
 from typing import Self
 
-from custom_components.discrete_state_forecaster.model.hyper_parameters import (
-    HyperParameters,
+from custom_components.discrete_state_forecaster.model.forecaster_engine_hyper_parameters import (
+    ForecasterEngineHyperParameters,
 )
 from custom_components.discrete_state_forecaster.model.learning.drift_monitor_hyper_parameters import (  # noqa: E501
     DriftMonitorHyperParameters,
@@ -27,7 +27,7 @@ from custom_components.discrete_state_forecaster.model.learning.drift_stats_runt
 
 def create_test_hp() -> DriftStatsHyperParameters:
     """Create test hyper-parameters."""
-    base_hp = HyperParameters(
+    base_hp = ForecasterEngineHyperParameters(
         half_life=50.0,
         min_prune_interval=10.0,
         prune_enabled=True,

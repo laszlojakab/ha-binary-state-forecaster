@@ -7,8 +7,8 @@ updates, multi-level predictions with fallback, and temporal decay.
 
 from typing import Self
 
-from custom_components.discrete_state_forecaster.model.hyper_parameters import (
-    HyperParameters,
+from custom_components.discrete_state_forecaster.model.forecaster_engine_hyper_parameters import (
+    ForecasterEngineHyperParameters,
 )
 from custom_components.discrete_state_forecaster.model.statistics.hierarchical_state_stats import (
     HierarchicalStateStats,
@@ -29,7 +29,7 @@ def create_test_hp(
     persistence_strength: float = 0.95,
 ) -> HierarchicalStateStatsHyperParameters:
     """Helper to create HyperParameters for testing."""
-    base_hp = HyperParameters(
+    base_hp = ForecasterEngineHyperParameters(
         half_life=half_life,
         min_prune_interval=min_prune_interval,
         prune_enabled=prune_enabled,

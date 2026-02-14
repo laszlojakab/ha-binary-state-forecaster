@@ -22,8 +22,8 @@ from .state_persistence_tracker_runtime_parameters import (
 )
 
 if TYPE_CHECKING:
-    from custom_components.discrete_state_forecaster.model.hyper_parameters import (
-        HyperParameters,
+    from custom_components.discrete_state_forecaster.model.forecaster_engine_hyper_parameters import (
+        ForecasterEngineHyperParameters,
     )
     from custom_components.discrete_state_forecaster.model.state import (
         State,

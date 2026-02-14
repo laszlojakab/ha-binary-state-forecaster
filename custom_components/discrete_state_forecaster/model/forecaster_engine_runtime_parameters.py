@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Final
 
 from custom_components.discrete_state_forecaster.model.learning.drift_monitor_runtime_parameters import (
     DriftMonitorRuntimeParameters,
@@ -14,21 +15,24 @@ from custom_components.discrete_state_forecaster.model.statistics.hierarchical_s
 )
 
 
-@dataclass(frozen=True)
+@dataclass()
 class ForecasterEngineRuntimeParameters:
     """Runtime parameters for ForecasterEngine."""
 
-    hierarchical_state_stats: HierarchicalStateStatsRuntimeParameters
+    hierarchical_state_stats: Final[HierarchicalStateStatsRuntimeParameters]
     """Runtime parameters for hierarchical state statistics."""
 
-    drift_monitor: DriftMonitorRuntimeParameters
+    drift_monitor: Final[DriftMonitorRuntimeParameters]
     """Runtime parameters for drift monitoring."""
 
-    long_term_error_tracker: OnlineErrorTrackerRuntimeParameters
+    long_term_error_tracker: Final[OnlineErrorTrackerRuntimeParameters]
     """Runtime parameters for long-term error tracking."""
 
-    short_term_error_tracker: OnlineErrorTrackerRuntimeParameters
+    short_term_error_tracker: Final[OnlineErrorTrackerRuntimeParameters]
     """Runtime parameters for short-term error tracking."""
 
-    state_persistence_tracker: StatePersistenceTrackerRuntimeParameters
+    state_persistence_tracker: Final[StatePersistenceTrackerRuntimeParameters]
     """Runtime parameters for state persistence tracking."""
+
+    min_prune_interval_factor: float
+    """Multiplier for minimum interval between prune operations"""

@@ -6,8 +6,8 @@ Comprehensive tests for concept drift detection using dual-baseline comparison.
 
 from typing import Self
 
-from custom_components.discrete_state_forecaster.model.hyper_parameters import (
-    HyperParameters,
+from custom_components.discrete_state_forecaster.model.forecaster_engine_hyper_parameters import (
+    ForecasterEngineHyperParameters,
 )
 from custom_components.discrete_state_forecaster.model.learning.drift_monitor import (
     DriftMonitor,
@@ -27,10 +27,10 @@ from custom_components.discrete_state_forecaster.model.learning.duration_weighte
 
 
 def create_test_hp(
-    base_hp: HyperParameters | None = None,
+    base_hp: ForecasterEngineHyperParameters | None = None,
 ) -> DriftMonitorHyperParameters:
     """Create test hyper-parameters."""
-    base_hp = HyperParameters(
+    base_hp = ForecasterEngineHyperParameters(
         half_life=50.0,
         min_prune_interval=10.0,
         prune_enabled=True,

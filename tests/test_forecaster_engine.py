@@ -14,6 +14,9 @@ from custom_components.discrete_state_forecaster.model.forecaster_engine import 
     ForecasterEngine,
     ForecasterEngineParameters,
 )
+from custom_components.discrete_state_forecaster.model.forecaster_engine_hyper_parameters import (
+    ForecasterEngineHyperParameters,
+)
 from custom_components.discrete_state_forecaster.model.forecaster_engine_runtime_parameters import (
     ForecasterEngineRuntimeParameters,
 )
@@ -44,6 +47,7 @@ def create_test_engine(
     half_life: float = 100.0,
     persistence_strength: float = 0.5,
     min_support_factor: float = 2.0,  # Threshold for testing (2*100=200)
+    min_prune_interval_factor: float = 5.0,
 ) -> ForecasterEngine:
     """Create a test forecaster engine with specified parameters."""
     params = ForecasterEngineParameters(
@@ -52,12 +56,21 @@ def create_test_engine(
         min_support_factor=min_support_factor,
     )
 
-    rp = create_test_rp()
+    rp = create_test_rp(min_prune_interval_factor=min_prune_interval_factor)
+
+    # hp = ForecasterEngineHyperParameters(
+    #     half_life=half_life,
+    #     min_prune_interval=parameters.half_life * parameters.min_prune_interval_factor,
+    #     prune_enabled=True,
+    #     persistence_strength=parameters.persistence_strength,
+    # )
 
     return ForecasterEngine(params, rp)
 
 
-def create_test_rp() -> ForecasterEngineRuntimeParameters:
+def create_test_rp(
+    min_prune_interval_factor: float = 5.0,
+) -> ForecasterEngineRuntimeParameters:
     """Create test runtime parameters with default values."""
     return ForecasterEngineRuntimeParameters(
         hierarchical_state_stats=HierarchicalStateStatsRuntimeParameters(
@@ -90,6 +103,7 @@ def create_test_rp() -> ForecasterEngineRuntimeParameters:
             n_enter=3,
             n_exit=5,
         ),
+        min_prune_interval_factor=min_prune_interval_factor,
     )
 
 

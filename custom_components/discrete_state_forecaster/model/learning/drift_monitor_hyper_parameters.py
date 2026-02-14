@@ -7,8 +7,8 @@ drift is detected through comparison of fast and slow baseline distributions.
 
 from typing import Final, Self
 
-from custom_components.discrete_state_forecaster.model.hyper_parameters import (
-    HyperParameters,
+from custom_components.discrete_state_forecaster.model.forecaster_engine_hyper_parameters import (
+    ForecasterEngineHyperParameters,
 )
 
 
@@ -20,12 +20,12 @@ class DriftMonitorHyperParameters:
     drift thresholds, and adaptive threshold adjustment.
     """
 
-    _hyper_parameters: Final[HyperParameters]
+    _hyper_parameters: Final[ForecasterEngineHyperParameters]
     """Base hyper-parameters providing the half-life value used for baselines."""
 
     def __init__(
         self: Self,
-        hyper_parameters: HyperParameters,
+        hyper_parameters: ForecasterEngineHyperParameters,
     ):
         """
         Initialize drift monitor hyper-parameters.
