@@ -46,14 +46,12 @@ from custom_components.discrete_state_forecaster.model.temporal.time_key import 
 def create_test_engine(
     half_life: float = 100.0,
     persistence_strength: float = 0.5,
-    min_support_factor: float = 2.0,  # Threshold for testing (2*100=200)
     min_prune_interval_factor: float = 5.0,
 ) -> ForecasterEngine:
     """Create a test forecaster engine with specified parameters."""
     params = ForecasterEngineParameters(
         half_life=half_life,
         persistence_strength=persistence_strength,
-        min_support_factor=min_support_factor,
     )
 
     rp = create_test_rp(min_prune_interval_factor=min_prune_interval_factor)
@@ -105,42 +103,6 @@ def create_test_rp(
         ),
         min_prune_interval_factor=min_prune_interval_factor,
     )
-
-
-class TestForecasterEngineParameters:
-    """Tests for ForecasterEngineParameters dataclass."""
-
-    def test_default_parameters(self: Self) -> None:
-        """Test that default parameters are sensible."""
-        params = ForecasterEngineParameters()
-        assert params.half_life == 3600.0
-        assert params.slow_half_life_factor == 20
-        assert params.fast_half_life_factor == 1.5
-        assert params.drift_half_life_factor == 30
-        assert params.tau_enter == 0.1
-        assert params.tau_exit == 0.05
-        assert params.adaptive_tau is True
-        assert params.n_enter == 3
-        assert params.n_exit == 5
-        assert params.persistence_strength == 0.5
-        assert params.min_support_factor == 7.5
-
-    def test_custom_parameters(self: Self) -> None:
-        """Test creating parameters with custom values."""
-        params = ForecasterEngineParameters(
-            half_life=7200.0,
-            persistence_strength=0.7,
-            min_support_factor=10.0,
-        )
-        assert params.half_life == 7200.0
-        assert params.persistence_strength == 0.7
-        assert params.min_support_factor == 10.0
-
-    def test_parameters_frozen(self: Self) -> None:
-        """Test that parameters dataclass is frozen."""
-        params = ForecasterEngineParameters()
-        with pytest.raises(AttributeError):
-            params.half_life = 1000.0  # type: ignore[misc]
 
 
 class TestForecasterEngineInitialization:
@@ -413,10 +375,8 @@ class TestForecasterEnginePruning:
 
     def test_pruning_respects_min_interval(self: Self) -> None:
         """Test that pruning only occurs after min interval."""
-        params = ForecasterEngineParameters(
-            half_life=100.0, min_prune_interval_factor=5.0
-        )
-        rp = create_test_rp()
+        params = ForecasterEngineParameters(half_life=100.0)
+        rp = create_test_rp(min_prune_interval_factor=5.0)
         engine = ForecasterEngine(params, rp)
         key = TimeKey.GLOBAL
 

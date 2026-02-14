@@ -106,37 +106,37 @@ class ForecasterEngineParameters:
     """
 
     half_life: float = 3600.0
-    # T = tipikus változási idő
-    # | Tracker          | Half-life       | Miért             |
-    # | ---------------- | --------------- | ----------------- |
-    # | short_term_error | **~ 2-4 x T**   | gyors reakció     |
-    # | long_term_error  | **~ 20-50 x T** | stabil referencia |
-    # 5-10 x base_half_life
-    #######
-    # half_life        ≈ typical_change
-    # fast_half_life   ≈ 1-2 x typical_change
-    # slow_half_life   ≈ 10-30 x typical_change
-    # drift_half_life  ≈ 1.5 x slow_half_life
-    slow_half_life_factor: float = 20
-    slow_epsilon: float = 1e-9
-    slow_prune_threshold: float = 1e-6
-    fast_half_life_factor: float = 1.5
-    fast_epsilon: float = 1e-9
-    fast_prune_threshold: float = 1e-6
-    drift_half_life_factor: float = 30
-    tau_enter: float = 0.1
-    tau_exit: float = 0.05
-    adaptive_tau: bool = True
-    n_enter: int = 3
-    n_exit: int = 5
-    short_term_error_half_life_factor: float = 4
-    long_term_error_half_life_factor: float = 40
-    persistence_half_life_factor: float = 5.0
-    # min_prune_interval ≈ 5-10 x base_half_life
-    min_prune_interval_factor: float = 5.0
+    # # T = tipikus változási idő
+    # # | Tracker          | Half-life       | Miért             |
+    # # | ---------------- | --------------- | ----------------- |
+    # # | short_term_error | **~ 2-4 x T**   | gyors reakció     |
+    # # | long_term_error  | **~ 20-50 x T** | stabil referencia |
+    # # 5-10 x base_half_life
+    # #######
+    # # half_life        ≈ typical_change
+    # # fast_half_life   ≈ 1-2 x typical_change
+    # # slow_half_life   ≈ 10-30 x typical_change
+    # # drift_half_life  ≈ 1.5 x slow_half_life
+    # slow_half_life_factor: float = 20
+    # slow_epsilon: float = 1e-9
+    # slow_prune_threshold: float = 1e-6
+    # fast_half_life_factor: float = 1.5
+    # fast_epsilon: float = 1e-9
+    # fast_prune_threshold: float = 1e-6
+    # drift_half_life_factor: float = 30
+    # tau_enter: float = 0.1
+    # tau_exit: float = 0.05
+    # adaptive_tau: bool = True
+    # n_enter: int = 3
+    # n_exit: int = 5
+    # short_term_error_half_life_factor: float = 4
+    # long_term_error_half_life_factor: float = 40
+    # persistence_half_life_factor: float = 5.0
+    # # min_prune_interval ≈ 5-10 x base_half_life
+    # min_prune_interval_factor: float = 5.0
     persistence_strength: float = 0.5
-    # min_support ≈ 5-10 x typical_change
-    min_support_factor: float = 7.5
+    # # min_support ≈ 5-10 x typical_change
+    # min_support_factor: float = 7.5
 
 
 class ForecasterEngine:

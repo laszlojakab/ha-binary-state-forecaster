@@ -69,7 +69,7 @@ def mock_indexer() -> MockTimeIndexer:
 def engine_params() -> ForecasterEngineParameters:
     """Fixture providing default ForecasterEngineParameters."""
     # Use lower min_support_factor for faster test convergence
-    return ForecasterEngineParameters(min_support_factor=0.5)
+    return ForecasterEngineParameters()
 
 
 @pytest.fixture
