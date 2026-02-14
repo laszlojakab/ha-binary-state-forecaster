@@ -24,14 +24,14 @@ from custom_components.discrete_state_forecaster.model.temporal.time_key import 
 
 def create_test_hp(
     half_life: float = 50.0,
-    min_prune_interval: float = 10.0,
+    min_prune_interval_factor: float = 0.2,
     prune_enabled: bool = True,
     persistence_strength: float = 0.95,
 ) -> HierarchicalStateStatsHyperParameters:
     """Helper to create HyperParameters for testing."""
     base_hp = ForecasterEngineHyperParameters(
         half_life=half_life,
-        min_prune_interval=min_prune_interval,
+        min_prune_interval_factor=min_prune_interval_factor,
         prune_enabled=prune_enabled,
         persistence_strength=persistence_strength,
     )

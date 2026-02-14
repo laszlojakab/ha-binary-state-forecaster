@@ -8,11 +8,16 @@ to changing data patterns.
 """
 
 import math
+from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Final, Self
 
 from custom_components.discrete_state_forecaster.model.forecaster_engine_hyper_parameters import (
     ForecasterEngineHyperParameters,
+)
+
+from .hyper_parameter_controller_runtime_parameters import (
+    HyperParameterControllerRuntimeParameters,
 )
 
 
@@ -32,6 +37,13 @@ class AdaptationMode(Enum):
     DRIFTING_OK = auto()
     MODEL_DEGRADING = auto()
     CONCEPT_DRIFT = auto()
+
+
+@dataclass
+class AdaptationConfig:
+    adapt_half_life: bool = True
+    adapt_persistence: bool = True
+    adapt_prune_interval: bool = True
 
 
 class HyperParameterController:
@@ -73,9 +85,11 @@ class HyperParameterController:
         self: Self,
         *,
         hyper_parameters: ForecasterEngineHyperParameters,
+        runtime_parameters: HyperParameterControllerRuntimeParameters,
         base_half_life: float,
         min_half_life: float = 60.0,
-        max_half_life: float = 3600.0 * 48,
+        max_half_life: float = 3600.0 * 48,  # TODO: this looks to low?
+        adaptation_config: AdaptationConfig | None = None,
     ) -> None:
         """
         Initialize hyper-parameter controller.
@@ -85,9 +99,10 @@ class HyperParameterController:
             base_half_life: Initial half-life value.
             min_half_life: Lower bound for half-life (default 60 seconds).
             max_half_life: Upper bound for half-life (default 48 hours).
-
+            adaptation_config: Which parameters to adapt based on mode.
         """
         self._hyper_parameters: Final = hyper_parameters
+        self._runtime_parameters: Final = runtime_parameters
 
         self._log_half_life = math.log(base_half_life)
 
@@ -95,6 +110,8 @@ class HyperParameterController:
         self._max_half_life = max_half_life
 
         self._mode = AdaptationMode.STABLE
+
+        self._config = adaptation_config or AdaptationConfig()
 
     @property
     def hyper_parameters(self: Self) -> ForecasterEngineHyperParameters:
@@ -125,6 +142,7 @@ class HyperParameterController:
         short_term_error: float | None,
         long_term_error: float | None,
         entropy_confidence: float | None,
+        fallback_depth: int | None = None,
     ) -> None:
         """
         Update adaptation mode and adjust hyper-parameters.
@@ -138,6 +156,7 @@ class HyperParameterController:
             short_term_error: Recent prediction error (or None if unavailable).
             long_term_error: Historical prediction error (or None if unavailable).
             entropy_confidence: Confidence level from entropy (or None if unavailable).
+            fallback_depth: Optional depth of contributions for additional context (not used in current logic).
 
         """
         error_worsening = (
@@ -147,12 +166,13 @@ class HyperParameterController:
         )
 
         low_confidence = entropy_confidence is not None and entropy_confidence < 0.4
+        deep_fallback = fallback_depth is not None and fallback_depth > 2
 
         # ----- Mode decision -----
 
         if is_drifting and error_worsening:
             self._mode = AdaptationMode.CONCEPT_DRIFT
-        elif is_drifting:
+        elif is_drifting or deep_fallback:
             self._mode = AdaptationMode.DRIFTING_OK
         elif error_worsening or low_confidence:
             self._mode = AdaptationMode.MODEL_DEGRADING
@@ -181,6 +201,14 @@ class HyperParameterController:
 
         self._update_params()
 
+    def _update_baseline(self) -> None:
+        """Slowly adapt baseline toward current half-life if system is stable."""
+        if self._mode == AdaptationMode.STABLE:
+            alpha = 0.001
+            self._baseline_log_half_life = (
+                1 - alpha
+            ) * self._baseline_log_half_life + alpha * self._log_half_life
+
     def _update_params(self: Self) -> None:
         """
         Update hyper-parameters based on current mode and half-life.
@@ -192,6 +220,23 @@ class HyperParameterController:
         """
         self._hyper_parameters.reset()
 
+        # TODO...
+        # if self._config.adapt_half_life:
+
+        #     if self._mode == AdaptationMode.CONCEPT_DRIFT:
+        #         self._log_half_life -= 0.08
+        #     elif self._mode == AdaptationMode.MODEL_DEGRADING:
+        #         self._log_half_life -= 0.03
+        #     elif self._mode == AdaptationMode.DRIFTING_OK:
+        #         self._log_half_life -= 0.015
+        #     else:
+        #         self._log_half_life += 0.01
+
+        #     self._log_half_life = max(
+        #         math.log(self._min_half_life),
+        #         min(math.log(self._max_half_life), self._log_half_life),
+        #     )
+
         half_life = math.exp(self._log_half_life)
 
         # ---- persistence derived from half-life ----
@@ -200,28 +245,39 @@ class HyperParameterController:
         )
         ratio = max(0.0, min(1.0, ratio))
 
-        persistence_strength = 0.2 + 0.8 * ratio
+        if self._config.adapt_persistence:
+            persistence_strength = 0.2 + 0.8 * ratio
+        else:
+            persistence_strength = self._hyper_parameters.persistence_strength
 
-        # ---- pruning policy by mode ----
-        if self._mode == AdaptationMode.CONCEPT_DRIFT:
-            prune_enabled = False
-            prune_interval = self._hyper_parameters.min_prune_interval * 4
+        if self._config.adapt_prune_interval:
+            base = self._runtime_parameters.min_prune_interval_factor
 
-        elif self._mode == AdaptationMode.DRIFTING_OK:
-            prune_enabled = False
-            prune_interval = self._hyper_parameters.min_prune_interval * 2
+            if self._mode == AdaptationMode.CONCEPT_DRIFT:
+                min_prune_interval_factor = base * 4
+                prune_enabled = False
 
-        elif self._mode == AdaptationMode.MODEL_DEGRADING:
-            prune_enabled = True
-            prune_interval = self._hyper_parameters.min_prune_interval * 0.7
+            elif self._mode == AdaptationMode.DRIFTING_OK:
+                min_prune_interval_factor = base * 2
+                prune_enabled = False
 
-        else:  # STABLE
-            prune_enabled = True
-            prune_interval = self._hyper_parameters.min_prune_interval
+            elif self._mode == AdaptationMode.MODEL_DEGRADING:
+                min_prune_interval_factor = base * 0.7
+                prune_enabled = True
+
+            else:
+                min_prune_interval_factor = base
+                prune_enabled = True
+        else:
+            min_prune_interval_factor = self._hyper_parameters.min_prune_interval_factor
+            prune_enabled = self._hyper_parameters.prune_enabled
 
         self._hyper_parameters.update(
             half_life=half_life,
-            min_prune_interval=prune_interval,
+            min_prune_interval_factor=min_prune_interval_factor,
             prune_enabled=prune_enabled,
             persistence_strength=persistence_strength,
         )
+
+        # TODO:...
+        # self._update_baseline()

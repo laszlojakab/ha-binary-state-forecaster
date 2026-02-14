@@ -28,7 +28,7 @@ def create_test_hp(
     """Create test hyper-parameters."""
     base_hp = ForecasterEngineHyperParameters(
         half_life=half_life,
-        min_prune_interval=10.0,
+        min_prune_interval_factor=0.2,
         prune_enabled=True,
         persistence_strength=0.95,
     )

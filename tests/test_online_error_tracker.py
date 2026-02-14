@@ -29,7 +29,7 @@ def create_test_hp() -> OnlineErrorTrackerHyperParameters:
     """Create OnlineErrorTrackerHyperParameters for testing purposes."""
     base_hp = ForecasterEngineHyperParameters(
         half_life=50.0,
-        min_prune_interval=10.0,
+        min_prune_interval_factor=0.2,
         prune_enabled=True,
         persistence_strength=0.95,
     )
@@ -471,7 +471,7 @@ class TestOnlineErrorTrackerSerialization:
     def test_from_dict_restores_tracker_state(self: Self) -> None:
         base_hp = ForecasterEngineHyperParameters(
             half_life=60.0,
-            min_prune_interval=10.0,
+            min_prune_interval_factor=0.2,
             prune_enabled=True,
             persistence_strength=0.9,
         )

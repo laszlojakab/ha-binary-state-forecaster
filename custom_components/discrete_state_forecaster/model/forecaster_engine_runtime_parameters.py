@@ -4,6 +4,9 @@ from typing import Final
 from custom_components.discrete_state_forecaster.model.learning.drift_monitor_runtime_parameters import (
     DriftMonitorRuntimeParameters,
 )
+from custom_components.discrete_state_forecaster.model.learning.hyper_parameter_controller_runtime_parameters import (
+    HyperParameterControllerRuntimeParameters,
+)
 from custom_components.discrete_state_forecaster.model.learning.state_persistence_tracker_runtime_parameters import (
     StatePersistenceTrackerRuntimeParameters,
 )
@@ -34,11 +37,11 @@ class ForecasterEngineRuntimeParameters:
     state_persistence_tracker: Final[StatePersistenceTrackerRuntimeParameters]
     """Runtime parameters for state persistence tracking."""
 
+    hyper_parameter_controller: Final[HyperParameterControllerRuntimeParameters]
+    """Runtime parameters for hyperparameter control."""
+
     half_life: float
     """Base half-life value for decay calculations (in seconds)."""
-
-    min_prune_interval_factor: float
-    """Multiplier for minimum interval between prune operations"""
 
     persistence_strength: float
     """Strength of persistence modeling (0.0 = no persistence, 1.0 = full persistence)."""

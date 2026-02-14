@@ -25,6 +25,9 @@ from custom_components.discrete_state_forecaster.model.learning.drift_stats_runt
 from custom_components.discrete_state_forecaster.model.learning.duration_weighted_baseline_runtime_parameters import (
     DurationWeightedBaselineRuntimeParameters,
 )
+from custom_components.discrete_state_forecaster.model.learning.hyper_parameter_controller_runtime_parameters import (
+    HyperParameterControllerRuntimeParameters,
+)
 from custom_components.discrete_state_forecaster.model.learning.state_persistence_tracker_runtime_parameters import (
     StatePersistenceTrackerRuntimeParameters,
 )
@@ -91,7 +94,9 @@ def create_test_parameters(
             n_enter=3,
             n_exit=5,
         ),
-        min_prune_interval_factor=min_prune_interval_factor,
+        hyper_parameter_controller=HyperParameterControllerRuntimeParameters(
+            min_prune_interval_factor=min_prune_interval_factor
+        ),
         half_life=half_life,
         persistence_strength=persistence_strength,
     )

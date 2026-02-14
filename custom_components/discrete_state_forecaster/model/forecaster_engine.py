@@ -168,8 +168,7 @@ class ForecasterEngine:
         """
         self._hyper_parameters = ForecasterEngineHyperParameters(
             half_life=parameters.half_life,
-            min_prune_interval=parameters.half_life
-            * parameters.min_prune_interval_factor,
+            min_prune_interval_factor=parameters.hyper_parameter_controller.min_prune_interval_factor,
             prune_enabled=True,
             persistence_strength=parameters.persistence_strength,
         )
@@ -209,7 +208,9 @@ class ForecasterEngine:
         )
 
         self._hyper_parameter_controller: Final = HyperParameterController(
-            hyper_parameters=self._hyper_parameters, base_half_life=parameters.half_life
+            hyper_parameters=self._hyper_parameters,
+            base_half_life=parameters.half_life,
+            runtime_parameters=parameters.hyper_parameter_controller,
         )
 
         self._last_update_timestamp: float | None = None
@@ -284,6 +285,9 @@ class ForecasterEngine:
                 global_prediction.confidence.entropy_confidence
                 if global_prediction
                 else None
+            ),
+            fallback_depth=(
+                global_prediction.confidence.depth if global_prediction else None
             ),
         )
 
@@ -457,8 +461,7 @@ class ForecasterEngine:
         # Create a runtime parameters object with the deserialized components
         runtime_parameters = ForecasterEngineRuntimeParameters(
             half_life=hyper_parameters.half_life,
-            min_prune_interval_factor=hyper_parameters.min_prune_interval
-            / hyper_parameters.half_life,
+            min_prune_interval_factor=hyper_parameters.min_prune_interval_factor,
             persistence_strength=hyper_parameters.persistence_strength,
             hierarchical_state_stats=HierarchicalStateStatsRuntimeParameters(stats),
             drift_monitor=DriftMonitorRuntimeParameters(drift_monitor),
@@ -493,7 +496,11 @@ class ForecasterEngine:
             return
 
         if (
-            self._last_prune_timestamp + self._hyper_parameters.min_prune_interval
+            self._last_prune_timestamp
+            + (
+                self._hyper_parameters.half_life
+                * self._hyper_parameters.min_prune_interval_factor
+            )
         ) > timestamp:
             return
 
