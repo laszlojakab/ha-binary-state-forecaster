@@ -84,20 +84,24 @@ class HyperParameterController:
         Args:
             runtime_parameters: Runtime parameters for hyper-parameter control.
         """
-        self._hyper_parameters: Final = ForecasterEngineHyperParameters(
-            half_life=runtime_parameters.base_half_life,
-            min_prune_interval_factor=runtime_parameters.min_prune_interval_factor,
-            prune_enabled=True,
-            persistence_strength=runtime_parameters.base_persistence_strength,
+        self._hyper_parameters: Final[ForecasterEngineHyperParameters] = (
+            ForecasterEngineHyperParameters(
+                half_life=runtime_parameters.base_half_life,
+                min_prune_interval_factor=runtime_parameters.min_prune_interval_factor,
+                prune_enabled=True,
+                persistence_strength=runtime_parameters.base_persistence_strength,
+            )
         )
-        self._runtime_parameters: Final = runtime_parameters
+        self._runtime_parameters: Final[HyperParameterControllerRuntimeParameters] = (
+            runtime_parameters
+        )
 
-        self._log_half_life = math.log(self._runtime_parameters.base_half_life)
+        self._log_half_life: float = math.log(self._runtime_parameters.base_half_life)
 
-        self._min_half_life = self._runtime_parameters.min_half_life
-        self._max_half_life = self._runtime_parameters.max_half_life
+        self._min_half_life: float = self._runtime_parameters.min_half_life
+        self._max_half_life: float = self._runtime_parameters.max_half_life
 
-        self._mode = AdaptationMode.STABLE
+        self._mode: AdaptationMode = AdaptationMode.STABLE
 
     @property
     def hyper_parameters(self: Self) -> ForecasterEngineHyperParameters:
