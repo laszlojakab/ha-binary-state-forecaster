@@ -97,6 +97,7 @@ class HyperParameterController:
         )
 
         self._log_half_life: float = math.log(self._runtime_parameters.base_half_life)
+        self._baseline_log_half_life = self._log_half_life
 
         self._min_half_life: float = self._runtime_parameters.min_half_life
         self._max_half_life: float = self._runtime_parameters.max_half_life
@@ -253,21 +254,20 @@ class HyperParameterController:
         """
         self._hyper_parameters.reset()
 
-        # TODO...
-        # if self._runtime_parameters.adaptation_config.adapt_half_life:
-        #     if self._mode == AdaptationMode.CONCEPT_DRIFT:
-        #         self._log_half_life -= 0.08
-        #     elif self._mode == AdaptationMode.MODEL_DEGRADING:
-        #         self._log_half_life -= 0.03
-        #     elif self._mode == AdaptationMode.DRIFTING_OK:
-        #         self._log_half_life -= 0.015
-        #     else:
-        #         self._log_half_life += 0.01
+        if self._runtime_parameters.adaptation_config.adapt_half_life:
+            if self._mode == AdaptationMode.CONCEPT_DRIFT:
+                self._log_half_life -= 0.08
+            elif self._mode == AdaptationMode.MODEL_DEGRADING:
+                self._log_half_life -= 0.03
+            elif self._mode == AdaptationMode.DRIFTING_OK:
+                self._log_half_life -= 0.015
+            else:
+                self._log_half_life += 0.01
 
-        #     self._log_half_life = max(
-        #         math.log(self._min_half_life),
-        #         min(math.log(self._max_half_life), self._log_half_life),
-        #     )
+            self._log_half_life = max(
+                math.log(self._min_half_life),
+                min(math.log(self._max_half_life), self._log_half_life),
+            )
 
         half_life = math.exp(self._log_half_life)
 
@@ -311,5 +311,4 @@ class HyperParameterController:
             persistence_strength=persistence_strength,
         )
 
-        # TODO: add baseline adaption later...
-        # self._update_baseline()
+        self._update_baseline()
