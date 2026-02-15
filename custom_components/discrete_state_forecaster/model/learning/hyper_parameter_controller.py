@@ -218,12 +218,9 @@ class HyperParameterController:
         instance._hyper_parameters = ForecasterEngineHyperParameters.from_dict(
             data["hyper_parameters"]
         )
-        instance._log_half_life = data.get(
-            "log_half_life", math.log(instance._hyper_parameters.half_life)
-        )
-        instance._baseline_log_half_life = data.get(
-            "baseline_log_half_life", instance._log_half_life
-        )
+        instance._log_half_life = data["log_half_life"]
+        instance._baseline_log_half_life = data["baseline_log_half_life"]
+
         return instance
 
     def _update_baseline(self: Self) -> None:

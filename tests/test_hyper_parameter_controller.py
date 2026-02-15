@@ -17,7 +17,7 @@ from custom_components.discrete_state_forecaster.model.learning.hyper_parameter_
 )
 
 
-def create_test_runtime_parameters(
+def create_test_runtime_parameters(  # noqa: PLR0913
     base_half_life: float = 300.0,
     base_persistence_strength: float = 0.95,
     min_prune_interval_factor: float = 5.0,
@@ -77,8 +77,8 @@ class TestHyperParameterControllerInitialization:
         controller = HyperParameterController(runtime_parameters=rp)
 
         # Access private attributes for testing
-        assert controller._min_half_life == 100.0  # noqa: SLF001
-        assert controller._max_half_life == 1000.0  # noqa: SLF001
+        assert controller._min_half_life == 100.0
+        assert controller._max_half_life == 1000.0
 
 
 class TestAdaptationModes:
@@ -405,7 +405,10 @@ class TestSerialization:
         controller2 = HyperParameterController.from_dict(data, rp)
 
         assert controller2.mode == controller1.mode
-        assert controller2.hyper_parameters.half_life == controller1.hyper_parameters.half_life
+        assert (
+            controller2.hyper_parameters.half_life
+            == controller1.hyper_parameters.half_life
+        )
         assert (
             controller2.hyper_parameters.persistence_strength
             == controller1.hyper_parameters.persistence_strength
@@ -556,7 +559,7 @@ class TestBaselineAdaptation:
         controller = HyperParameterController(runtime_parameters=rp)
 
         # Access private attribute for testing
-        assert controller._baseline_log_half_life == controller._log_half_life  # noqa: SLF001
+        assert controller._baseline_log_half_life == controller._log_half_life
 
     def test_baseline_adapts_in_stable_mode(self) -> None:
         """Test that baseline adapts toward current half-life in stable mode."""
@@ -572,8 +575,8 @@ class TestBaselineAdaptation:
                 entropy_confidence=0.8,
             )
 
-        decreased_log_half_life = controller._log_half_life  # noqa: SLF001
-        initial_baseline = controller._baseline_log_half_life  # noqa: SLF001
+        decreased_log_half_life = controller._log_half_life
+        initial_baseline = controller._baseline_log_half_life
 
         # Now stabilize - baseline should slowly approach current half-life
         for _ in range(100):
@@ -584,8 +587,8 @@ class TestBaselineAdaptation:
                 entropy_confidence=0.8,
             )
 
-        final_baseline = controller._baseline_log_half_life  # noqa: SLF001
-        final_log_half_life = controller._log_half_life  # noqa: SLF001
+        final_baseline = controller._baseline_log_half_life
+        final_log_half_life = controller._log_half_life
 
         # Baseline should have moved toward decreased value (but not all the way)
         assert final_baseline < initial_baseline
@@ -599,7 +602,7 @@ class TestBaselineAdaptation:
         rp = create_test_runtime_parameters(base_half_life=300.0)
         controller = HyperParameterController(runtime_parameters=rp)
 
-        initial_baseline = controller._baseline_log_half_life  # noqa: SLF001
+        initial_baseline = controller._baseline_log_half_life
 
         # Apply drift updates
         for _ in range(10):
@@ -610,7 +613,7 @@ class TestBaselineAdaptation:
                 entropy_confidence=0.8,
             )
 
-        final_baseline = controller._baseline_log_half_life  # noqa: SLF001
+        final_baseline = controller._baseline_log_half_life
 
         # Baseline should not have changed
         assert final_baseline == initial_baseline
@@ -640,38 +643,8 @@ class TestBaselineAdaptation:
         controller2 = HyperParameterController.from_dict(data, rp)
 
         # Baselines should match
-        assert (
-            controller2._baseline_log_half_life  # noqa: SLF001
-            == controller._baseline_log_half_life  # noqa: SLF001
-        )
-        assert (
-            controller2._log_half_life == controller._log_half_life  # noqa: SLF001
-        )
-
-    def test_baseline_backwards_compatibility(self) -> None:
-        """Test that old serialization format without baseline still works."""
-        rp = create_test_runtime_parameters(base_half_life=300.0)
-
-        # Create old-style serialization (without baseline)
-        data = {
-            "mode": "STABLE",
-            "hyper_parameters": {
-                "half_life": 300.0,
-                "min_prune_interval_factor": 5.0,
-                "prune_enabled": True,
-                "persistence_strength": 0.95,
-                "base_half_life": 300.0,
-                "base_min_prune_interval_factor": 5.0,
-                "base_prune_enabled": True,
-                "base_persistence_strength": 0.95,
-            },
-        }
-
-        # Should not crash, should use defaults
-        controller = HyperParameterController.from_dict(data, rp)
-
-        # Should have initialized baseline from current half-life
-        assert controller._baseline_log_half_life is not None  # noqa: SLF001
+        assert controller2._baseline_log_half_life == controller._baseline_log_half_life
+        assert controller2._log_half_life == controller._log_half_life
 
 
 class TestAdaptationConfiguration:
@@ -759,4 +732,3 @@ class TestAdaptationConfiguration:
         assert controller.hyper_parameters.half_life != initial_half_life
         # But persistence should not
         assert controller.hyper_parameters.persistence_strength == initial_persistence
-
