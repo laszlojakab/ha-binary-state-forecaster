@@ -50,6 +50,7 @@ class HyperParameterController:
         _hyper_parameters: Configuration object to update.
         _runtime_parameters: Runtime parameters for hyper-parameter control.
         _log_half_life: Log of current half-life (for smooth exponential updates).
+        _baseline_log_half_life: Log of baseline half-life (slowly adapts in stable mode).
         _min_half_life: Lower bound for half-life.
         _max_half_life: Upper bound for half-life.
         _mode: Current adaptation mode.
@@ -97,7 +98,7 @@ class HyperParameterController:
         )
 
         self._log_half_life: float = math.log(self._runtime_parameters.base_half_life)
-        self._baseline_log_half_life = self._log_half_life
+        self._baseline_log_half_life: float = self._log_half_life
 
         self._min_half_life: float = self._runtime_parameters.min_half_life
         self._max_half_life: float = self._runtime_parameters.max_half_life
@@ -178,24 +179,7 @@ class HyperParameterController:
         else:
             self._mode = AdaptationMode.STABLE
 
-        # Adjust half-life based on mode
-        if self._mode == AdaptationMode.CONCEPT_DRIFT:
-            self._log_half_life -= 0.08
-        elif self._mode == AdaptationMode.MODEL_DEGRADING:
-            self._log_half_life -= 0.03
-        elif self._mode == AdaptationMode.DRIFTING_OK:
-            self._log_half_life -= 0.015
-        else:
-            # In stable mode, slowly increase half-life to regain stability
-            self._log_half_life += 0.01
-
-        # Clamp log_half_life to min/max bounds
-        self._log_half_life = max(
-            math.log(self._min_half_life),
-            min(math.log(self._max_half_life), self._log_half_life),
-        )
-
-        # Update hyper-parameters based on new half-life and mode
+        # Update hyper-parameters based on mode and half-life
         self._update_params()
 
     def to_dict(self: Self) -> dict[str, Any]:
@@ -208,6 +192,8 @@ class HyperParameterController:
         return {
             "mode": self._mode.name,
             "hyper_parameters": self._hyper_parameters.to_dict(),
+            "log_half_life": self._log_half_life,
+            "baseline_log_half_life": self._baseline_log_half_life,
         }
 
     @classmethod
@@ -232,11 +218,22 @@ class HyperParameterController:
         instance._hyper_parameters = ForecasterEngineHyperParameters.from_dict(
             data["hyper_parameters"]
         )
-        instance._log_half_life = math.log(instance._hyper_parameters.half_life)
+        instance._log_half_life = data.get(
+            "log_half_life", math.log(instance._hyper_parameters.half_life)
+        )
+        instance._baseline_log_half_life = data.get(
+            "baseline_log_half_life", instance._log_half_life
+        )
         return instance
 
-    def _update_baseline(self) -> None:
-        """Slowly adapt baseline toward current half-life if system is stable."""
+    def _update_baseline(self: Self) -> None:
+        """
+        Slowly adapt baseline toward current half-life if system is stable.
+
+        When the system operates in STABLE mode, the baseline half-life gradually
+        adapts toward the current half-life using exponential smoothing. This allows
+        the baseline to track long-term stable operating points.
+        """
         if self._mode == AdaptationMode.STABLE:
             alpha = 0.001
             self._baseline_log_half_life = (

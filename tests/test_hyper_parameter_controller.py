@@ -545,3 +545,218 @@ class TestEdgeCases:
         )
 
         assert controller.mode == AdaptationMode.STABLE
+
+
+class TestBaselineAdaptation:
+    """Tests for baseline half-life adaptation."""
+
+    def test_baseline_initializes_to_current_half_life(self) -> None:
+        """Test that baseline starts equal to current half-life."""
+        rp = create_test_runtime_parameters(base_half_life=300.0)
+        controller = HyperParameterController(runtime_parameters=rp)
+
+        # Access private attribute for testing
+        assert controller._baseline_log_half_life == controller._log_half_life  # noqa: SLF001
+
+    def test_baseline_adapts_in_stable_mode(self) -> None:
+        """Test that baseline adapts toward current half-life in stable mode."""
+        rp = create_test_runtime_parameters(base_half_life=300.0)
+        controller = HyperParameterController(runtime_parameters=rp)
+
+        # First decrease half-life
+        for _ in range(10):
+            controller.update(
+                is_drifting=True,
+                short_term_error=0.2,
+                long_term_error=0.1,
+                entropy_confidence=0.8,
+            )
+
+        decreased_log_half_life = controller._log_half_life  # noqa: SLF001
+        initial_baseline = controller._baseline_log_half_life  # noqa: SLF001
+
+        # Now stabilize - baseline should slowly approach current half-life
+        for _ in range(100):
+            controller.update(
+                is_drifting=False,
+                short_term_error=0.1,
+                long_term_error=0.1,
+                entropy_confidence=0.8,
+            )
+
+        final_baseline = controller._baseline_log_half_life  # noqa: SLF001
+        final_log_half_life = controller._log_half_life  # noqa: SLF001
+
+        # Baseline should have moved toward decreased value (but not all the way)
+        assert final_baseline < initial_baseline
+        # Baseline should be between initial and current
+        assert decreased_log_half_life < final_baseline < initial_baseline
+        # Current half-life should have increased from the decreased level
+        assert final_log_half_life > decreased_log_half_life
+
+    def test_baseline_does_not_adapt_in_drift_mode(self) -> None:
+        """Test that baseline doesn't adapt when not in stable mode."""
+        rp = create_test_runtime_parameters(base_half_life=300.0)
+        controller = HyperParameterController(runtime_parameters=rp)
+
+        initial_baseline = controller._baseline_log_half_life  # noqa: SLF001
+
+        # Apply drift updates
+        for _ in range(10):
+            controller.update(
+                is_drifting=True,
+                short_term_error=0.2,
+                long_term_error=0.1,
+                entropy_confidence=0.8,
+            )
+
+        final_baseline = controller._baseline_log_half_life  # noqa: SLF001
+
+        # Baseline should not have changed
+        assert final_baseline == initial_baseline
+
+    def test_baseline_serialization(self) -> None:
+        """Test that baseline is included in serialization."""
+        rp = create_test_runtime_parameters(base_half_life=300.0)
+        controller = HyperParameterController(runtime_parameters=rp)
+
+        # Modify state
+        for _ in range(5):
+            controller.update(
+                is_drifting=False,
+                short_term_error=0.1,
+                long_term_error=0.1,
+                entropy_confidence=0.8,
+            )
+
+        # Serialize
+        data = controller.to_dict()
+
+        # Should include baseline
+        assert "baseline_log_half_life" in data
+        assert "log_half_life" in data
+
+        # Deserialize
+        controller2 = HyperParameterController.from_dict(data, rp)
+
+        # Baselines should match
+        assert (
+            controller2._baseline_log_half_life  # noqa: SLF001
+            == controller._baseline_log_half_life  # noqa: SLF001
+        )
+        assert (
+            controller2._log_half_life == controller._log_half_life  # noqa: SLF001
+        )
+
+    def test_baseline_backwards_compatibility(self) -> None:
+        """Test that old serialization format without baseline still works."""
+        rp = create_test_runtime_parameters(base_half_life=300.0)
+
+        # Create old-style serialization (without baseline)
+        data = {
+            "mode": "STABLE",
+            "hyper_parameters": {
+                "half_life": 300.0,
+                "min_prune_interval_factor": 5.0,
+                "prune_enabled": True,
+                "persistence_strength": 0.95,
+                "base_half_life": 300.0,
+                "base_min_prune_interval_factor": 5.0,
+                "base_prune_enabled": True,
+                "base_persistence_strength": 0.95,
+            },
+        }
+
+        # Should not crash, should use defaults
+        controller = HyperParameterController.from_dict(data, rp)
+
+        # Should have initialized baseline from current half-life
+        assert controller._baseline_log_half_life is not None  # noqa: SLF001
+
+
+class TestAdaptationConfiguration:
+    """Tests for adaptation configuration options."""
+
+    def test_disable_half_life_adaptation(self) -> None:
+        """Test that half-life doesn't adapt when disabled."""
+        rp = create_test_runtime_parameters(
+            base_half_life=300.0,
+            adapt_half_life=False,
+        )
+        controller = HyperParameterController(runtime_parameters=rp)
+
+        initial_half_life = controller.hyper_parameters.half_life
+
+        # Trigger concept drift
+        for _ in range(10):
+            controller.update(
+                is_drifting=True,
+                short_term_error=0.2,
+                long_term_error=0.1,
+                entropy_confidence=0.8,
+            )
+
+        # Half-life should not have changed
+        assert math.isclose(
+            controller.hyper_parameters.half_life, initial_half_life, rel_tol=1e-9
+        )
+
+    def test_all_adaptations_disabled(self) -> None:
+        """Test that all parameters stay constant when adaptation is disabled."""
+        rp = create_test_runtime_parameters(
+            base_half_life=300.0,
+            base_persistence_strength=0.95,
+            min_prune_interval_factor=5.0,
+            adapt_half_life=False,
+            adapt_persistence=False,
+            adapt_prune_interval=False,
+        )
+        controller = HyperParameterController(runtime_parameters=rp)
+
+        initial_half_life = controller.hyper_parameters.half_life
+        initial_persistence = controller.hyper_parameters.persistence_strength
+        initial_prune_enabled = controller.hyper_parameters.prune_enabled
+
+        # Apply various updates
+        for _ in range(10):
+            controller.update(
+                is_drifting=True,
+                short_term_error=0.2,
+                long_term_error=0.1,
+                entropy_confidence=0.8,
+            )
+
+        # All parameters should remain unchanged
+        assert math.isclose(
+            controller.hyper_parameters.half_life, initial_half_life, rel_tol=1e-9
+        )
+        assert controller.hyper_parameters.persistence_strength == initial_persistence
+        assert controller.hyper_parameters.prune_enabled == initial_prune_enabled
+
+    def test_selective_adaptation(self) -> None:
+        """Test that individual adaptations can be enabled/disabled independently."""
+        rp = create_test_runtime_parameters(
+            base_half_life=300.0,
+            adapt_half_life=True,
+            adapt_persistence=False,
+            adapt_prune_interval=False,
+        )
+        controller = HyperParameterController(runtime_parameters=rp)
+
+        initial_half_life = controller.hyper_parameters.half_life
+        initial_persistence = controller.hyper_parameters.persistence_strength
+
+        # Trigger drift
+        for _ in range(10):
+            controller.update(
+                is_drifting=True,
+                short_term_error=0.2,
+                long_term_error=0.1,
+                entropy_confidence=0.8,
+            )
+
+        # Half-life should have changed
+        assert controller.hyper_parameters.half_life != initial_half_life
+        # But persistence should not
+        assert controller.hyper_parameters.persistence_strength == initial_persistence
+
