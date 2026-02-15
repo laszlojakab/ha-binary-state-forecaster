@@ -166,16 +166,13 @@ class ForecasterEngine:
         Args:
             parameters: Runtime parameters for configuring the engine's behavior.
         """
-        self._hyper_parameters = ForecasterEngineHyperParameters(
-            half_life=parameters.half_life,
-            min_prune_interval_factor=parameters.hyper_parameter_controller.min_prune_interval_factor,
-            prune_enabled=True,
-            persistence_strength=parameters.persistence_strength,
+        self._hyper_parameter_controller: Final = HyperParameterController(
+            runtime_parameters=parameters.hyper_parameter_controller,
         )
 
         self._stats: Final = HierarchicalStateStats(
             HierarchicalStateStatsHyperParameters(
-                hyper_parameters=self._hyper_parameters,
+                hyper_parameters=self._hyper_parameter_controller.hyper_parameters,
             ),
             parameters.hierarchical_state_stats,
         )
@@ -183,34 +180,28 @@ class ForecasterEngine:
         # Drift monitor detects concept drifts in GLOBAL distribution.
         self._drift_monitor: Final = DriftMonitor(
             DriftMonitorHyperParameters(
-                hyper_parameters=self._hyper_parameters,
+                hyper_parameters=self._hyper_parameter_controller.hyper_parameters,
             ),
             parameters.drift_monitor,
         )
         self._short_term_error_tracker: Final = OnlineErrorTracker(
             OnlineErrorTrackerHyperParameters(
-                hyper_parameters=self._hyper_parameters,
+                hyper_parameters=self._hyper_parameter_controller.hyper_parameters,
             ),
             parameters.short_term_error_tracker,
         )
         self._long_term_error_tracker: Final = OnlineErrorTracker(
             OnlineErrorTrackerHyperParameters(
-                hyper_parameters=self._hyper_parameters,
+                hyper_parameters=self._hyper_parameter_controller.hyper_parameters,
             ),
             parameters.long_term_error_tracker,
         )
 
         self._state_persistence_tracker: Final = StatePersistenceTracker(
             StatePersistenceTrackerHyperParameters(
-                hyper_parameters=self._hyper_parameters,
+                hyper_parameters=self._hyper_parameter_controller.hyper_parameters,
             ),
             parameters.state_persistence_tracker,
-        )
-
-        self._hyper_parameter_controller: Final = HyperParameterController(
-            hyper_parameters=self._hyper_parameters,
-            base_half_life=parameters.half_life,
-            runtime_parameters=parameters.hyper_parameter_controller,
         )
 
         self._last_update_timestamp: float | None = None
@@ -277,6 +268,11 @@ class ForecasterEngine:
         # Update state persistence tracker
         self._state_persistence_tracker.update(state, timestamp)
 
+        self._last_update_timestamp = timestamp
+
+        # TODO: ezt ki lehetne egy felsobb retegbe vinni? Igy akkor a hiperparameterek bentrol
+        # nezve statikusak. Kérdés: itt van-e a helye a frift monitornak és az error trackernek?
+        # lehet nem... ForecasterOrchestrator? (nem sokat tesz hozza, mert majdnem minden kikerül innen akkor...)
         self._hyper_parameter_controller.update(
             is_drifting=self._drift_monitor.is_drifting,
             short_term_error=self._short_term_error_tracker.mean,
@@ -290,8 +286,6 @@ class ForecasterEngine:
                 global_prediction.confidence.depth if global_prediction else None
             ),
         )
-
-        self._last_update_timestamp = timestamp
 
     def predict(self: Self, key: TimeKey) -> PredictionResult | None:
         """
@@ -361,7 +355,7 @@ class ForecasterEngine:
                 if state == current_state:
                     weight *= (
                         1.0
-                        + self._hyper_parameters.persistence_strength
+                        + self._hyper_parameter_controller.hyper_parameters.persistence_strength
                         * persistence_boost
                     )
 
@@ -397,7 +391,7 @@ class ForecasterEngine:
                     if state == internal_current:
                         weight *= (
                             1.0
-                            + self._hyper_parameters.persistence_strength
+                            + self._hyper_parameter_controller.hyper_parameters.persistence_strength
                             * persistence_boost
                         )
 
@@ -424,59 +418,13 @@ class ForecasterEngine:
             and state persistence tracker state.
         """
         return {
-            "hyper_parameters": self._hyper_parameters.to_dict(),
             "stats": self._stats.to_dict(),
             "drift_monitor": self._drift_monitor.to_dict(),
             "short_term_error_tracker": self._short_term_error_tracker.to_dict(),
             "long_term_error_tracker": self._long_term_error_tracker.to_dict(),
             "state_persistence_tracker": self._state_persistence_tracker.to_dict(),
+            "hyper_parameter_controller": self._hyper_parameter_controller.to_dict(),
         }
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> ForecasterEngine:
-        """
-        Deserializes a ForecasterEngine from a dictionary.
-
-        Args:
-            data: A dictionary representation of the forecaster engine.
-
-        Returns:
-            A ForecasterEngine instance reconstructed from the provided dictionary.
-        """
-        hyper_parameters = ForecasterEngineHyperParameters.from_dict(
-            data["hyper_parameters"]
-        )
-        stats = HierarchicalStateStats.from_dict(data["stats"], hyper_parameters)
-        drift_monitor = DriftMonitor.from_dict(data["drift_monitor"], hyper_parameters)
-        short_term_error_tracker = OnlineErrorTracker.from_dict(
-            data["short_term_error_tracker"], hyper_parameters
-        )
-        long_term_error_tracker = OnlineErrorTracker.from_dict(
-            data["long_term_error_tracker"], hyper_parameters
-        )
-        state_persistence_tracker = StatePersistenceTracker.from_dict(
-            data["state_persistence_tracker"], hyper_parameters
-        )
-
-        # Create a runtime parameters object with the deserialized components
-        runtime_parameters = ForecasterEngineRuntimeParameters(
-            half_life=hyper_parameters.half_life,
-            min_prune_interval_factor=hyper_parameters.min_prune_interval_factor,
-            persistence_strength=hyper_parameters.persistence_strength,
-            hierarchical_state_stats=HierarchicalStateStatsRuntimeParameters(stats),
-            drift_monitor=DriftMonitorRuntimeParameters(drift_monitor),
-            short_term_error_tracker=OnlineErrorTrackerRuntimeParameters(
-                short_term_error_tracker
-            ),
-            long_term_error_tracker=OnlineErrorTrackerRuntimeParameters(
-                long_term_error_tracker
-            ),
-            state_persistence_tracker=StatePersistenceTrackerRuntimeParameters(
-                state_persistence_tracker
-            ),
-        )
-
-        return cls(runtime_parameters)
 
     def _prune(self: Self, timestamp: float) -> None:
         """
@@ -488,7 +436,7 @@ class ForecasterEngine:
         Args:
             timestamp: Current timestamp for checking prune interval.
         """
-        if not self._hyper_parameters.prune_enabled:
+        if not self._hyper_parameter_controller.hyper_parameters.prune_enabled:
             return
 
         if self._last_prune_timestamp is None:
@@ -498,8 +446,8 @@ class ForecasterEngine:
         if (
             self._last_prune_timestamp
             + (
-                self._hyper_parameters.half_life
-                * self._hyper_parameters.min_prune_interval_factor
+                self._hyper_parameter_controller.hyper_parameters.half_life
+                * self._hyper_parameter_controller.hyper_parameters.min_prune_interval_factor
             )
         ) > timestamp:
             return
@@ -519,4 +467,6 @@ class ForecasterEngine:
         Returns:
             Decay factor between 0 and 1.
         """
-        return 2 ** (-duration / self._hyper_parameters.half_life)
+        return 2 ** (
+            -duration / self._hyper_parameter_controller.hyper_parameters.half_life
+        )

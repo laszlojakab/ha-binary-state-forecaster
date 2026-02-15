@@ -26,6 +26,7 @@ from custom_components.discrete_state_forecaster.model.learning.duration_weighte
     DurationWeightedBaselineRuntimeParameters,
 )
 from custom_components.discrete_state_forecaster.model.learning.hyper_parameter_controller_runtime_parameters import (
+    AdaptationConfig,
     HyperParameterControllerRuntimeParameters,
 )
 from custom_components.discrete_state_forecaster.model.learning.state_persistence_tracker_runtime_parameters import (
@@ -95,10 +96,13 @@ def create_test_parameters(
             n_exit=5,
         ),
         hyper_parameter_controller=HyperParameterControllerRuntimeParameters(
-            min_prune_interval_factor=min_prune_interval_factor
+            min_prune_interval_factor=min_prune_interval_factor,
+            base_half_life=half_life,
+            base_persistence_strength=persistence_strength,
+            adaptation_config=AdaptationConfig(
+                adapt_half_life=True, adapt_prune_interval=False
+            ),
         ),
-        half_life=half_life,
-        persistence_strength=persistence_strength,
     )
 
 

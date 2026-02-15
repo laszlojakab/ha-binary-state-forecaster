@@ -8,9 +8,8 @@ to changing data patterns.
 """
 
 import math
-from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Final, Self
+from typing import Any, Final, Self
 
 from custom_components.discrete_state_forecaster.model.forecaster_engine_hyper_parameters import (
     ForecasterEngineHyperParameters,
@@ -39,13 +38,6 @@ class AdaptationMode(Enum):
     CONCEPT_DRIFT = auto()
 
 
-@dataclass
-class AdaptationConfig:
-    adapt_half_life: bool = True
-    adapt_persistence: bool = True
-    adapt_prune_interval: bool = True
-
-
 class HyperParameterController:
     """
     Controls adaptive hyper-parameter adjustment based on model performance.
@@ -56,6 +48,7 @@ class HyperParameterController:
 
     Attributes:
         _hyper_parameters: Configuration object to update.
+        _runtime_parameters: Runtime parameters for hyper-parameter control.
         _log_half_life: Log of current half-life (for smooth exponential updates).
         _min_half_life: Lower bound for half-life.
         _max_half_life: Upper bound for half-life.
@@ -83,35 +76,28 @@ class HyperParameterController:
 
     def __init__(
         self: Self,
-        *,
-        hyper_parameters: ForecasterEngineHyperParameters,
         runtime_parameters: HyperParameterControllerRuntimeParameters,
-        base_half_life: float,
-        min_half_life: float = 60.0,
-        max_half_life: float = 3600.0 * 48,  # TODO: this looks to low?
-        adaptation_config: AdaptationConfig | None = None,
     ) -> None:
         """
         Initialize hyper-parameter controller.
 
         Args:
-            hyper_parameters: Configuration object to update.
-            base_half_life: Initial half-life value.
-            min_half_life: Lower bound for half-life (default 60 seconds).
-            max_half_life: Upper bound for half-life (default 48 hours).
-            adaptation_config: Which parameters to adapt based on mode.
+            runtime_parameters: Runtime parameters for hyper-parameter control.
         """
-        self._hyper_parameters: Final = hyper_parameters
+        self._hyper_parameters: Final = ForecasterEngineHyperParameters(
+            half_life=runtime_parameters.base_half_life,
+            min_prune_interval_factor=runtime_parameters.min_prune_interval_factor,
+            prune_enabled=True,
+            persistence_strength=runtime_parameters.base_persistence_strength,
+        )
         self._runtime_parameters: Final = runtime_parameters
 
-        self._log_half_life = math.log(base_half_life)
+        self._log_half_life = math.log(self._runtime_parameters.base_half_life)
 
-        self._min_half_life = min_half_life
-        self._max_half_life = max_half_life
+        self._min_half_life = self._runtime_parameters.min_half_life
+        self._max_half_life = self._runtime_parameters.max_half_life
 
         self._mode = AdaptationMode.STABLE
-
-        self._config = adaptation_config or AdaptationConfig()
 
     @property
     def hyper_parameters(self: Self) -> ForecasterEngineHyperParameters:
@@ -156,7 +142,7 @@ class HyperParameterController:
             short_term_error: Recent prediction error (or None if unavailable).
             long_term_error: Historical prediction error (or None if unavailable).
             entropy_confidence: Confidence level from entropy (or None if unavailable).
-            fallback_depth: Optional depth of contributions for additional context (not used in current logic).
+            fallback_depth: Depth of fallback used (if applicable, None if not applicable).
 
         """
         error_worsening = (
@@ -165,11 +151,19 @@ class HyperParameterController:
             and short_term_error > long_term_error * 1.1
         )
 
-        low_confidence = entropy_confidence is not None and entropy_confidence < 0.4
-        deep_fallback = fallback_depth is not None and fallback_depth > 2
+        # Consider low confidence as a signal of potential degradation,
+        # even without explicit error increase
+        low_confidence = (
+            entropy_confidence is not None and entropy_confidence < 0.4  # noqa: PLR2004
+        )
 
-        # ----- Mode decision -----
+        # Consider deep fallback as a signal of potential drift impact,
+        # even without explicit drift detection
+        deep_fallback = (
+            fallback_depth is not None and fallback_depth > 2  # noqa: PLR2004
+        )
 
+        # Determine adaptation mode based on signals
         if is_drifting and error_worsening:
             self._mode = AdaptationMode.CONCEPT_DRIFT
         elif is_drifting or deep_fallback:
@@ -179,27 +173,62 @@ class HyperParameterController:
         else:
             self._mode = AdaptationMode.STABLE
 
-        # ----- Half-life adaptation (continuous) -----
-
+        # Adjust half-life based on mode
         if self._mode == AdaptationMode.CONCEPT_DRIFT:
             self._log_half_life -= 0.08
-
         elif self._mode == AdaptationMode.MODEL_DEGRADING:
             self._log_half_life -= 0.03
-
         elif self._mode == AdaptationMode.DRIFTING_OK:
             self._log_half_life -= 0.015
-
-        else:  # STABLE
+        else:
+            # In stable mode, slowly increase half-life to regain stability
             self._log_half_life += 0.01
 
-        # Clamp
+        # Clamp log_half_life to min/max bounds
         self._log_half_life = max(
             math.log(self._min_half_life),
             min(math.log(self._max_half_life), self._log_half_life),
         )
 
+        # Update hyper-parameters based on new half-life and mode
         self._update_params()
+
+    def to_dict(self: Self) -> dict[str, Any]:
+        """
+        Serialize controller state to a dictionary.
+
+        Returns:
+            A dictionary containing current mode and hyper-parameter values.
+        """
+        return {
+            "mode": self._mode.name,
+            "hyper_parameters": self._hyper_parameters.to_dict(),
+        }
+
+    @classmethod
+    def from_dict(
+        cls,
+        data: dict[str, Any],
+        runtime_parameters: HyperParameterControllerRuntimeParameters,
+    ) -> Self:
+        """
+        Create an instance from a dictionary.
+
+        Args:
+            data: Dictionary containing mode and hyper-parameter values.
+            runtime_parameters: Runtime parameters for the controller.
+
+        Returns:
+            A new HyperParameterController instance initialized with the provided data.
+        """
+        instance = cls(runtime_parameters=runtime_parameters)
+
+        instance._mode = AdaptationMode[data["mode"]]
+        instance._hyper_parameters = ForecasterEngineHyperParameters.from_dict(
+            data["hyper_parameters"]
+        )
+        instance._log_half_life = math.log(instance._hyper_parameters.half_life)
+        return instance
 
     def _update_baseline(self) -> None:
         """Slowly adapt baseline toward current half-life if system is stable."""
@@ -221,8 +250,7 @@ class HyperParameterController:
         self._hyper_parameters.reset()
 
         # TODO...
-        # if self._config.adapt_half_life:
-
+        # if self._runtime_parameters.adaptation_config.adapt_half_life:
         #     if self._mode == AdaptationMode.CONCEPT_DRIFT:
         #         self._log_half_life -= 0.08
         #     elif self._mode == AdaptationMode.MODEL_DEGRADING:
@@ -245,12 +273,12 @@ class HyperParameterController:
         )
         ratio = max(0.0, min(1.0, ratio))
 
-        if self._config.adapt_persistence:
+        if self._runtime_parameters.adaptation_config.adapt_persistence:
             persistence_strength = 0.2 + 0.8 * ratio
         else:
             persistence_strength = self._hyper_parameters.persistence_strength
 
-        if self._config.adapt_prune_interval:
+        if self._runtime_parameters.adaptation_config.adapt_prune_interval:
             base = self._runtime_parameters.min_prune_interval_factor
 
             if self._mode == AdaptationMode.CONCEPT_DRIFT:
@@ -279,5 +307,5 @@ class HyperParameterController:
             persistence_strength=persistence_strength,
         )
 
-        # TODO:...
+        # TODO: add baseline adaption later...
         # self._update_baseline()

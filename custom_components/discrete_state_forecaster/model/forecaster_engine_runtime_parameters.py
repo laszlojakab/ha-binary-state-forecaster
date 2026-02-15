@@ -39,9 +39,3 @@ class ForecasterEngineRuntimeParameters:
 
     hyper_parameter_controller: Final[HyperParameterControllerRuntimeParameters]
     """Runtime parameters for hyperparameter control."""
-
-    half_life: float
-    """Base half-life value for decay calculations (in seconds)."""
-
-    persistence_strength: float
-    """Strength of persistence modeling (0.0 = no persistence, 1.0 = full persistence)."""
