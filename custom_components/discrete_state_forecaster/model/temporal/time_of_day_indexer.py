@@ -109,3 +109,35 @@ class TimeOfDayIndexer(TimeIndexer):
         bucket_index = total_seconds // self.bucket_size
 
         return TimeKey((self.name, bucket_index))
+
+    async def next_boundary(self: Self, timestamp: datetime) -> datetime:
+        """
+        Returns the next time-of-day bucket boundary strictly after `timestamp`.
+
+        The next boundary is the next time when the bucket index changes, which
+        occurs at multiples of bucket_size seconds since midnight.
+
+        Args:
+            timestamp: The datetime to find the next boundary after.
+
+        Returns:
+            A datetime representing the next time-of-day bucket boundary.
+
+        Examples:
+            >>> indexer = TimeOfDayIndexer(bucket_size=3600)
+            >>> ts = datetime(2024, 1, 15, 14, 30)  # Bucket 14
+            >>> boundary = await indexer.next_boundary(ts)
+            >>> boundary
+            datetime(2024, 1, 15, 15, 0)  # Next hour (bucket 15)
+
+        """
+        total_seconds = timestamp.hour * 3600 + timestamp.minute * 60 + timestamp.second
+        next_bucket_start = ((total_seconds // self.bucket_size) + 1) * self.bucket_size
+
+        # Calculate hours, minutes, seconds for the next boundary
+        hours = next_bucket_start // 3600
+        minutes = (next_bucket_start % 3600) // 60
+        seconds = next_bucket_start % 60
+
+        # Construct the next boundary datetime
+        return timestamp.replace(hour=hours % 24, minute=minutes, second=seconds, microsecond=0)

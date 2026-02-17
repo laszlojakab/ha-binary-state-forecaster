@@ -45,7 +45,7 @@
           "calendar_features": "Naptár entitások különleges napokhoz"
         },
         "data_description": {
-          "time_bucket_size_in_minutes": "Az időfelbontás a mintázatok tanulásához. Kisebb értékek (15-30 perc) a gyors változásokat rögzítik, nagyobb értékek (120-240 perc) az általánosabb mintázatokra fókuszálnak.",
+          "time_bucket_size_in_minutes": "Az időfelbontás a mintázatok tanulásához. Kisebb értékek (15-30 perc) a gyors változásokat rögzítik, nagyobb értékek (120-240 perc) az általánosabb mintázatokra fókuszálnak. A beállítás módosítása csak a megtanult mintázatok törlésével lehetséges.",
           "use_day_of_week": "Engedélyezze a hétköznapok és hétvégék közötti különböző mintázatok tanulását (pl. munkaidő, irodai berendezések)",
           "use_month_of_year": "Engedélyezze a havonta ismétlődő szezonális mintázatok tanulását (pl. fűtés/hűtés, öntözés, kültéri világítás)",
           "use_season": "Engedélyezze az évszakokhoz kötött szezonális mintázatok tanulását (pl. fűtés/hűtés, öntözés, kültéri világítás)",
@@ -57,7 +57,7 @@
       },
       "confirm_reset": {
         "title": "⚠️ Mintázat visszaállításának megerősítése",
-        "description": "**Figyelmeztetés**: Az időmintázatok megváltoztatása (hét napja, hónap) **törli az összes megtanult adatot**.\n\nAz előrejelző teljesen elölről kezdi a tanulást, ami **több napot vagy hetet** vehet igénybe a pontos előrejelzések újbóli felépítéséhez.\n\n**Az összes jelenlegi megtanult mintázat véglegesen elveszik.**\n\nBiztos benne, hogy folytatja?",
+        "description": "**Figyelmeztetés**: Az időmintázatok megváltoztatása **törli az összes megtanult adatot**.\n\nAz előrejelző teljesen elölről kezdi a tanulást, ami **több napot vagy hetet** vehet igénybe a pontos előrejelzések újbóli felépítéséhez.\n\n**Az összes jelenlegi megtanult mintázat véglegesen elveszik.**\n\nBiztos benne, hogy folytatja?",
         "data": {
           "confirm": "Igen, törölje a megtanult mintázatokat és alkalmazza az új beállításokat"
         }

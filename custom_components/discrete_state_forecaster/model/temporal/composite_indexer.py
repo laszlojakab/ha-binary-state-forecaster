@@ -102,3 +102,6 @@ class CompositeIndexer(TimeIndexer):
             current += await indexer.get_key(timestamp)
 
         return current
+
+    async def next_boundary(self: Self, timestamp: datetime) -> datetime:
+        return min([await idx.next_boundary(timestamp) for idx in self.indexers])

@@ -46,7 +46,7 @@
           "calendar_features": "Calendar entities for special days"
         },
         "data_description": {
-          "time_bucket_size_in_minutes": "The time resolution for learning patterns. Smaller values (15-30 min) capture quick changes, larger values (120-240 min) focus on broader patterns.",
+          "time_bucket_size_in_minutes": "The time resolution for learning patterns. Smaller values (15-30 min) capture quick changes, larger values (120-240 min) focus on broader patterns. Changing this setting requires resetting learned patterns.",
           "use_day_of_week": "Enable to learn different patterns for weekdays vs weekends (e.g., work schedules, office equipment)",
           "use_month_of_year": "Enable to learn monthly that repeat monthly (e.g., HVAC, irrigation, outdoor lighting)",
           "use_season": "Enable to learn seasonal patterns tied to seasons (e.g., HVAC, irrigation, outdoor lighting)",
@@ -58,7 +58,7 @@
       },
       "confirm_reset": {
         "title": "⚠️ Confirm Pattern Reset",
-        "description": "**Warning**: Changing which temporal patterns to learn (day of week, month) will **delete all learned data**.\n\nThe forecaster will start learning from scratch, which may take **several days or weeks** to build accurate predictions again.\n\n**All current learned patterns will be permanently lost.**\n\nAre you sure you want to continue?",
+        "description": "**Warning**: Changing which temporal patterns to learn will **delete all learned data**.\n\nThe forecaster will start learning from scratch, which may take **several days or weeks** to build accurate predictions again.\n\n**All current learned patterns will be permanently lost.**\n\nAre you sure you want to continue?",
         "data": {
           "confirm": "Yes, reset learned patterns and apply new settings"
         }

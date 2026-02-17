@@ -84,12 +84,8 @@ ATTR_PROBABILITY: Final = "probability"
 
 
 STORING_TIME_PATTERN: Final = {
-    # TODO: restore later
-    # "minute": 0,
-    # "second": 0,
-    # "hour": "*",
-    "minute": "*",
-    "second": "0",
+    "minute": 0,
+    "second": 0,
     "hour": "*",
 }
 """The pattern specifying the time at which to store the state of the discrete state forecaster."""

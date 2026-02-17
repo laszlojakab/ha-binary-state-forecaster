@@ -13,12 +13,18 @@ still be aggregated when making predictions.
 
 from __future__ import annotations
 
+from dataclasses import astuple
 from typing import TYPE_CHECKING, Any, Self
+
+from custom_components.discrete_state_forecaster.model.temporal.time_key import (
+    TimeKey,
+)
 
 from .distribution_stats import DistributionStats
 
 if TYPE_CHECKING:
     from collections.abc import Hashable, Iterable
+
 
 
 class KeyedDistributionStore:
@@ -40,16 +46,16 @@ class KeyedDistributionStore:
 
     """
 
-    _store: dict[Hashable, DistributionStats]
-    """Dictionary mapping hashable keys to their associated DistributionStats."""
+    _store: dict[TimeKey, DistributionStats]
+    """Dictionary mapping TimeKey keys to their associated DistributionStats."""
 
     def __init__(self: Self) -> None:
         """Initializes an empty distribution store."""
-        self._store: dict[Hashable, DistributionStats] = {}
+        self._store: dict[TimeKey, DistributionStats] = {}
 
     def update(
         self: Self,
-        key: Hashable,
+        key: TimeKey,
         state: Hashable,
         weight: float = 1.0,
     ) -> None:
@@ -60,7 +66,7 @@ class KeyedDistributionStore:
         Then updates the specified state with the given weight.
 
         Args:
-            key: The hashable key identifying which distribution to update.
+            key: The TimeKey identifying which distribution to update.
             state: The state to update.
             weight: The weight to add to the state. Defaults to 1.0.
 
@@ -112,12 +118,12 @@ class KeyedDistributionStore:
 
         self._store = {k: d for k, d in self._store.items() if not d.is_empty}
 
-    def get_distribution(self, key: Hashable) -> DistributionStats | None:
+    def get_distribution(self, key: TimeKey) -> DistributionStats | None:
         """
         Gets the distribution for a specific key.
 
         Args:
-            key: The hashable key identifying the distribution.
+            key: The TimeKey identifying the distribution.
 
         Returns:
             The DistributionStats for the key, or None if the key doesn't
@@ -126,11 +132,12 @@ class KeyedDistributionStore:
         """
         return self._store.get(key)
 
+    # TODO: not used!
     def aggregate(
         self: Self,
-        keys: Iterable[Hashable],
+        keys: Iterable[TimeKey],
         min_support: float,
-    ) -> tuple[DistributionStats, Hashable] | None:
+    ) -> tuple[DistributionStats, TimeKey] | None:
         """
         Aggregates statistics across multiple distributions until confident.
 
@@ -145,7 +152,7 @@ class KeyedDistributionStore:
         don't have enough confidence.
 
         Args:
-            keys: Iterable of hashable keys to aggregate in order.
+            keys: Iterable of TimeKey keys to aggregate in order.
             min_support: Minimum required total support for confidence.
 
         Returns:
@@ -192,7 +199,15 @@ class KeyedDistributionStore:
           A dictionary representation of the store, where each key maps to the serialized
           form of its DistributionStats.
         """
-        return {k:v.to_dict() for k, v in self._store.items()}
+        return {
+            "store": [
+                {
+                    "key": astuple(k)[0],
+                    "stats": v.to_dict(),
+                }
+                for k, v in self._store.items()
+            ]
+        }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> KeyedDistributionStore:
@@ -206,6 +221,9 @@ class KeyedDistributionStore:
           A KeyedDistributionStore instance reconstructed from the provided dictionary.
         """
         store = cls()
-        for k, v in data.items():
-            store._store[k] = DistributionStats.from_dict(v)
+        for item in data.get("store", []):
+            key = TimeKey(*tuple(tuple(k) for k in item["key"]))
+            stats = DistributionStats.from_dict(item["stats"])
+            store._store[key] = stats
+
         return store

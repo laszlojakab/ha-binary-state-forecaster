@@ -426,6 +426,63 @@ class ForecasterEngine:
             "hyper_parameter_controller": self._hyper_parameter_controller.to_dict(),
         }
 
+    @classmethod
+    def from_dict(
+        cls, data: dict[str, Any], parameters: ForecasterEngineRuntimeParameters
+    ) -> ForecasterEngine:
+        """
+        Deserializes a forecaster engine from a dictionary.
+
+        Args:
+            data: A dictionary representation of the forecaster engine.
+
+        Returns:
+            A ForecasterEngine instance reconstructed from the provided data.
+        """
+        instance = cls(parameters=parameters)
+
+        instance._stats = HierarchicalStateStats.from_dict(
+            data["stats"],
+            HierarchicalStateStatsHyperParameters(
+                hyper_parameters=instance._hyper_parameter_controller.hyper_parameters,
+            ),
+            parameters.hierarchical_state_stats,
+        )
+        instance._drift_monitor = DriftMonitor.from_dict(
+            data["drift_monitor"],
+            DriftMonitorHyperParameters(
+                hyper_parameters=instance._hyper_parameter_controller.hyper_parameters,
+            ),
+            parameters.drift_monitor,
+        )
+        instance._short_term_error_tracker = OnlineErrorTracker.from_dict(
+            data["short_term_error_tracker"],
+            OnlineErrorTrackerHyperParameters(
+                hyper_parameters=instance._hyper_parameter_controller.hyper_parameters,
+            ),
+            parameters.short_term_error_tracker,
+        )
+        instance._long_term_error_tracker = OnlineErrorTracker.from_dict(
+            data["long_term_error_tracker"],
+            OnlineErrorTrackerHyperParameters(
+                hyper_parameters=instance._hyper_parameter_controller.hyper_parameters,
+            ),
+            parameters.long_term_error_tracker,
+        )
+        instance._state_persistence_tracker = StatePersistenceTracker.from_dict(
+            data["state_persistence_tracker"],
+            StatePersistenceTrackerHyperParameters(
+                hyper_parameters=instance._hyper_parameter_controller.hyper_parameters,
+            ),
+            parameters.state_persistence_tracker,
+        )
+        instance._hyper_parameter_controller = HyperParameterController.from_dict(
+            data["hyper_parameter_controller"],
+            parameters.hyper_parameter_controller,
+        )
+
+        return instance
+
     def _prune(self: Self, timestamp: float) -> None:
         """
         Prunes low-weight statistics to prevent memory bloat.

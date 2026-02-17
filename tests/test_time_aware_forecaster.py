@@ -30,9 +30,6 @@ from custom_components.discrete_state_forecaster.model.learning.state_persistenc
 from custom_components.discrete_state_forecaster.model.metrics.online_error_tracker_runtime_parameters import (
     OnlineErrorTrackerRuntimeParameters,
 )
-from custom_components.discrete_state_forecaster.model.runtime_parameters import (
-    RuntimeParameters,
-)
 from custom_components.discrete_state_forecaster.model.statistics.hierarchical_state_stats_runtime_parameters import (
     HierarchicalStateStatsRuntimeParameters,
 )
@@ -119,20 +116,12 @@ def engine_runtime_params() -> ForecasterEngineRuntimeParameters:
 
 
 @pytest.fixture
-def runtime_params(
-    engine_runtime_params: ForecasterEngineRuntimeParameters,
-) -> RuntimeParameters:
-    """Fixture providing default RuntimeParameters."""
-    return RuntimeParameters(engine=engine_runtime_params)
-
-
-@pytest.fixture
 def forecaster(
     structural_params: StructuralParameters,
-    runtime_params: RuntimeParameters,
+    engine_runtime_params: ForecasterEngineRuntimeParameters,
 ) -> TimeAwareForecaster:
     """Fixture providing a TimeAwareForecaster instance."""
-    return TimeAwareForecaster(structural_params, runtime_params)
+    return TimeAwareForecaster(structural_params, engine_runtime_params)
 
 
 # --- TimeAwareForecaster Initialization Tests ---
@@ -140,10 +129,10 @@ def forecaster(
 
 def test_forecaster_initialization_creates_engine(
     structural_params: StructuralParameters,
-    runtime_params: RuntimeParameters,
+    engine_runtime_params: ForecasterEngineRuntimeParameters,
 ) -> None:
     """Test that initialization creates ForecasterEngine."""
-    forecaster = TimeAwareForecaster(structural_params, runtime_params)
+    forecaster = TimeAwareForecaster(structural_params, engine_runtime_params)
     # Engine should be created
     assert forecaster._engine is not None
     assert hasattr(forecaster._engine, "_stats")
@@ -391,11 +380,11 @@ async def test_predict_interval_respects_resolution(
 @pytest.mark.asyncio
 async def test_predict_interval_with_boundary_support(
     structural_params: StructuralParameters,
-    runtime_params: RuntimeParameters,
+    engine_runtime_params: ForecasterEngineRuntimeParameters,
 ) -> None:
     """Test predict_interval with an indexer that supports boundaries."""
     # Create forecaster with boundary-supporting indexer
-    forecaster = TimeAwareForecaster(structural_params, runtime_params)
+    forecaster = TimeAwareForecaster(structural_params, engine_runtime_params)
 
     base_time = datetime(2024, 1, 15, 14, 0, 0, tzinfo=UTC)
     for i in range(30):

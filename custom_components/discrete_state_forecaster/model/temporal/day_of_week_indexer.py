@@ -16,7 +16,7 @@ Days are represented as integers following Python's datetime convention:
 - 6 = Sunday
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Final, Self
 
 from .time_indexer import (
@@ -88,3 +88,27 @@ class DayOfWeekIndexer(TimeIndexer):
         weekday = timestamp.weekday()  # Monday=0, Sunday=6
 
         return TimeKey((self.name, weekday))
+
+    async def next_boundary(self: Self, timestamp: datetime) -> datetime:
+        """
+        Calculate the next boundary timestamp when the day of week changes.
+
+        Args:
+            timestamp: The current datetime.
+
+        Returns:
+            A datetime representing the next time the day of week changes
+            (i.e., the next midnight).
+
+        Examples:
+            >>> indexer = DayOfWeekIndexer()
+            >>> ts = datetime(2024, 1, 15, 10, 30)  # Monday
+            >>> next_boundary = await indexer.next_boundary(ts)
+            >>> next_boundary
+            datetime(2024, 1, 16, 0, 0)  # Next day (Tuesday)
+
+        """
+        # Calculate the next midnight after the given timestamp
+        return timestamp.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(
+            days=1
+        )

@@ -7,16 +7,17 @@ timestamps to temporal keys using a TimeIndexer, allowing the forecaster to
 learn and predict patterns within different temporal contexts.
 """
 
-from dataclasses import dataclass
 from datetime import datetime
-from typing import Final, Self
+from typing import Any, Final, Self
 
+from custom_components.discrete_state_forecaster.model.forecaster_engine_runtime_parameters import (
+    ForecasterEngineRuntimeParameters,
+)
 from custom_components.discrete_state_forecaster.model.statistics.prediction_result import (
     PredictionResult,
 )
 
 from .forecaster_engine import ForecasterEngine
-from .runtime_parameters import RuntimeParameters
 from .state import (
     State,
 )
@@ -51,19 +52,18 @@ class TimeAwareForecaster:
     def __init__(
         self: Self,
         structural_parameters: StructuralParameters,
-        runtime_parameters: RuntimeParameters,
+        runtime_parameters: ForecasterEngineRuntimeParameters,
     ) -> None:
         """
         Initializes the time-aware forecaster.
 
         Args:
             structural_parameters: Structural parameters including the time indexer.
-            parameters: Configuration parameters including the forecaster engine parameters.
+            runtime_parameters: Runtime parameters including the forecaster engine parameters.
         """
         self._engine: Final = ForecasterEngine(
-            parameters=runtime_parameters.engine,
+            parameters=runtime_parameters,
         )
-        self._runtime_parameters: Final = runtime_parameters
         self._structural_parameters: Final = structural_parameters
 
     async def update(self: Self, state: State, timestamp: datetime) -> None:
@@ -213,3 +213,36 @@ class TimeAwareForecaster:
             ts = datetime.fromtimestamp(step_end_ts, tz=start_ts.tzinfo)
 
         return results
+
+    def to_dict(self: Self) -> dict[str, Any]:
+        """
+        Serialize the forecaster to a dictionary.
+
+        Returns:
+            A dictionary containing structural parameters and runtime parameters.
+        """
+        return {
+            "engine": self._engine.to_dict(),
+        }
+
+    @classmethod
+    def from_dict(
+        cls,
+        data: dict[str, Any],
+        structural_parameters: StructuralParameters,
+        runtime_parameters: ForecasterEngineRuntimeParameters,
+    ) -> Self:
+        """
+        Deserialize the forecaster from a dictionary.
+
+        Args:
+            data: Dictionary containing serialized forecaster state.
+            structural_parameters: Structural parameters to use for the forecaster.
+            runtime_parameters: Runtime parameters to use for the forecaster.
+        """
+        forecaster = cls(structural_parameters, runtime_parameters)
+        forecaster._engine = ForecasterEngine.from_dict(
+            data["engine"], runtime_parameters
+        )
+
+        return forecaster

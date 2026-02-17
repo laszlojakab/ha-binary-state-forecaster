@@ -13,6 +13,7 @@ from custom_components.discrete_state_forecaster.model.statistics.distribution_s
 from custom_components.discrete_state_forecaster.model.statistics.keyed_distribution_store import (
     KeyedDistributionStore,
 )
+from custom_components.discrete_state_forecaster.model.temporal.time_key import TimeKey
 
 
 class TestKeyedDistributionStoreInitialization:
@@ -429,32 +430,37 @@ class TestKeyedDistributionStoreSerialization:
 
     def test_to_dict_contains_serialized_distributions(self: Self) -> None:
         store = KeyedDistributionStore()
-        store.update("k1", "a", 2.5)
-        store.update(("hour", 14), "on", 5.0)
+        store.update(TimeKey(("hour", 13)), "off", 2.5)
+        store.update(TimeKey(("hour", 14)), "on", 5.0)
 
         data = store.to_dict()
         assert isinstance(data, dict)
-        # keys preserved (string and tuple)
-        assert "k1" in data
-        assert ("hour", 14) in data
-        # serialized distribution contains 'states' mapping with support
-        assert data["k1"]["states"]["a"]["support"] == 2.5
+
+        assert data == {
+            "store": [
+                {
+                    "key": (("hour", 13),),
+                    "stats": {"states": {"off": {"support": 2.5}}},
+                },
+                {"key": (("hour", 14),), "stats": {"states": {"on": {"support": 5.0}}}},
+            ]
+        }
 
     def test_from_dict_reconstructs_store(self: Self) -> None:
         store = KeyedDistributionStore()
-        store.update("k1", "x", 3.0)
-        store.update("k2", "y", 4.0)
+        store.update(TimeKey(("k1", "x")), "on", 3.0)
+        store.update(TimeKey(("k2", "y")), "off", 4.0)
 
         payload = store.to_dict()
         restored = KeyedDistributionStore.from_dict(payload)
 
-        dist_k1 = restored.get_distribution("k1")
-        dist_k2 = restored.get_distribution("k2")
+        dist_k1 = restored.get_distribution(TimeKey(("k1", "x")))
+        dist_k2 = restored.get_distribution(TimeKey(("k2", "y")))
 
         assert dist_k1 is not None
-        assert abs(dist_k1.to_dict()["states"]["x"]["support"] - 3.0) < 1e-12
+        assert abs(dist_k1.to_dict()["states"]["on"]["support"] - 3.0) < 1e-12
         assert dist_k2 is not None
-        assert abs(dist_k2.to_dict()["states"]["y"]["support"] - 4.0) < 1e-12
+        assert abs(dist_k2.to_dict()["states"]["off"]["support"] - 4.0) < 1e-12
 
     def test_from_dict_handles_empty_mapping(self: Self) -> None:
         restored = KeyedDistributionStore.from_dict({})
