@@ -87,7 +87,7 @@ class HyperParameterController:
         """
         self._hyper_parameters: Final[ForecasterEngineHyperParameters] = (
             ForecasterEngineHyperParameters(
-                half_life=runtime_parameters.base_half_life,
+                half_life=runtime_parameters.base_half_life, # TODO: ez nem fog atmenni...
                 min_prune_interval_factor=runtime_parameters.min_prune_interval_factor,
                 prune_enabled=True,
                 persistence_strength=runtime_parameters.base_persistence_strength,

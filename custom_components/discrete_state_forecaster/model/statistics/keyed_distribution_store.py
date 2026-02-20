@@ -26,7 +26,6 @@ if TYPE_CHECKING:
     from collections.abc import Hashable, Iterable
 
 
-
 class KeyedDistributionStore:
     """
     Storage and management of multiple indexed distribution statistics.

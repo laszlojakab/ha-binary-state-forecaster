@@ -2,10 +2,10 @@
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # from datetime import datetime
-from typing import TYPE_CHECKING, Any, Self, cast
+from typing import TYPE_CHECKING, Any, Hashable, Self, cast
 
 from homeassistant.const import (
     EVENT_HOMEASSISTANT_STOP,
@@ -35,6 +35,9 @@ from custom_components.discrete_state_forecaster.model.learning.drift_stats_runt
 from custom_components.discrete_state_forecaster.model.learning.duration_weighted_baseline_runtime_parameters import (
     DurationWeightedBaselineRuntimeParameters,
 )
+from custom_components.discrete_state_forecaster.model.learning.hyper_parameter_controller import (
+    AdaptationMode,
+)
 from custom_components.discrete_state_forecaster.model.learning.hyper_parameter_controller_runtime_parameters import (
     AdaptationConfig,
     HyperParameterControllerRuntimeParameters,
@@ -47,6 +50,9 @@ from custom_components.discrete_state_forecaster.model.metrics.online_error_trac
 )
 from custom_components.discrete_state_forecaster.model.statistics.hierarchical_state_stats_runtime_parameters import (
     HierarchicalStateStatsRuntimeParameters,
+)
+from custom_components.discrete_state_forecaster.model.statistics.prediction_result import (
+    PredictionResult,
 )
 from custom_components.discrete_state_forecaster.model.structural_parameters import (
     StructuralParameters,
@@ -84,7 +90,7 @@ from custom_components.discrete_state_forecaster.model.time_aware_forecaster imp
 from .const import (
     #     CONF_ADAPTIVE_PERSISTENCE,
     #     CONF_CALENDAR_FEATURES,
-    #     CONF_HALF_LIFE_HOURS,
+    CONF_HALF_LIFE_HOURS,
     #     CONF_STATE_PERSISTENCE_FACTOR,
     CONF_TARGET_ENTITY_ID,
     CONF_TIME_BUCKET_SIZE_IN_MINUTES,
@@ -92,7 +98,7 @@ from .const import (
     #     CONF_USE_MONTH_OF_YEAR,
     #     CONF_USE_SEASON,
     #     DEFAULT_ADAPTIVE_PERSISTENCE,
-    #     DEFAULT_HALF_LIFE_HOURS,
+    DEFAULT_HALF_LIFE_HOURS,
     #     DEFAULT_STATE_PERSISTENCE_FACTOR,
     DEFAULT_TIME_BUCKET_SIZE_IN_MINUTES,
     #     DEFAULT_USE_DAY_OF_WEEK,
@@ -111,59 +117,53 @@ if TYPE_CHECKING:
 class DiscreteStateForecasterCoordinatorState:
     """State of the Discrete State Forecaster Coordinator."""
 
-
-#     prediction: Prediction
-#     current_state: str | None
-#     timestamp: datetime
-#     next_transition_timestamp: datetime | None = None
-
-params = ForecasterEngineRuntimeParameters(
-    hierarchical_state_stats=HierarchicalStateStatsRuntimeParameters(
-        min_support_factor=0.5  # Use lower value for faster test convergence
-    ),
-    short_term_error_tracker=OnlineErrorTrackerRuntimeParameters(
-        error_half_life_factor=4.0
-    ),
-    long_term_error_tracker=OnlineErrorTrackerRuntimeParameters(
-        error_half_life_factor=40.0
-    ),
-    state_persistence_tracker=StatePersistenceTrackerRuntimeParameters(
-        persistence_half_life_factor=5
-    ),
-    drift_monitor=DriftMonitorRuntimeParameters(
-        slow_baseline=DurationWeightedBaselineRuntimeParameters(
-            half_life_factor=20.0,
-            prune_threshold=1e-6,
-            epsilon=1e-9,
-        ),
-        fast_baseline=DurationWeightedBaselineRuntimeParameters(
-            half_life_factor=1.5,
-            prune_threshold=1e-6,
-            epsilon=1e-9,
-        ),
-        drift_stats=DriftStatsRuntimeParameters(half_life_factor=30.0),
-        tau_enter=0.1,
-        tau_exit=0.05,
-        adaptive_tau=False,
-        n_enter=3,
-        n_exit=5,
-    ),
-    hyper_parameter_controller=HyperParameterControllerRuntimeParameters(
-        min_prune_interval_factor=5.0,
-        base_half_life=3600.0,
-        base_persistence_strength=0.5,
-        adaptation_config=AdaptationConfig(
-            adapt_half_life=False,
-            adapt_prune_interval=False,
-            adapt_persistence=False,
-        ),
-    ),
-)
+    prediction: PredictionResult
+    current_state: str | None
+    timestamp: datetime
+    next_transition_timestamp: datetime | None = None
+    adaption_mode: AdaptationMode | None = None
 
 
 class DiscreteStateForecasterCoordinator(
     DataUpdateCoordinator[DiscreteStateForecasterCoordinatorState]
 ):
+
+    _config_entry: "DiscreteStateForecasterConfigEntry"
+    """Configuration entry for the coordinator."""
+
+    _runtime_parameters: ForecasterEngineRuntimeParameters
+    """Runtime parameters for the forecaster engine."""
+
+    _current_state: Hashable | None
+    """Current state of the target entity."""
+
+    _current_state_last_reported_to_engine_at: datetime | None
+    """Timestamp of the last time the current state was reported to the forecaster engine."""
+
+    _current_state_next_boundary: datetime | None
+    """Timestamp of the next expected time indexer boundary."""
+
+    _composite_indexer: CompositeIndexer
+    """Composite indexer that combines multiple time indexers based on configuration."""
+
+    _forecaster: TimeAwareForecaster
+    """The core forecaster engine that maintains state statistics and makes predictions."""
+
+    _store: Store
+    """Storage for persisting the forecaster state across restarts."""
+
+    _unsubscribe_callbacks: list[CALLBACK_TYPE]
+    """List of callbacks to unsubscribe from events when the coordinator is stopped."""
+
+    _unsubscribe_time_indexer_change_callback: CALLBACK_TYPE | None
+    """Callback to unsubscribe from time indexer change tracking."""
+
+    _current_time_bucket_size: int
+    """
+    Currently used time bucket size for the time of day indexer,
+    tracked for detecting configuration changes.
+    """
+
     def __init__(
         self: Self,
         hass: HomeAssistant,
@@ -185,14 +185,60 @@ class DiscreteStateForecasterCoordinator(
             )
         )
 
-        self._current_state = None
-
-        # Build indexers based on configuration
-        self._time_indexers = self._build_indexers(
-            time_bucket_minutes, config_entry.options
+        self._runtime_parameters = ForecasterEngineRuntimeParameters(
+            hierarchical_state_stats=HierarchicalStateStatsRuntimeParameters(
+                min_support_factor=0.00000001
+            ),
+            short_term_error_tracker=OnlineErrorTrackerRuntimeParameters(
+                error_half_life_factor=4.0
+            ),
+            long_term_error_tracker=OnlineErrorTrackerRuntimeParameters(
+                error_half_life_factor=40.0
+            ),
+            state_persistence_tracker=StatePersistenceTrackerRuntimeParameters(
+                persistence_half_life_factor=5
+            ),
+            drift_monitor=DriftMonitorRuntimeParameters(
+                slow_baseline=DurationWeightedBaselineRuntimeParameters(
+                    half_life_factor=20.0,
+                    prune_threshold=1e-6,
+                    epsilon=1e-9,
+                ),
+                fast_baseline=DurationWeightedBaselineRuntimeParameters(
+                    half_life_factor=1.5,
+                    prune_threshold=1e-6,
+                    epsilon=1e-9,
+                ),
+                drift_stats=DriftStatsRuntimeParameters(half_life_factor=30.0),
+                tau_enter=0.1,
+                tau_exit=0.05,
+                adaptive_tau=False,
+                n_enter=3,
+                n_exit=5,
+            ),
+            hyper_parameter_controller=HyperParameterControllerRuntimeParameters(
+                min_prune_interval_factor=5.0,
+                base_half_life=config_entry.options.get(
+                    CONF_HALF_LIFE_HOURS, DEFAULT_HALF_LIFE_HOURS
+                )
+                * 3600,
+                base_persistence_strength=0.5,
+                adaptation_config=AdaptationConfig(
+                    adapt_half_life=False,
+                    adapt_prune_interval=False,
+                    adapt_persistence=False,
+                ),
+            ),
         )
 
-        self._composite_indexer = CompositeIndexer(self._time_indexers)
+        self._current_state = None
+        self._current_state_last_reported_to_engine_at = None
+        self._current_state_next_boundary = None
+
+        # Build indexers based on configuration
+        self._composite_indexer = CompositeIndexer(
+            self._build_indexers(time_bucket_minutes, config_entry.options)
+        )
 
         #         # Get persistence settings from options
         #         state_persistence_factor = config_entry.options.get(
@@ -201,15 +247,12 @@ class DiscreteStateForecasterCoordinator(
         #         adaptive_persistence = config_entry.options.get(
         #             CONF_ADAPTIVE_PERSISTENCE, DEFAULT_ADAPTIVE_PERSISTENCE
         #         )
-        #         half_life_hours = config_entry.options.get(
-        #             CONF_HALF_LIFE_HOURS, DEFAULT_HALF_LIFE_HOURS
-        #         )
 
         self._forecaster = TimeAwareForecaster(
             StructuralParameters(
                 indexer=self._composite_indexer,
             ),
-            runtime_parameters=params,
+            runtime_parameters=self._runtime_parameters,
         )
 
         # Initialize storage for model persistence
@@ -217,8 +260,8 @@ class DiscreteStateForecasterCoordinator(
             hass, 1, f"{config_entry.domain}_{config_entry.entry_id}_forecaster.json"
         )
 
-        self._unsubscribe_callbacks: list[CALLBACK_TYPE] = []
-        self._unsubscribe_time_indexer_change_callback: CALLBACK_TYPE | None = None
+        self._unsubscribe_callbacks = []
+        self._unsubscribe_time_indexer_change_callback = None
 
         #         # Track current indexer configuration for detecting changes
         #         self._current_use_day_of_week = config_entry.options.get(
@@ -249,7 +292,7 @@ class DiscreteStateForecasterCoordinator(
         # Restore stored state
         await self._async_restore_state()
 
-        now = dt_util.now()
+        now_local = dt_util.as_local(dt_util.now())
 
         # Initiate target entity state
         await self._handle_target_entity_state_change(
@@ -260,7 +303,7 @@ class DiscreteStateForecasterCoordinator(
                         self.config_entry.data[CONF_TARGET_ENTITY_ID]
                     )
                 },
-                time_fired_timestamp=now.timestamp(),
+                time_fired_timestamp=now_local.timestamp(),
             )
         )
 
@@ -274,7 +317,7 @@ class DiscreteStateForecasterCoordinator(
         )
 
         # Initiate time index changes
-        await self._track_next_time_indexer_change(now)
+        await self._track_next_time_indexer_change(now_local)
 
         async def _scheduled_store_state(now: datetime) -> None:  # noqa: ARG001
             await self._async_store_state()
@@ -318,7 +361,7 @@ class DiscreteStateForecasterCoordinator(
                 self._forecaster = TimeAwareForecaster.from_dict(
                     data,
                     StructuralParameters(indexer=self._composite_indexer),
-                    runtime_parameters=params,
+                    runtime_parameters=self._runtime_parameters,
                 )
 
                 self.logger.info(
@@ -331,7 +374,6 @@ class DiscreteStateForecasterCoordinator(
                     self._config_entry.data[CONF_TARGET_ENTITY_ID],
                     err,
                 )
-                self.logger.error(data)
         else:
             self.logger.debug(
                 "No stored state found for %s. Starting with fresh model.",
@@ -358,42 +400,49 @@ class DiscreteStateForecasterCoordinator(
     ) -> DiscreteStateForecasterCoordinatorState:
         """Fetches the latest prediction data."""
         self.logger.debug(
-            "Updating data for %s. Current data: %s",
-            self._config_entry.data[CONF_TARGET_ENTITY_ID],
-            self.data,
+            "Updating data for %s.", self._config_entry.data[CONF_TARGET_ENTITY_ID]
         )
 
         # Get current time and make prediction
-        now = dt_util.now()
+        now_local = dt_util.as_local(dt_util.now())
 
-        # Get current state from Home Assistant
-        target_entity = self.hass.states.get(
-            self._config_entry.data[CONF_TARGET_ENTITY_ID]
+        # Get calculate the current state duration for persistence adjustment
+        current_state_duration = (
+            now_local.timestamp()
+            - self._current_state_last_reported_to_engine_at.timestamp()
+            if self._current_state_last_reported_to_engine_at
+            else None
         )
-        current_state = self._get_state_to_store(target_entity)
 
-    #         # Make prediction for current time
-    #         prediction = await self._forecaster.predict(
-    #             now,
-    #             current_state=current_state,
-    #         )
+        # Make prediction for current time
+        prediction = await self._forecaster.predict_with_persistence(
+            now_local,
+            current_state=self._current_state,
+            current_state_duration=current_state_duration,
+        )
 
-    #         # Calculate next transition time, using a binary search approach
-    #         interval_minutes = 1440
-    #         while interval_minutes > 1:
-    #             next_transition_timestamp = await self._forecaster.find_next_transition(
-    #                 now, max_horizon_minutes=1440, interval_minutes=interval_minutes
-    #             )
-    #             if next_transition_timestamp is None:
-    #                 break
-    #             interval_minutes = interval_minutes // 2
+        # Calculate next transition time
+        next_transition_timestamp = await self._forecaster.predict_next_transition(
+            timestamp=now_local,
+            current_state=self._current_state,
+            current_state_duration=current_state_duration,
+        )
 
-    #         return DiscreteStateForecasterCoordinatorState(
-    #             prediction=prediction,
-    #             current_state=current_state,
-    #             timestamp=now,
-    #             next_transition_timestamp=next_transition_timestamp,
-    #         )
+        state = DiscreteStateForecasterCoordinatorState(
+            prediction=prediction,
+            current_state=self._current_state,
+            timestamp=now_local,
+            next_transition_timestamp=next_transition_timestamp,
+            adaption_mode=self._forecaster._engine._hyper_parameter_controller.mode,
+        )
+
+        self.logger.debug(
+            "Data updated for %s. New state: %s",
+            self._config_entry.data[CONF_TARGET_ENTITY_ID],
+            state,
+        )
+
+        return state
 
     async def _handle_target_entity_state_change(self: Self, event: Event) -> None:
         """Handle state changes of the forecasted entity."""
@@ -413,15 +462,19 @@ class DiscreteStateForecasterCoordinator(
             )
             return
 
+        time_fired_in_local = dt_util.as_local(event.time_fired)
         self.logger.debug(
             "Updating state tracker for %s with new state: %s at %s.",
             self._config_entry.data[CONF_TARGET_ENTITY_ID],
             new_state_to_store,
-            event.time_fired,
+            time_fired_in_local,
         )
 
-        self._current_state = new_state_to_store
-        await self._forecaster.update(new_state_to_store, event.time_fired)
+        if self._current_state != new_state_to_store:
+            self._current_state = new_state_to_store
+            self._current_state_last_reported_to_engine_at = time_fired_in_local
+
+        await self._forecaster.update(new_state_to_store, time_fired_in_local)
 
         # TODO: remove
         await self._async_store_state()
@@ -429,23 +482,26 @@ class DiscreteStateForecasterCoordinator(
         await self.async_refresh()
 
     async def _handle_time_key_change(self: Self, now: datetime) -> None:
-        key = await self._composite_indexer.get_key(now)
+        new_key_now_local = dt_util.as_local(now)
 
         self.logger.debug(
-            "Time key change detected for %s at %s. Key: %s",
+            "Time key change detected for %s at %s.",
             self._config_entry.data[CONF_TARGET_ENTITY_ID],
-            now,
-            key,
+            new_key_now_local,
         )
 
-
         if self._current_state is not None:
-            await self._forecaster.update(self._current_state, now)
+            self._current_state_last_reported_to_engine_at = (
+                self._current_state_next_boundary
+            )
+            await self._forecaster.update(
+                self._current_state, self._current_state_next_boundary
+            )
 
             # TODO: remove
             await self._async_store_state()
 
-        await self._track_next_time_indexer_change(now)
+        await self._track_next_time_indexer_change(new_key_now_local)
 
         await self.async_refresh()
 
@@ -489,7 +545,7 @@ class DiscreteStateForecasterCoordinator(
         #             indexers.append(SeasonIndexer())
 
         # Time of day indexer (always included)
-        indexers.append(TimeOfDayIndexer(time_bucket_minutes))
+        indexers.append(TimeOfDayIndexer(time_bucket_minutes * 60))
 
         return indexers
 
@@ -525,13 +581,18 @@ class DiscreteStateForecasterCoordinator(
             != self._current_time_bucket_size
         )
 
+        half_life_hours = config_entry.options.get(
+            CONF_HALF_LIFE_HOURS, DEFAULT_HALF_LIFE_HOURS
+        )
+
         if indexers_changed:
             self.logger.info(
                 "Indexer configuration changed - resetting model. "
-                # "Time bucket size: %s -> %s, Day of week: %s -> %s, Month: %s -> %s, "
+                "Time bucket size: %s -> %s",
+                # ", Day of week: %s -> %s, Month: %s -> %s, ",
                 # "Season: %s -> %s, Calendar features: %s -> %s",
-                # self._current_time_bucket_size,
-                # new_time_bucket_size,
+                self._current_time_bucket_size,
+                new_time_bucket_size,
                 # self._current_use_day_of_week,
                 # new_use_day_of_week,
                 # self._current_use_month,
@@ -542,6 +603,11 @@ class DiscreteStateForecasterCoordinator(
                 # new_calendar_features,
             )
 
+            # Unsubscribe from old time indexer change tracking
+            if self._unsubscribe_time_indexer_change_callback:
+                self._unsubscribe_time_indexer_change_callback()
+                self._unsubscribe_time_indexer_change_callback = None
+
             # Update tracked configuration
             #             self._current_use_day_of_week = new_use_day_of_week
             #             self._current_use_month = new_use_month
@@ -549,10 +615,9 @@ class DiscreteStateForecasterCoordinator(
             self._current_time_bucket_size = new_time_bucket_size
 
             # Rebuild indexers
-            self._time_indexers = self._build_indexers(
-                new_time_bucket_size, config_entry.options
+            self._composite_indexer = CompositeIndexer(
+                self._build_indexers(new_time_bucket_size, config_entry.options)
             )
-            self._composite_indexer = CompositeIndexer(self._time_indexers)
 
             #             # Get persistence settings from options
             #             state_persistence_factor = config_entry.options.get(
@@ -561,32 +626,49 @@ class DiscreteStateForecasterCoordinator(
             #             adaptive_persistence = config_entry.options.get(
             #                 CONF_ADAPTIVE_PERSISTENCE, DEFAULT_ADAPTIVE_PERSISTENCE
             #             )
-            #             half_life_hours = config_entry.options.get(
-            #                 CONF_HALF_LIFE_HOURS, DEFAULT_HALF_LIFE_HOURS
-            #             )
 
             # Create new forecaster (resets the model)
             self._forecaster = TimeAwareForecaster(
-                self._composite_indexer,
-                params,
+                StructuralParameters(self._composite_indexer),
+                self._runtime_parameters,
             )
 
-            # Delete old stored state
-            await self._store.async_remove()
+            now_local = dt_util.as_local(dt_util.now())
+
+            # If the entity has a known state, update the new forecaster with it
+            # to avoid losing the current state information
+            if self._current_state is not None:
+                await self._forecaster.update(self._current_state, now_local)
+
+            # Start tracking time indexer changes with new indexer configuration
+            self._unsubscribe_time_indexer_change_callback = (
+                await self._track_next_time_indexer_change(now_local)
+            )
+
+            # Store state immediately to persist the reset model and new configuration
+            await self._async_store_state()
 
             self.logger.info("Model reset complete - learning from scratch")
 
-            # Trigger update to refresh all entities
-            await self.async_refresh()
+        self._runtime_parameters.hyper_parameter_controller.base_half_life = (
+            half_life_hours * 3600
+        )
+
+        # Trigger update to refresh all entities
+        await self.async_refresh()
 
     async def _track_next_time_indexer_change(self: Self, now: datetime) -> None:
-        next_boundary = await self._composite_indexer.next_boundary(now)
+        now_local = dt_util.as_local(now)
+
+        next_boundary = await self._composite_indexer.next_boundary(now_local)
 
         self.logger.debug(
             "Scheduling next time indexer change tracking for %s at %s.",
             self._config_entry.data[CONF_TARGET_ENTITY_ID],
             next_boundary,
         )
+
+        self._current_state_next_boundary = next_boundary
 
         self._unsubscribe_time_indexer_change_callback = async_track_point_in_time(
             self.hass,

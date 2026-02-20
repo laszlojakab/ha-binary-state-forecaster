@@ -10,7 +10,7 @@ from homeassistant.helpers import selector
 from .const import (
     # CONF_ADAPTIVE_PERSISTENCE,
     # CONF_CALENDAR_FEATURES,
-    # CONF_HALF_LIFE_HOURS,
+    CONF_HALF_LIFE_HOURS,
     # CONF_STATE_PERSISTENCE_FACTOR,
     CONF_TARGET_ENTITY_ID,
     CONF_TIME_BUCKET_SIZE_IN_MINUTES,
@@ -18,7 +18,7 @@ from .const import (
     # CONF_USE_MONTH_OF_YEAR,
     # CONF_USE_SEASON,
     # DEFAULT_ADAPTIVE_PERSISTENCE,
-    # DEFAULT_HALF_LIFE_HOURS,
+    DEFAULT_HALF_LIFE_HOURS,
     # DEFAULT_STATE_PERSISTENCE_FACTOR,
     DEFAULT_TIME_BUCKET_SIZE_IN_MINUTES,
     # DEFAULT_USE_DAY_OF_WEEK,
@@ -83,9 +83,9 @@ class DiscreteStateForecasterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN
                 #     CONF_ADAPTIVE_PERSISTENCE: user_input.get(
                 #         CONF_ADAPTIVE_PERSISTENCE, DEFAULT_ADAPTIVE_PERSISTENCE
                 #     ),
-                #     CONF_HALF_LIFE_HOURS: user_input.get(
-                #         CONF_HALF_LIFE_HOURS, DEFAULT_HALF_LIFE_HOURS
-                #     ),
+                CONF_HALF_LIFE_HOURS: user_input.get(
+                    CONF_HALF_LIFE_HOURS, DEFAULT_HALF_LIFE_HOURS
+                ),
                 #     CONF_CALENDAR_FEATURES: user_input.get(CONF_CALENDAR_FEATURES, []),
             }
 
@@ -131,9 +131,9 @@ class DiscreteStateForecasterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN
                 # vol.Required(
                 #     CONF_ADAPTIVE_PERSISTENCE, default=DEFAULT_ADAPTIVE_PERSISTENCE
                 # ): bool,
-                # vol.Required(
-                #     CONF_HALF_LIFE_HOURS, default=DEFAULT_HALF_LIFE_HOURS
-                # ): vol.All(vol.Coerce(float), vol.Range(min=0.0, max=8760.0)),
+                vol.Required(
+                    CONF_HALF_LIFE_HOURS, default=DEFAULT_HALF_LIFE_HOURS
+                ): vol.All(vol.Coerce(float), vol.Range(min=0.0, max=8760.0)),
                 # vol.Optional(CONF_CALENDAR_FEATURES): selector.EntitySelector(
                 #     selector.EntitySelectorConfig(
                 #         multiple=True,
@@ -186,8 +186,8 @@ class DiscreteStateForecasterOptionsFlow(config_entries.OptionsFlow):
                 # or user_input.get(CONF_CALENDAR_FEATURES, [])
                 # != current_calendar_features
                 # or
-                user_input[CONF_TIME_BUCKET_SIZE_IN_MINUTES]
-                != current_time_bucket_size_in_minutes
+                str(user_input[CONF_TIME_BUCKET_SIZE_IN_MINUTES])
+                != str(current_time_bucket_size_in_minutes)
             )
 
             if indexers_changed:
@@ -214,9 +214,9 @@ class DiscreteStateForecasterOptionsFlow(config_entries.OptionsFlow):
         # current_adaptive = self.config_entry.options.get(
         #     CONF_ADAPTIVE_PERSISTENCE, DEFAULT_ADAPTIVE_PERSISTENCE
         # )
-        # current_half_life = self.config_entry.options.get(
-        #     CONF_HALF_LIFE_HOURS, DEFAULT_HALF_LIFE_HOURS
-        # )
+        current_half_life = self.config_entry.options.get(
+            CONF_HALF_LIFE_HOURS, DEFAULT_HALF_LIFE_HOURS
+        )
         # current_calendar_features = self.config_entry.options.get(
         #     CONF_CALENDAR_FEATURES, []
         # )
@@ -256,10 +256,10 @@ class DiscreteStateForecasterOptionsFlow(config_entries.OptionsFlow):
                 #     CONF_ADAPTIVE_PERSISTENCE,
                 #     default=current_adaptive,
                 # ): bool,
-                # vol.Required(
-                #     CONF_HALF_LIFE_HOURS,
-                #     default=current_half_life,
-                # ): vol.All(vol.Coerce(float), vol.Range(min=0.0, max=8760.0)),
+                vol.Required(
+                    CONF_HALF_LIFE_HOURS,
+                    default=current_half_life,
+                ): vol.All(vol.Coerce(float), vol.Range(min=0.0, max=8760.0)),
                 # vol.Optional(
                 #     CONF_CALENDAR_FEATURES, default=current_calendar_features
                 # ): selector.EntitySelector(

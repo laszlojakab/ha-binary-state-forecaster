@@ -7,13 +7,14 @@ from typing import TYPE_CHECKING, Any, Self
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import DiscreteStateForecasterCoordinator
 
 if TYPE_CHECKING:
+    from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
     from . import DiscreteStateForecasterConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
@@ -61,10 +62,10 @@ class DiscreteStateForecasterSensor(
             return "unknown"
 
         prediction = self.coordinator.data.prediction
-        if prediction.state is None:
+        if prediction is None or not prediction.distribution:
             return "unknown"  # No data yet
 
-        return str(prediction.state)
+        return str(max(prediction.distribution, key=prediction.distribution.get))
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -74,11 +75,23 @@ class DiscreteStateForecasterSensor(
 
         prediction = self.coordinator.data.prediction
         attributes: dict[str, Any] = {}
+        # Add timestamp of prediction
+        attributes["timestamp"] = self.coordinator.data.timestamp.isoformat()
+
+        if self.coordinator.data.prediction is None:
+            return attributes  # No prediction data yet, return timestamp only
 
         # Add predicted state and probability
-        if prediction.state is not None:
-            attributes["predicted_state"] = str(prediction.state)
-            attributes["probability"] = prediction.distribution.get(prediction.state, 0.0)
+        if prediction.distribution is not None:
+            attributes["predicted_state"] = max(
+                prediction.distribution, key=prediction.distribution.get
+            )
+
+            # Add full probability distribution
+            attributes["distribution"] = {
+                str(state): round(prob, 3)
+                for state, prob in prediction.distribution.items()
+            }
 
         # Add current actual state for comparison
         if self.coordinator.data.current_state:
@@ -90,17 +103,11 @@ class DiscreteStateForecasterSensor(
         attributes["confidence"] = {
             "max_probability": round(confidence.max_probability, 3),
             "entropy_confidence": round(confidence.entropy_confidence, 3),
-            "support_time": round(confidence.support_time),
+            "support_time": round(confidence.support),
             "depth": confidence.depth,
         }
 
-        # Add full probability distribution
-        attributes["distribution"] = {
-            str(state): round(prob, 3) for state, prob in prediction.distribution.items()
-        }
-
-        # Add timestamp of prediction
-        attributes["timestamp"] = self.coordinator.data.timestamp.isoformat()
+        attributes["adaption_mode"] = str(self.coordinator.data.adaption_mode)
 
         # Add next transition time if available
         attributes["next_transition_time"] = (
@@ -109,15 +116,15 @@ class DiscreteStateForecasterSensor(
             else None
         )
 
-        # Add learned persistence factors if available
-        try:
-            learned_persistence = self.coordinator._forecaster.get_learned_persistence()
-            if learned_persistence:
-                attributes["learned_persistence"] = {
-                    str(state): factor for state, factor in learned_persistence.items()
-                }
-        except Exception:  # noqa: S110
-            pass  # Not critical if this fails
+        # # Add learned persistence factors if available
+        # try:
+        #     learned_persistence = self.coordinator._forecaster.get_learned_persistence()
+        #     if learned_persistence:
+        #         attributes["learned_persistence"] = {
+        #             str(state): factor for state, factor in learned_persistence.items()
+        #         }
+        # except Exception:  # noqa: S110
+        #     pass  # Not critical if this fails
 
         return attributes
 

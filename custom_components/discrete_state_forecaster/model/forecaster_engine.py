@@ -204,6 +204,7 @@ class ForecasterEngine:
             parameters.state_persistence_tracker,
         )
 
+        self._current_state: State | None = None
         self._last_update_timestamp: float | None = None
         self._last_prune_timestamp: float | None = None
 
@@ -232,21 +233,25 @@ class ForecasterEngine:
             timestamp if timestamp is not None else datetime.now(tz=UTC).timestamp()
         )
 
-        if self._last_update_timestamp is not None:
+        if self._last_update_timestamp is not None and self._current_state is not None:
             duration = timestamp - self._last_update_timestamp
 
             if duration < 0:
+                # TODO.JL: ez elojon a -5 masodperces updatekor....
+                return
                 raise ValueError(
                     "Timestamp cannot be in the past, "
                     f"previous update was at {self._last_update_timestamp}, "
                     f"current timestamp is {timestamp}"
                 )
 
+            # Update with the PREVIOUS state and its duration
+            self._stats.update(key, self._current_state, weight=duration)
+
+            # Apply decay to all statistics based on the time elapsed since the last update
             self._stats.apply_decay(self._get_decay_factor(duration))
         else:
             duration = 0.0
-
-        self._stats.update(key, state, weight=duration)
 
         global_prediction = self._stats.predict(TimeKey.GLOBAL)
 
@@ -265,14 +270,15 @@ class ForecasterEngine:
                 prediction.distribution, state, timestamp
             )
 
-        # Update state persistence tracker
-        self._state_persistence_tracker.update(state, timestamp)
+        # Update state persistence tracker with PREVIOUS state if we had one
+        if self._current_state is not None:
+            self._state_persistence_tracker.update(self._current_state, timestamp)
 
+        # Store the current state for the next update
+        self._current_state = state
         self._last_update_timestamp = timestamp
 
-        # TODO: ezt ki lehetne egy felsobb retegbe vinni? Igy akkor a hiperparameterek bentrol
-        # nezve statikusak. Kérdés: itt van-e a helye a frift monitornak és az error trackernek?
-        # lehet nem... ForecasterOrchestrator? (nem sokat tesz hozza, mert majdnem minden kikerül innen akkor...)
+        # Update hyperparameters based on current conditions
         self._hyper_parameter_controller.update(
             is_drifting=self._drift_monitor.is_drifting,
             short_term_error=self._short_term_error_tracker.mean,
@@ -303,7 +309,7 @@ class ForecasterEngine:
         return self._stats.predict(key)
 
     def predict_with_persistence(
-        self,
+        self: Self,
         key: TimeKey,
         current_state: State | None = None,
         current_state_duration: float | None = None,
@@ -408,7 +414,7 @@ class ForecasterEngine:
         # ------------------------------------------------------------------
         return prediction
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self: Self) -> dict[str, Any]:
         """
         Serializes the forecaster engine to a dictionary for persistence.
 

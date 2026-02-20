@@ -7,7 +7,7 @@ timestamps to temporal keys using a TimeIndexer, allowing the forecaster to
 learn and predict patterns within different temporal contexts.
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Final, Self
 
 from custom_components.discrete_state_forecaster.model.forecaster_engine_runtime_parameters import (
@@ -105,6 +105,37 @@ class TimeAwareForecaster:
         """
         key = await self._structural_parameters.indexer.get_key(timestamp)
         return self._engine.predict(key)
+
+    async def predict_with_persistence(
+        self: Self,
+        timestamp: datetime,
+        current_state: State | None = None,
+        current_state_duration: float | None = None,
+    ) -> PredictionResult | None:
+        """
+        Generates a state prediction considering persistence of the current state.
+
+        This method allows the forecaster to take into account how long the
+        current state has been active, which can improve predictions for states
+        that exhibit duration-dependent behavior.
+
+        Args:
+            timestamp: Datetime for which to generate a prediction.
+            current_state: Optional current state to consider for persistence.
+            current_state_duration: Optional duration (in seconds) that the
+                current state has been active.
+
+        Returns:
+            PredictionResult with predicted distribution and contributions,
+            or None if insufficient data is available.
+        """
+        key = await self._structural_parameters.indexer.get_key(timestamp)
+
+        return self._engine.predict_with_persistence(
+            key=key,
+            current_state=current_state,
+            current_state_duration=current_state_duration,
+        )
 
     async def predict_interval(
         self: Self,
@@ -213,6 +244,76 @@ class TimeAwareForecaster:
             ts = datetime.fromtimestamp(step_end_ts, tz=start_ts.tzinfo)
 
         return results
+
+    async def predict_next_transition(
+        self: Self,
+        timestamp: datetime,
+        current_state: State | None = None,
+        current_state_duration: float | None = None,
+    ) -> datetime | None:
+        """
+        Predicts the next state transition time after the given timestamp.
+
+        This method uses a binary search approach to find the next transition time
+        efficiently. It repeatedly queries the forecaster for predictions at
+        future timestamps, narrowing down the interval until it finds the next
+        transition time or determines that no transition occurs within a reasonable
+        horizon.
+
+        Args:
+            timestamp: The starting datetime to search for the next transition.
+            current_state: Optional current state to consider for persistence in predictions.
+            current_state_duration: Optional duration of the current state to consider
+            for persistence in predictions.
+
+        Returns:
+            A datetime representing the predicted next transition time, or None if no
+            transition is predicted within the search horizon.
+        """
+        # Define search parameters
+        max_horizon_seconds = 7 * 24 * 3600  # Search up to 7 days into the future
+        resolution_seconds = 3600  # Start with 1 hour resolution
+
+        start_ts = timestamp
+        end_ts = timestamp + timedelta(seconds=max_horizon_seconds)
+
+        while start_ts < end_ts:
+            prediction = await self.predict_with_persistence(
+                start_ts,
+                current_state=current_state,
+                current_state_duration=(
+                    (
+                        current_state_duration
+                        + (start_ts.timestamp() - timestamp.timestamp())
+                    )
+                    if current_state_duration is not None
+                    else None
+                ),
+            )
+
+            if prediction is None:
+                # No prediction available, move forward by resolution
+                start_ts += timedelta(seconds=resolution_seconds)
+                continue
+
+            dist = prediction.distribution
+
+            if not dist:
+                # No distribution available, move forward by resolution
+                start_ts += timedelta(seconds=resolution_seconds)
+                continue
+
+            # Get most likely state
+            most_likely_state = max(dist.items(), key=lambda x: x[1])[0]
+
+            if current_state is not None and most_likely_state != current_state:
+                # Transition predicted at this timestamp
+                return start_ts
+
+            # No transition predicted, move forward by resolution
+            start_ts += timedelta(seconds=resolution_seconds)
+
+        return None
 
     def to_dict(self: Self) -> dict[str, Any]:
         """
