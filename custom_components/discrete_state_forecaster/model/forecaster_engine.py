@@ -236,6 +236,8 @@ class ForecasterEngine:
         if self._last_update_timestamp is not None and self._current_state is not None:
             duration = timestamp - self._last_update_timestamp
 
+            # TODO: bekapcsolva volt a tv es a 4. percben ki lett kapcsolva, a kikapcsol allapot mar nem kerult ra erra az 5 perces blokkra.
+            # olyan mintha a kovetkezo 5 perces blokkra kerulne
             if duration < 0:
                 # TODO.JL: ez elojon a -5 masodperces updatekor....
                 return
@@ -248,6 +250,7 @@ class ForecasterEngine:
             # Update with the PREVIOUS state and its duration
             self._stats.update(key, self._current_state, weight=duration)
 
+            # TODO: apply decay elobb vagy kesobb?
             # Apply decay to all statistics based on the time elapsed since the last update
             self._stats.apply_decay(self._get_decay_factor(duration))
         else:

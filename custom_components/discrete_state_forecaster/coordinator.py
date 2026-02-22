@@ -140,8 +140,11 @@ class DiscreteStateForecasterCoordinator(
     _current_state_last_reported_to_engine_at: datetime | None
     """Timestamp of the last time the current state was reported to the forecaster engine."""
 
-    _current_state_next_boundary: datetime | None
-    """Timestamp of the next expected time indexer boundary."""
+    _current_time_bucket_start_at: datetime | None
+    """Timestamp of the current time bucket start."""
+
+    _next_time_bucket_start_at: datetime | None
+    """Timestamp of the next time bucket start."""
 
     _composite_indexer: CompositeIndexer
     """Composite indexer that combines multiple time indexers based on configuration."""
@@ -233,12 +236,14 @@ class DiscreteStateForecasterCoordinator(
 
         self._current_state = None
         self._current_state_last_reported_to_engine_at = None
-        self._current_state_next_boundary = None
 
         # Build indexers based on configuration
         self._composite_indexer = CompositeIndexer(
             self._build_indexers(time_bucket_minutes, config_entry.options)
         )
+
+        self._next_time_bucket_start_at = None
+        self._current_time_bucket_start_at = None
 
         #         # Get persistence settings from options
         #         state_persistence_factor = config_entry.options.get(
@@ -293,6 +298,15 @@ class DiscreteStateForecasterCoordinator(
         await self._async_restore_state()
 
         now_local = dt_util.as_local(dt_util.now())
+
+        # Initialize time bucket boundaries
+        self._next_time_bucket_start_at = await self._composite_indexer.next_boundary(
+            dt_util.as_local(dt_util.now())
+        )
+        self._current_time_bucket_start_at = (
+            self._next_time_bucket_start_at
+            - timedelta(minutes=self._current_time_bucket_size)
+        )
 
         # Initiate target entity state
         await self._handle_target_entity_state_change(
@@ -464,7 +478,7 @@ class DiscreteStateForecasterCoordinator(
 
         time_fired_in_local = dt_util.as_local(event.time_fired)
         self.logger.debug(
-            "Updating state tracker for %s with new state: %s at %s.",
+            "Updating forecaster for %s with new state: %s at %s.",
             self._config_entry.data[CONF_TARGET_ENTITY_ID],
             new_state_to_store,
             time_fired_in_local,
@@ -491,11 +505,19 @@ class DiscreteStateForecasterCoordinator(
         )
 
         if self._current_state is not None:
+            self.logger.debug(
+                "Updating forecaster for time key change with current state: %s at %s. "
+                "Time key start: %s",
+                self._current_state,
+                new_key_now_local,
+                self._current_time_bucket_start_at,
+            )
+
             self._current_state_last_reported_to_engine_at = (
-                self._current_state_next_boundary
+                self._current_time_bucket_start_at
             )
             await self._forecaster.update(
-                self._current_state, self._current_state_next_boundary
+                self._current_state, self._current_time_bucket_start_at
             )
 
             # TODO: remove
@@ -658,20 +680,32 @@ class DiscreteStateForecasterCoordinator(
         await self.async_refresh()
 
     async def _track_next_time_indexer_change(self: Self, now: datetime) -> None:
-        now_local = dt_util.as_local(now)
+        # Previously I have used `now` parameter but sometimes it contained values which generates
+        # next boundary for an elapsed time which caused immediate triggering of the callback.
+        # Finally it has run into an infinite loop. To avoid this issue, I have changed to use
+        # the current time which ensures that the next boundary is always in the future.
+        now_local = dt_util.as_local(dt_util.now())
 
-        next_boundary = await self._composite_indexer.next_boundary(now_local)
+        self._current_time_bucket_start_at = self._next_time_bucket_start_at
+        self._next_time_bucket_start_at = await self._composite_indexer.next_boundary(
+            now_local
+        )
 
         self.logger.debug(
             "Scheduling next time indexer change tracking for %s at %s.",
             self._config_entry.data[CONF_TARGET_ENTITY_ID],
-            next_boundary,
+            self._next_time_bucket_start_at,
         )
 
-        self._current_state_next_boundary = next_boundary
+        self.logger.debug(
+            "Updated time indexer boundaries for %s. Current: %s, Next: %s",
+            self._config_entry.data[CONF_TARGET_ENTITY_ID],
+            self._current_time_bucket_start_at,
+            self._next_time_bucket_start_at,
+        )
 
         self._unsubscribe_time_indexer_change_callback = async_track_point_in_time(
             self.hass,
             self._handle_time_key_change,
-            next_boundary,
+            self._next_time_bucket_start_at,
         )
