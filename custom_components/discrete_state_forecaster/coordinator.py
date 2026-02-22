@@ -484,10 +484,11 @@ class DiscreteStateForecasterCoordinator(
             time_fired_in_local,
         )
 
-        if self._current_state != new_state_to_store:
-            self._current_state = new_state_to_store
-            self._current_state_last_reported_to_engine_at = time_fired_in_local
-
+        # We store the state and the timestamp when it was reported.
+        # We use the timestamp to calculate the state duration for persistence adjustment
+        # when making predictions.
+        self._current_state = new_state_to_store
+        self._current_state_last_reported_to_engine_at = time_fired_in_local
         await self._forecaster.update(new_state_to_store, time_fired_in_local)
 
         # TODO: remove
@@ -513,12 +514,12 @@ class DiscreteStateForecasterCoordinator(
                 self._current_time_bucket_start_at,
             )
 
-            self._current_state_last_reported_to_engine_at = (
-                self._current_time_bucket_start_at
-            )
-            await self._forecaster.update(
-                self._current_state, self._current_time_bucket_start_at
-            )
+            # _next_time_bucket_start_at is the boundary that just fired (e.g. 09:15:00).
+            # Subtracting 1 microsecond places the timestamp firmly inside the finishing
+            # bucket so the engine indexes it into the correct time key.
+            just_before_boundary = self._next_time_bucket_start_at - timedelta(microseconds=1)
+            await self._forecaster.update(self._current_state, just_before_boundary)
+            self._current_state_last_reported_to_engine_at = self._next_time_bucket_start_at
 
             # TODO: remove
             await self._async_store_state()
@@ -636,6 +637,15 @@ class DiscreteStateForecasterCoordinator(
             #             self._current_calendar_features = new_calendar_features
             self._current_time_bucket_size = new_time_bucket_size
 
+            # Reset bucket boundaries to avoid stale values from old indexer
+            now_local = dt_util.as_local(dt_util.now())
+            self._next_time_bucket_start_at = (
+                await self._composite_indexer.next_boundary(now_local)
+            )
+            self._current_time_bucket_start_at = self._next_time_bucket_start_at - (
+                timedelta(minutes=self._current_time_bucket_size)
+            )
+
             # Rebuild indexers
             self._composite_indexer = CompositeIndexer(
                 self._build_indexers(new_time_bucket_size, config_entry.options)
@@ -663,9 +673,7 @@ class DiscreteStateForecasterCoordinator(
                 await self._forecaster.update(self._current_state, now_local)
 
             # Start tracking time indexer changes with new indexer configuration
-            self._unsubscribe_time_indexer_change_callback = (
-                await self._track_next_time_indexer_change(now_local)
-            )
+            await self._track_next_time_indexer_change(now_local)
 
             # Store state immediately to persist the reset model and new configuration
             await self._async_store_state()
