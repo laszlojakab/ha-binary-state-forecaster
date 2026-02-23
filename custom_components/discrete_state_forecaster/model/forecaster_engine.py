@@ -236,11 +236,7 @@ class ForecasterEngine:
         if self._last_update_timestamp is not None and self._current_state is not None:
             duration = timestamp - self._last_update_timestamp
 
-            # TODO: bekapcsolva volt a tv es a 4. percben ki lett kapcsolva, a kikapcsol allapot mar nem kerult ra erra az 5 perces blokkra.
-            # olyan mintha a kovetkezo 5 perces blokkra kerulne
             if duration < 0:
-                # TODO.JL: ez elojon a -5 masodperces updatekor....
-                return
                 raise ValueError(
                     "Timestamp cannot be in the past, "
                     f"previous update was at {self._last_update_timestamp}, "

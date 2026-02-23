@@ -15,13 +15,13 @@
           "calendar_features": "Calendar entities for special days"
         },
         "data_description": {
-          "time_bucket_size_in_minutes": "The time resolution for learning patterns. Smaller values (15-30 min) capture quick changes, larger values (120-240 min) focus on broader patterns.",
+          "time_bucket_size_in_minutes": "The time resolution for learning patterns. Smaller values (15-30 min) capture quick changes, larger values (120-240 min) focus on broader patterns. Changing this setting requires resetting learned patterns.",
           "use_day_of_week": "Enable to learn different patterns for weekdays vs weekends (e.g., work schedules, office equipment)",
           "use_month_of_year": "Enable to learn monthly that repeat monthly (e.g., HVAC, irrigation, outdoor lighting)",
           "use_season": "Enable to learn seasonal patterns tied to seasons (e.g., HVAC, irrigation, outdoor lighting)",
           "state_persistence_factor": "How strongly states tend to persist (0.0 = states change freely, 1.0 = states rarely change). Typical: 0.1-0.5. Can be tuned without resetting learned patterns.",
           "adaptive_persistence": "Learn state-specific persistence (e.g., ON states may be stickier than OFF states). Can be toggled without resetting learned patterns.",
-          "half_life_hours": "How quickly old patterns fade (0 = never fade, 168 = 1 week, 720 = 30 days). Useful for evolving habits or seasonal changes. Can be adjusted without resetting learned patterns.",
+          "half_life_hours": "How quickly old patterns fade (0 = never fade, 168 = 1 week, 720 = 30 days, 8760 = 1 year). Useful for evolving habits or seasonal changes. Can be adjusted without resetting learned patterns.",
           "calendar_features": "Select calendar entities to account for special days (e.g., holidays) that may affect usage patterns."
         },
         "description": "Configure prediction settings"
@@ -52,7 +52,7 @@
           "use_season": "Enable to learn seasonal patterns tied to seasons (e.g., HVAC, irrigation, outdoor lighting)",
           "state_persistence_factor": "How strongly states tend to persist (0.0 = states change freely, 1.0 = states rarely change). Typical: 0.1-0.5. Can be tuned without resetting learned patterns.",
           "adaptive_persistence": "Learn state-specific persistence (e.g., ON states may be stickier than OFF states). Can be toggled without resetting learned patterns.",
-          "half_life_hours": "How quickly old patterns fade (0 = never fade, 168 = 1 week, 720 = 30 days). Useful for evolving habits or seasonal changes. Can be adjusted without resetting learned patterns.",
+          "half_life_hours": "How quickly old patterns fade (0 = never fade, 168 = 1 week, 720 = 30 days, 8760 = 1 year). Useful for evolving habits or seasonal changes. Can be adjusted without resetting learned patterns.",
           "calendar_features": "Select calendar entities to account for special days (e.g., holidays) that may affect usage patterns."
         }
       },

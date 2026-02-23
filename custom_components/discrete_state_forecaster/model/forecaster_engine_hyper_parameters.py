@@ -24,10 +24,6 @@ class ForecasterEngineHyperParameters:
         _min_prune_interval_factor: Current minimum pruning interval factor.
         _prune_enabled: Whether pruning is currently enabled.
         _persistence_strength: Current persistence modeling strength.
-        _base_half_life: Baseline half-life value for reset.
-        _base_min_prune_interval_factor: Baseline pruning interval factor.
-        _base_prune_enabled: Baseline pruning enabled state.
-        _base_persistence_strength: Baseline persistence strength.
 
     Example:
         >>> hp = ForecasterEngineHyperParameters(
@@ -68,24 +64,6 @@ class ForecasterEngineHyperParameters:
         self._min_prune_interval_factor: float = min_prune_interval_factor
         self._prune_enabled: bool = prune_enabled
         self._persistence_strength: float = persistence_strength
-
-        self._base_half_life: float = half_life
-        self._base_min_prune_interval_factor: float = min_prune_interval_factor
-        self._base_prune_enabled: bool = prune_enabled
-        self._base_persistence_strength: float = persistence_strength
-
-    def reset(self: Self) -> None:
-        """
-        Reset all hyper-parameters to their baseline values.
-
-        This method restores all parameters to their initial values,
-        effectively undoing any dynamic adjustments made via update().
-
-        """
-        self._half_life = self._base_half_life
-        self._min_prune_interval_factor = self._base_min_prune_interval_factor
-        self._prune_enabled = self._base_prune_enabled
-        self._persistence_strength = self._base_persistence_strength
 
     def update(
         self: Self,
@@ -174,10 +152,6 @@ class ForecasterEngineHyperParameters:
             "min_prune_interval_factor": self._min_prune_interval_factor,
             "prune_enabled": self._prune_enabled,
             "persistence_strength": self._persistence_strength,
-            "base_half_life": self._base_half_life,
-            "base_min_prune_interval_factor": self._base_min_prune_interval_factor,
-            "base_prune_enabled": self._base_prune_enabled,
-            "base_persistence_strength": self._base_persistence_strength,
         }
 
     @classmethod
@@ -192,17 +166,9 @@ class ForecasterEngineHyperParameters:
             A new ForecasterEngineHyperParameters instance.
 
         """
-        parameters = cls(
+        return cls(
             half_life=data["half_life"],
             min_prune_interval_factor=data["min_prune_interval_factor"],
             prune_enabled=data["prune_enabled"],
             persistence_strength=data["persistence_strength"],
         )
-        parameters._base_half_life = data["base_half_life"]
-        parameters._base_min_prune_interval_factor = data[
-            "base_min_prune_interval_factor"
-        ]
-        parameters._base_prune_enabled = data["base_prune_enabled"]
-        parameters._base_persistence_strength = data["base_persistence_strength"]
-
-        return parameters

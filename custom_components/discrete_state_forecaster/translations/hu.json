@@ -15,13 +15,13 @@
           "calendar_features": "Naptár entitások különleges napokhoz"
         },
         "data_description": {
-          "time_bucket_size_in_minutes": "Az időfelbontás a mintázatok tanulásához. Kisebb értékek (15-30 perc) a gyors változásokat rögzítik, nagyobb értékek (120-240 perc) az általánosabb mintázatokra fókuszálnak.",
+          "time_bucket_size_in_minutes": "Az időfelbontás a mintázatok tanulásához. Kisebb értékek (15-30 perc) a gyors változásokat rögzítik, nagyobb értékek (120-240 perc) az általánosabb mintázatokra fókuszálnak. A beállítás módosítása csak a megtanult mintázatok törlésével lehetséges.",
           "use_day_of_week": "Engedélyezze a hétköznapok és hétvégék közötti különböző mintázatok tanulását (pl. munkaidő, irodai berendezések)",
           "use_month_of_year": "Engedélyezze a havonta ismétlődő szezonális mintázatok tanulását (pl. fűtés/hűtés, öntözés, kültéri világítás)",
           "use_season": "Engedélyezze az évszakokhoz kötött szezonális mintázatok tanulását (pl. fűtés/hűtés, öntözés, kültéri világítás)",
           "state_persistence_factor": "Milyen erősen hajlamosak az állapotok megmaradni (0.0 = szabadon változnak, 1.0 = ritkán változnak). Tipikusan: 0.1-0.5. A megtanult mintázatok törlése nélkül módosítható.",
           "adaptive_persistence": "Állapot-specifikus kitartás tanulása (pl. a BE állapot stabilabb lehet mint a KI). A megtanult mintázatok törlése nélkül módosítható.",
-          "half_life_hours": "Milyen gyorsan fakulnak a régi mintázatok (0 = soha, 168 = 1 hét, 720 = 30 nap). Hasznos változó szokásokhoz vagy szezonális változásokhoz. A megtanult mintázatok törlése nélkül módosítható.",
+          "half_life_hours": "Milyen gyorsan fakulnak a régi mintázatok (0 = soha, 168 = 1 hét, 720 = 30 nap, 8760 = 1 év). Hasznos változó szokásokhoz vagy szezonális változásokhoz. A megtanult mintázatok törlése nélkül módosítható.",
           "calendar_features": "Válasszon naptár entitásokat a különleges napok (pl. ünnepnapok) figyelembevételéhez, amelyek befolyásolhatják a használati mintázatokat."
         },
         "description": "Előrejelzési beállítások konfigurálása"
@@ -36,6 +36,7 @@
         "title": "Időmintázat konfiguráció",
         "description": "Állítsa be, hogy mely időmintázatokat tanulja meg az előrejelző. Több mintázat jobb pontosságot eredményez, de több tanítási adatot igényel.",
         "data": {
+          "time_bucket_size_in_minutes": "Idősáv mérete",
           "use_day_of_week": "Hét napjainak mintázatának tanulása",
           "use_month_of_year": "Havi mintázatok tanulása",
           "use_season": "Szezonális (évszak) mintázatok tanulása",
@@ -51,7 +52,7 @@
           "use_season": "Engedélyezze az évszakokhoz kötött szezonális mintázatok tanulását (pl. fűtés/hűtés, öntözés, kültéri világítás)",
           "state_persistence_factor": "Milyen erősen hajlamosak az állapotok megmaradni (0.0 = szabadon változnak, 1.0 = ritkán változnak). Tipikusan: 0.1-0.5. A megtanult mintázatok törlése nélkül módosítható.",
           "adaptive_persistence": "Állapot-specifikus kitartás tanulása (pl. a BE állapot stabilabb lehet mint a KI). A megtanult mintázatok törlése nélkül módosítható.",
-          "half_life_hours": "Milyen gyorsan fakulnak a régi mintázatok (0 = soha, 168 = 1 hét, 720 = 30 nap). Hasznos változó szokásokhoz vagy szezonális változásokhoz. A megtanult mintázatok törlése nélkül módosítható.",
+          "half_life_hours": "Milyen gyorsan fakulnak a régi mintázatok (0 = soha, 168 = 1 hét, 720 = 30 nap, 8760 = 1 év). Hasznos változó szokásokhoz vagy szezonális változásokhoz. A megtanult mintázatok törlése nélkül módosítható.",
           "calendar_features": "Válasszon naptár entitásokat a különleges napok (pl. ünnepnapok) figyelembevételéhez, amelyek befolyásolhatják a használati mintázatokat."
         }
       },

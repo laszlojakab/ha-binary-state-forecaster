@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import logging
+import math
 from typing import TYPE_CHECKING, Any, Self
 
-from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.sensor import SensorEntity, SensorStateClass
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -29,7 +30,10 @@ async def async_setup_entry(
     coordinator = config_entry.runtime_data.coordinator
 
     async_add_entities(
-        [DiscreteStateForecasterSensor(coordinator, config_entry)],
+        [
+            DiscreteStateForecasterSensor(coordinator, config_entry),
+            DiscreteStateForecasterConfidenceSensor(coordinator, config_entry),
+        ],
         True,
     )
 
@@ -132,3 +136,48 @@ class DiscreteStateForecasterSensor(
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
         self.async_write_ha_state()
+
+
+class DiscreteStateForecasterConfidenceSensor(
+    CoordinatorEntity[DiscreteStateForecasterCoordinator], SensorEntity
+):
+    """Sensor that shows the confidence of the prediction."""
+
+    def __init__(
+        self: Self,
+        coordinator: DiscreteStateForecasterCoordinator,
+        config_entry: DiscreteStateForecasterConfigEntry,
+    ) -> None:
+        """Initialize the confidence sensor."""
+        super().__init__(coordinator)
+        self._attr_has_entity_name = True
+        self._attr_name = "Prediction Confidence"
+        self._attr_unique_id = f"{config_entry.entry_id}_prediction_confidence"
+        self._attr_unit_of_measurement = "%"
+        self._attr_icon = "mdi:chart-timeline-variant-shimmer"
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, config_entry.entry_id)},
+            "name": f"Discrete State Forecaster {config_entry.title}",
+            "manufacturer": "Discrete State Forecaster",
+        }
+        self._attr_state_class = SensorStateClass.MEASUREMENT
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the confidence of the prediction."""
+        if self.coordinator.data is None or self.coordinator.data.prediction is None:
+            return None
+
+        confidence = self.coordinator.data.prediction.confidence
+
+        likelihood = confidence.max_probability * confidence.entropy_confidence
+
+        prior_reliability = 1 - math.exp(-confidence.support / 30.0)
+
+        complexity_penalty = 1 / (1 + math.sqrt(confidence.depth))
+
+        final_confidence = (
+            0.7 * likelihood + 0.2 * prior_reliability + 0.1 * complexity_penalty
+        )
+
+        return round(final_confidence, 3) * 100

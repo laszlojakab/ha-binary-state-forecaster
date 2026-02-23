@@ -50,7 +50,6 @@ class HyperParameterController:
         _hyper_parameters: Configuration object to update.
         _runtime_parameters: Runtime parameters for hyper-parameter control.
         _log_half_life: Log of current half-life (for smooth exponential updates).
-        _baseline_log_half_life: Log of baseline half-life (slowly adapts in stable mode).
         _min_half_life: Lower bound for half-life.
         _max_half_life: Upper bound for half-life.
         _mode: Current adaptation mode.
@@ -87,7 +86,7 @@ class HyperParameterController:
         """
         self._hyper_parameters: Final[ForecasterEngineHyperParameters] = (
             ForecasterEngineHyperParameters(
-                half_life=runtime_parameters.base_half_life, # TODO: ez nem fog atmenni...
+                half_life=runtime_parameters.base_half_life,  # TODO: ez nem fog atmenni...
                 min_prune_interval_factor=runtime_parameters.min_prune_interval_factor,
                 prune_enabled=True,
                 persistence_strength=runtime_parameters.base_persistence_strength,
@@ -96,9 +95,6 @@ class HyperParameterController:
         self._runtime_parameters: Final[HyperParameterControllerRuntimeParameters] = (
             runtime_parameters
         )
-
-        self._log_half_life: float = math.log(self._runtime_parameters.base_half_life)
-        self._baseline_log_half_life: float = self._log_half_life
 
         self._min_half_life: float = self._runtime_parameters.min_half_life
         self._max_half_life: float = self._runtime_parameters.max_half_life
@@ -192,8 +188,6 @@ class HyperParameterController:
         return {
             "mode": self._mode.name,
             "hyper_parameters": self._hyper_parameters.to_dict(),
-            "log_half_life": self._log_half_life,
-            "baseline_log_half_life": self._baseline_log_half_life,
         }
 
     @classmethod
@@ -218,52 +212,47 @@ class HyperParameterController:
         instance._hyper_parameters = ForecasterEngineHyperParameters.from_dict(
             data["hyper_parameters"]
         )
-        instance._log_half_life = data["log_half_life"]
-        instance._baseline_log_half_life = data["baseline_log_half_life"]
 
         return instance
-
-    def _update_baseline(self: Self) -> None:
-        """
-        Slowly adapt baseline toward current half-life if system is stable.
-
-        When the system operates in STABLE mode, the baseline half-life gradually
-        adapts toward the current half-life using exponential smoothing. This allows
-        the baseline to track long-term stable operating points.
-        """
-        if self._mode == AdaptationMode.STABLE:
-            alpha = 0.001
-            self._baseline_log_half_life = (
-                1 - alpha
-            ) * self._baseline_log_half_life + alpha * self._log_half_life
 
     def _update_params(self: Self) -> None:
         """
         Update hyper-parameters based on current mode and half-life.
 
-        Resets parameters and recomputes them based on current log_half_life
+        Resets parameters and recomputes them based on current half-life
         and adaptation mode. Adjusts persistence strength, pruning policy,
         and pruning interval according to the mode.
-
         """
-        self._hyper_parameters.reset()
-
         if self._runtime_parameters.adaptation_config.adapt_half_life:
             if self._mode == AdaptationMode.CONCEPT_DRIFT:
-                self._log_half_life -= 0.08
+                # If there is a concept drift, we want to adapt very quickly (short half-life) to
+                # forget old patterns and learn new ones.
+                log_change = -0.08
             elif self._mode == AdaptationMode.MODEL_DEGRADING:
-                self._log_half_life -= 0.03
+                # If the model is degrading but we don't detect drift,
+                # we want to adapt moderately (medium half-life)
+                log_change = -0.03
             elif self._mode == AdaptationMode.DRIFTING_OK:
-                self._log_half_life -= 0.015
+                # If the model is drifting but still performing okay,
+                # we want to adapt slowly (long half-life)
+                log_change = -0.015
             else:
-                self._log_half_life += 0.01
+                # If the model is stable, we want to maintain a long half-life
+                # so we increase the half-life slightly to reinforce memory of stable patterns.
+                log_change = +0.01
 
-            self._log_half_life = max(
-                math.log(self._min_half_life),
-                min(math.log(self._max_half_life), self._log_half_life),
+            half_life = math.exp(
+                max(
+                    math.log(self._min_half_life),
+                    min(
+                        math.log(self._max_half_life),
+                        math.log(self._runtime_parameters.base_half_life) + log_change,
+                    ),
+                )
             )
-
-        half_life = math.exp(self._log_half_life)
+        else:
+            # We reset to baseline half-life
+            half_life = self._runtime_parameters.base_half_life
 
         # ---- persistence derived from half-life ----
         ratio = (half_life - self._min_half_life) / (
@@ -304,5 +293,3 @@ class HyperParameterController:
             prune_enabled=prune_enabled,
             persistence_strength=persistence_strength,
         )
-
-        self._update_baseline()
