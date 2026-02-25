@@ -55,5 +55,5 @@ class HyperParameterControllerRuntimeParameters:
     min_half_life: float = 60.0
     """Lower bound for half-life adaptation (in seconds)."""
 
-    max_half_life: float = 3600.0 * 48  # TODO: is this too low?
-    """Upper bound for half-life adaptation (in seconds, default: 48 hours)."""
+    max_half_life: float = 3600.0 * 8760
+    """Upper bound for half-life adaptation (in seconds, default: 1 year)."""

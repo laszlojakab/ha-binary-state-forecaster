@@ -9,22 +9,45 @@
           "use_day_of_week": "Learn day-of-week patterns",
           "use_month_of_year": "Learn monthly patterns",
           "use_season": "Learn seasonal patterns",
-          "state_persistence_factor": "State persistence factor",
-          "adaptive_persistence": "Adaptive state persistence",
-          "half_life_hours": "Pattern decay half-life (hours)",
-          "calendar_features": "Calendar entities for special days"
+          "calendar_features": "Calendar entities for special days",
+          "advanced_configuration": "Advanced configuration"
         },
         "data_description": {
           "time_bucket_size_in_minutes": "The time resolution for learning patterns. Smaller values (15-30 min) capture quick changes, larger values (120-240 min) focus on broader patterns. Changing this setting requires resetting learned patterns.",
-          "use_day_of_week": "Enable to learn different patterns for weekdays vs weekends (e.g., work schedules, office equipment)",
-          "use_month_of_year": "Enable to learn monthly that repeat monthly (e.g., HVAC, irrigation, outdoor lighting)",
-          "use_season": "Enable to learn seasonal patterns tied to seasons (e.g., HVAC, irrigation, outdoor lighting)",
-          "state_persistence_factor": "How strongly states tend to persist (0.0 = states change freely, 1.0 = states rarely change). Typical: 0.1-0.5. Can be tuned without resetting learned patterns.",
-          "adaptive_persistence": "Learn state-specific persistence (e.g., ON states may be stickier than OFF states). Can be toggled without resetting learned patterns.",
+          "use_day_of_week": "Enable to learn different patterns for weekdays vs weekends (e.g., work schedules, office equipment). Changing this setting requires resetting learned patterns.",
+          "use_month_of_year": "Enable to learn monthly patterns (e.g., HVAC, irrigation, outdoor lighting). Changing this setting requires resetting learned patterns.",
+          "use_season": "Enable to learn seasonal patterns tied to seasons (e.g., HVAC, irrigation, outdoor lighting). Changing this setting requires resetting learned patterns.",
           "half_life_hours": "How quickly old patterns fade (0 = never fade, 168 = 1 week, 720 = 30 days, 8760 = 1 year). Useful for evolving habits or seasonal changes. Can be adjusted without resetting learned patterns.",
-          "calendar_features": "Select calendar entities to account for special days (e.g., holidays) that may affect usage patterns."
+          "calendar_features": "Select calendar entities to account for special days (e.g., holidays) that may affect usage patterns.",
+          "advanced_configuration": "Access additional settings for fine-tuning the forecaster's learning and adaptability."
         },
         "description": "Configure prediction settings"
+      },
+      "advanced_configuration": {
+        "title": "Advanced Configuration",
+        "description": "Access additional settings for fine-tuning the forecaster's learning and adaptability.",
+        "data": {
+          "preset": "Pre-set configurations",
+          "adaptive_half_life": "Adaptive pattern decay",
+          "adaptive_prune_interval": "Adaptive pruning interval",
+          "adaptive_persistence": "Adaptive state persistence"
+        },
+        "data_description": {
+          "preset": "Choose from pre-set configurations optimized for different use cases: \n- Stable: For devices with consistent patterns (e.g., TV, evening lights, covers, heating).\n- Moderate: For devices with some variability (e.g., appliances).\n- Dynamic: For highly variable devices (e.g., sensors, presence, manually controlled devices).\n- Custom: Manually adjust all parameters for fine-tuning.",
+          "adaptive_half_life": "Enable adaptive pattern decay where the half-life can adjust based on pattern stability. This allows the forecaster to automatically fade unstable patterns faster while retaining stable ones longer.",
+          "adaptive_prune_interval": "Enable adaptive pruning intervals where the frequency of pruning old patterns can adjust based on the amount of learned data. This helps maintain a manageable number of patterns while ensuring timely removal of outdated ones.",
+          "adaptive_persistence": "Enable adaptive state persistence where the persistence factor can adjust based on the observed stability of each state. This allows the forecaster to learn that some states (e.g., ON) may be more persistent than others (e.g., OFF), improving prediction accuracy."
+        }
+      },
+      "custom_preset": {
+        "title": "Custom Settings",
+        "description": "Configure advanced configuration parameters with custom values for fine-tuning.",
+        "data": {
+          "half_life_hours": "Pattern decay half-life (hours)"
+        },
+        "data_description": {
+          "half_life_hours": "How quickly old patterns fade (0 = never fade, 168 = 1 week, 720 = 30 days, 8760 = 1 year). Useful for evolving habits or seasonal changes. Can be adjusted without resetting learned patterns."
+        }
       }
     },
     "error": {},
@@ -43,17 +66,19 @@
           "state_persistence_factor": "State persistence factor",
           "adaptive_persistence": "Adaptive state persistence",
           "half_life_hours": "Pattern decay half-life (hours)",
-          "calendar_features": "Calendar entities for special days"
+          "calendar_features": "Calendar entities for special days",
+          "advanced_configuration": "Advanced configuration"
         },
         "data_description": {
           "time_bucket_size_in_minutes": "The time resolution for learning patterns. Smaller values (15-30 min) capture quick changes, larger values (120-240 min) focus on broader patterns. Changing this setting requires resetting learned patterns.",
-          "use_day_of_week": "Enable to learn different patterns for weekdays vs weekends (e.g., work schedules, office equipment)",
-          "use_month_of_year": "Enable to learn monthly that repeat monthly (e.g., HVAC, irrigation, outdoor lighting)",
-          "use_season": "Enable to learn seasonal patterns tied to seasons (e.g., HVAC, irrigation, outdoor lighting)",
+          "use_day_of_week": "Enable to learn different patterns for weekdays vs weekends (e.g., work schedules, office equipment). Changing this setting requires resetting learned patterns.",
+          "use_month_of_year": "Enable to learn monthly patterns (e.g., HVAC, irrigation, outdoor lighting). Changing this setting requires resetting learned patterns.",
+          "use_season": "Enable to learn seasonal patterns tied to seasons (e.g., HVAC, irrigation, outdoor lighting). Changing this setting requires resetting learned patterns.",
           "state_persistence_factor": "How strongly states tend to persist (0.0 = states change freely, 1.0 = states rarely change). Typical: 0.1-0.5. Can be tuned without resetting learned patterns.",
           "adaptive_persistence": "Learn state-specific persistence (e.g., ON states may be stickier than OFF states). Can be toggled without resetting learned patterns.",
           "half_life_hours": "How quickly old patterns fade (0 = never fade, 168 = 1 week, 720 = 30 days, 8760 = 1 year). Useful for evolving habits or seasonal changes. Can be adjusted without resetting learned patterns.",
-          "calendar_features": "Select calendar entities to account for special days (e.g., holidays) that may affect usage patterns."
+          "calendar_features": "Select calendar entities to account for special days (e.g., holidays) that may affect usage patterns.",
+          "advanced_configuration": "Access additional settings for fine-tuning the forecaster's learning and adaptability."
         }
       },
       "confirm_reset": {
@@ -62,10 +87,44 @@
         "data": {
           "confirm": "Yes, reset learned patterns and apply new settings"
         }
+      },
+      "advanced_configuration": {
+        "title": "Advanced Configuration",
+        "description": "Access additional settings for fine-tuning the forecaster's learning and adaptability.",
+        "data": {
+          "preset": "Pre-set configurations",
+          "adaptive_half_life": "Adaptive pattern decay",
+          "adaptive_prune_interval": "Adaptive pruning interval",
+          "adaptive_persistence": "Adaptive state persistence"
+        },
+        "data_description": {
+          "preset": "Choose from pre-set configurations optimized for different use cases: \n- Stable: For devices with consistent patterns (e.g., TV, evening lights, covers, heating).\n- Moderate: For devices with some variability (e.g., appliances).\n- Dynamic: For highly variable devices (e.g., sensors, presence, manually controlled devices).\n- Custom: Manually adjust all parameters for fine-tuning.",
+          "adaptive_half_life": "Enable adaptive pattern decay where the half-life can adjust based on pattern stability. This allows the forecaster to automatically fade unstable patterns faster while retaining stable ones longer.",
+          "adaptive_prune_interval": "Enable adaptive pruning intervals where the frequency of pruning old patterns can adjust based on the amount of learned data. This helps maintain a manageable number of patterns while ensuring timely removal of outdated ones.",
+          "adaptive_persistence": "Enable adaptive state persistence where the persistence factor can adjust based on the observed stability of each state. This allows the forecaster to learn that some states (e.g., ON) may be more persistent than others (e.g., OFF), improving prediction accuracy."
+        }
+      },
+      "custom_preset": {
+        "title": "Custom Settings",
+        "description": "Configure advanced configuration parameters with custom values for fine-tuning.",
+        "data": {
+          "half_life_hours": "Pattern decay half-life (hours)"
+        },
+        "data_description": {
+          "half_life_hours": "How quickly old patterns fade (0 = never fade, 168 = 1 week, 720 = 30 days, 8760 = 1 year). Useful for evolving habits or seasonal changes. Can be adjusted without resetting learned patterns."
+        }
       }
     }
   },
   "selector": {
+    "preset": {
+      "options": {
+        "stable": "Stable",
+        "moderate": "Moderate",
+        "dynamic": "Dynamic",
+        "custom": "Custom"
+      }
+    },
     "time_bucket_size_in_minutes": {
       "options": {
         "5": "5 minutes",

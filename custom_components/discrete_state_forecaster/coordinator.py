@@ -1,11 +1,10 @@
 # """Module of the Discrete State Forecaster Coordinator."""
 
 import logging
+from collections.abc import Hashable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-
-# from datetime import datetime
-from typing import TYPE_CHECKING, Any, Hashable, Self, cast
+from typing import TYPE_CHECKING, Any, Self, cast
 
 from homeassistant.const import (
     EVENT_HOMEASSISTANT_STOP,
@@ -60,22 +59,20 @@ from custom_components.discrete_state_forecaster.model.structural_parameters imp
 from custom_components.discrete_state_forecaster.model.temporal.composite_indexer import (
     CompositeIndexer,
 )
+from custom_components.discrete_state_forecaster.model.temporal.day_of_week_indexer import (
+    DayOfWeekIndexer,
+)
+from custom_components.discrete_state_forecaster.model.temporal.month_indexer import (
+    MonthIndexer,
+)
 
 # from custom_components.discrete_state_forecaster.model.temporal.calendar_indexer import (
 #     CalendarIndexer,
 # )
-# from custom_components.discrete_state_forecaster.model.temporal.season_indexer import (
-#     SeasonIndexer,
-# )
-# from custom_components.discrete_state_forecaster.model.temporal.composite_indexer import (
-#     CompositeIndexer,
-# )
-# from custom_components.discrete_state_forecaster.model.temporal.day_of_week_indexer import (
-#     DayOfWeekIndexer,
-# )
-# from custom_components.discrete_state_forecaster.model.temporal.month_indexer import (
-#     MonthIndexer,
-# )
+from custom_components.discrete_state_forecaster.model.temporal.season_indexer import (
+    SeasonIndexer,
+)
+
 # from custom_components.discrete_state_forecaster.old_model.prediction import Prediction
 # from custom_components.discrete_state_forecaster.old_model.time_aware_forecaster import (
 #     TimeAwareForecaster,
@@ -94,16 +91,16 @@ from .const import (
     #     CONF_STATE_PERSISTENCE_FACTOR,
     CONF_TARGET_ENTITY_ID,
     CONF_TIME_BUCKET_SIZE_IN_MINUTES,
-    #     CONF_USE_DAY_OF_WEEK,
-    #     CONF_USE_MONTH_OF_YEAR,
-    #     CONF_USE_SEASON,
+    CONF_USE_DAY_OF_WEEK,
+    CONF_USE_MONTH_OF_YEAR,
+    CONF_USE_SEASON,
     #     DEFAULT_ADAPTIVE_PERSISTENCE,
     DEFAULT_HALF_LIFE_HOURS,
     #     DEFAULT_STATE_PERSISTENCE_FACTOR,
     DEFAULT_TIME_BUCKET_SIZE_IN_MINUTES,
-    #     DEFAULT_USE_DAY_OF_WEEK,
-    #     DEFAULT_USE_MONTH_OF_YEAR,
-    #     DEFAULT_USE_SEASON,
+    DEFAULT_USE_DAY_OF_WEEK,
+    DEFAULT_USE_MONTH_OF_YEAR,
+    DEFAULT_USE_SEASON,
     STORING_TIME_PATTERN,
 )
 
@@ -190,7 +187,7 @@ class DiscreteStateForecasterCoordinator(
 
         self._runtime_parameters = ForecasterEngineRuntimeParameters(
             hierarchical_state_stats=HierarchicalStateStatsRuntimeParameters(
-                min_support_factor=0.00000001
+                min_support_factor=0.5
             ),
             short_term_error_tracker=OnlineErrorTrackerRuntimeParameters(
                 error_half_life_factor=4.0
@@ -268,19 +265,19 @@ class DiscreteStateForecasterCoordinator(
         self._unsubscribe_callbacks = []
         self._unsubscribe_time_indexer_change_callback = None
 
-        #         # Track current indexer configuration for detecting changes
-        #         self._current_use_day_of_week = config_entry.options.get(
-        #             CONF_USE_DAY_OF_WEEK, DEFAULT_USE_DAY_OF_WEEK
-        #         )
-        #         self._current_use_month = config_entry.options.get(
-        #             CONF_USE_MONTH_OF_YEAR, DEFAULT_USE_MONTH_OF_YEAR
-        #         )
-        #         self._current_use_season = config_entry.options.get(
-        #             CONF_USE_SEASON, DEFAULT_USE_SEASON
-        #         )
-        #         self._current_calendar_features = config_entry.options.get(
-        #             CONF_CALENDAR_FEATURES, []
-        #         )
+        # Track current indexer configuration for detecting changes
+        self._current_use_day_of_week = config_entry.options.get(
+            CONF_USE_DAY_OF_WEEK, DEFAULT_USE_DAY_OF_WEEK
+        )
+        self._current_use_month = config_entry.options.get(
+            CONF_USE_MONTH_OF_YEAR, DEFAULT_USE_MONTH_OF_YEAR
+        )
+        self._current_use_season = config_entry.options.get(
+            CONF_USE_SEASON, DEFAULT_USE_SEASON
+        )
+        # self._current_calendar_features = config_entry.options.get(
+        #     CONF_CALENDAR_FEATURES, []
+        # )
         self._current_time_bucket_size = time_bucket_minutes
 
         # Listen for config entry updates
@@ -517,9 +514,13 @@ class DiscreteStateForecasterCoordinator(
             # _next_time_bucket_start_at is the boundary that just fired (e.g. 09:15:00).
             # Subtracting 1 microsecond places the timestamp firmly inside the finishing
             # bucket so the engine indexes it into the correct time key.
-            just_before_boundary = self._next_time_bucket_start_at - timedelta(microseconds=1)
+            just_before_boundary = self._next_time_bucket_start_at - timedelta(
+                microseconds=1
+            )
             await self._forecaster.update(self._current_state, just_before_boundary)
-            self._current_state_last_reported_to_engine_at = self._next_time_bucket_start_at
+            self._current_state_last_reported_to_engine_at = (
+                self._next_time_bucket_start_at
+            )
 
             # TODO: remove
             await self._async_store_state()
@@ -553,19 +554,19 @@ class DiscreteStateForecasterCoordinator(
         #                 CalendarIndexer(self.hass, calendar_feature)
         #             )  # noqa: PERF401
 
-        #         # Day of week indexer (optional)
-        #         use_day_of_week = options.get(CONF_USE_DAY_OF_WEEK, DEFAULT_USE_DAY_OF_WEEK)
-        #         if use_day_of_week:
-        #             indexers.append(DayOfWeekIndexer())
+        # Day of week indexer (optional)
+        use_day_of_week = options.get(CONF_USE_DAY_OF_WEEK, DEFAULT_USE_DAY_OF_WEEK)
+        if use_day_of_week:
+            indexers.append(DayOfWeekIndexer())
 
-        #         # Month of year indexer (optional)
-        #         use_month = options.get(CONF_USE_MONTH_OF_YEAR, DEFAULT_USE_MONTH_OF_YEAR)
-        #         if use_month:
-        #             indexers.append(MonthIndexer())
+        # Month of year indexer (optional)
+        use_month = options.get(CONF_USE_MONTH_OF_YEAR, DEFAULT_USE_MONTH_OF_YEAR)
+        if use_month:
+            indexers.append(MonthIndexer())
 
-        #         use_season = options.get(CONF_USE_SEASON, DEFAULT_USE_SEASON)
-        #         if use_season:
-        #             indexers.append(SeasonIndexer())
+        use_season = options.get(CONF_USE_SEASON, DEFAULT_USE_SEASON)
+        if use_season:
+            indexers.append(SeasonIndexer())
 
         # Time of day indexer (always included)
         indexers.append(TimeOfDayIndexer(time_bucket_minutes * 60))
@@ -584,24 +585,22 @@ class DiscreteStateForecasterCoordinator(
                 DEFAULT_TIME_BUCKET_SIZE_IN_MINUTES,
             )
         )
-        #         new_use_day_of_week = config_entry.options.get(
-        #             CONF_USE_DAY_OF_WEEK, DEFAULT_USE_DAY_OF_WEEK
-        #         )
-        #         new_use_month = config_entry.options.get(
-        #             CONF_USE_MONTH_OF_YEAR, DEFAULT_USE_MONTH_OF_YEAR
-        #         )
-        #         new_use_season = config_entry.options.get(CONF_USE_SEASON, DEFAULT_USE_SEASON)
+        new_use_day_of_week = config_entry.options.get(
+            CONF_USE_DAY_OF_WEEK, DEFAULT_USE_DAY_OF_WEEK
+        )
+        new_use_month = config_entry.options.get(
+            CONF_USE_MONTH_OF_YEAR, DEFAULT_USE_MONTH_OF_YEAR
+        )
+        new_use_season = config_entry.options.get(CONF_USE_SEASON, DEFAULT_USE_SEASON)
         #         new_calendar_features = config_entry.options.get(CONF_CALENDAR_FEATURES, [])
 
-        #         # Check if indexer configuration changed
+        # Check if indexer configuration changed
         indexers_changed = (
-            #             new_use_day_of_week != self._current_use_day_of_week
-            #             or new_use_month != self._current_use_month
-            #             or new_use_season != self._current_use_season
-            #             or new_calendar_features != self._current_calendar_features
-            # or
-            new_time_bucket_size
-            != self._current_time_bucket_size
+            new_time_bucket_size != self._current_time_bucket_size
+            or new_use_day_of_week != self._current_use_day_of_week
+            or new_use_month != self._current_use_month
+            or new_use_season != self._current_use_season
+            # or new_calendar_features != self._current_calendar_features
         )
 
         half_life_hours = config_entry.options.get(
@@ -611,17 +610,19 @@ class DiscreteStateForecasterCoordinator(
         if indexers_changed:
             self.logger.info(
                 "Indexer configuration changed - resetting model. "
-                "Time bucket size: %s -> %s",
-                # ", Day of week: %s -> %s, Month: %s -> %s, ",
-                # "Season: %s -> %s, Calendar features: %s -> %s",
+                "Time bucket size: %s -> %s, "
+                "Day of week: %s -> %s, "
+                "Month: %s -> %s, "
+                "Season: %s -> %s, ",
+                # "Calendar features: %s -> %s",
                 self._current_time_bucket_size,
                 new_time_bucket_size,
-                # self._current_use_day_of_week,
-                # new_use_day_of_week,
-                # self._current_use_month,
-                # new_use_month,
-                # self._current_use_season,
-                # new_use_season,
+                self._current_use_day_of_week,
+                new_use_day_of_week,
+                self._current_use_month,
+                new_use_month,
+                self._current_use_season,
+                new_use_season,
                 # self._current_calendar_features,
                 # new_calendar_features,
             )
@@ -632,10 +633,16 @@ class DiscreteStateForecasterCoordinator(
                 self._unsubscribe_time_indexer_change_callback = None
 
             # Update tracked configuration
-            #             self._current_use_day_of_week = new_use_day_of_week
-            #             self._current_use_month = new_use_month
-            #             self._current_calendar_features = new_calendar_features
+            self._current_use_season = new_use_season
+            self._current_use_day_of_week = new_use_day_of_week
+            self._current_use_month = new_use_month
+            # self._current_calendar_features = new_calendar_features
             self._current_time_bucket_size = new_time_bucket_size
+
+            # Rebuild indexers
+            self._composite_indexer = CompositeIndexer(
+                self._build_indexers(new_time_bucket_size, config_entry.options)
+            )
 
             # Reset bucket boundaries to avoid stale values from old indexer
             now_local = dt_util.as_local(dt_util.now())
@@ -644,11 +651,6 @@ class DiscreteStateForecasterCoordinator(
             )
             self._current_time_bucket_start_at = self._next_time_bucket_start_at - (
                 timedelta(minutes=self._current_time_bucket_size)
-            )
-
-            # Rebuild indexers
-            self._composite_indexer = CompositeIndexer(
-                self._build_indexers(new_time_bucket_size, config_entry.options)
             )
 
             #             # Get persistence settings from options

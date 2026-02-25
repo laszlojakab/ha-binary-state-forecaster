@@ -3,28 +3,64 @@
     "step": {
       "user": {
         "title": "Előrejelzési beállítások konfigurálása",
+        "description": "Előrejelzési beállítások konfigurálása. A beállítások módosítása a későbbiekben csak a megtanult mintázatok törlésével lehetséges!",
         "data": {
           "target_entity_id": "Előrejelzendő entitás",
           "time_bucket_size_in_minutes": "Idősáv mérete",
           "use_day_of_week": "Hét napjainak mintázatának tanulása",
           "use_month_of_year": "Havi mintázatok tanulása",
           "use_season": "Szezonális (évszak) mintázatok tanulása",
-          "state_persistence_factor": "Állapot-kitartási tényező",
-          "adaptive_persistence": "Adaptív állapot-kitartás",
-          "half_life_hours": "Mintázat-lecsengési felezési idő (óra)",
-          "calendar_features": "Naptár entitások különleges napokhoz"
+          "calendar_features": "Naptár entitások különleges napokhoz",
+          "advanced_configuration": "Haladó beállítások"
         },
         "data_description": {
-          "time_bucket_size_in_minutes": "Az időfelbontás a mintázatok tanulásához. Kisebb értékek (15-30 perc) a gyors változásokat rögzítik, nagyobb értékek (120-240 perc) az általánosabb mintázatokra fókuszálnak. A beállítás módosítása csak a megtanult mintázatok törlésével lehetséges.",
-          "use_day_of_week": "Engedélyezze a hétköznapok és hétvégék közötti különböző mintázatok tanulását (pl. munkaidő, irodai berendezések)",
-          "use_month_of_year": "Engedélyezze a havonta ismétlődő szezonális mintázatok tanulását (pl. fűtés/hűtés, öntözés, kültéri világítás)",
-          "use_season": "Engedélyezze az évszakokhoz kötött szezonális mintázatok tanulását (pl. fűtés/hűtés, öntözés, kültéri világítás)",
-          "state_persistence_factor": "Milyen erősen hajlamosak az állapotok megmaradni (0.0 = szabadon változnak, 1.0 = ritkán változnak). Tipikusan: 0.1-0.5. A megtanult mintázatok törlése nélkül módosítható.",
-          "adaptive_persistence": "Állapot-specifikus kitartás tanulása (pl. a BE állapot stabilabb lehet mint a KI). A megtanult mintázatok törlése nélkül módosítható.",
-          "half_life_hours": "Milyen gyorsan fakulnak a régi mintázatok (0 = soha, 168 = 1 hét, 720 = 30 nap, 8760 = 1 év). Hasznos változó szokásokhoz vagy szezonális változásokhoz. A megtanult mintázatok törlése nélkül módosítható.",
-          "calendar_features": "Válasszon naptár entitásokat a különleges napok (pl. ünnepnapok) figyelembevételéhez, amelyek befolyásolhatják a használati mintázatokat."
+          "time_bucket_size_in_minutes": "Az időfelbontás a mintázatok tanulásához. Kisebb értékek (15-30 perc) a gyors változásokat rögzítik, nagyobb értékek (120-240 perc) az általánosabb mintázatokra fókuszálnak.",
+          "use_day_of_week": "Engedélyezze a hétköznapok és hétvégék közötti különböző mintázatok tanulását (pl. munkaidő, irodai berendezések).",
+          "use_month_of_year": "Engedélyezze a havonta ismétlődő szezonális mintázatok tanulását (pl. fűtés/hűtés, öntözés, kültéri világítás).",
+          "use_season": "Engedélyezze az évszakokhoz kötött szezonális mintázatok tanulását (pl. fűtés/hűtés, öntözés, kültéri világítás).",
+          "calendar_features": "Válasszon naptár entitásokat a különleges napok (pl. ünnepnapok) figyelembevételéhez, amelyek befolyásolhatják a használati mintázatokat.",
+          "advanced_configuration": "Lépjen be további beállításokhoz az előrejelző tanulásának és alkalmazkodóképességének finomhangolásához."
+        }
+      },
+      "advanced_configuration": {
+        "title": "Haladó beállítások",
+        "description": "Állítsa be az előrejelző tanulásának és alkalmazkodóképességének finomhangolásához szükséges további beállításokat.",
+        "data": {
+          "preset": "Előre beállított konfigurációk"
         },
-        "description": "Előrejelzési beállítások konfigurálása"
+        "data_description": {
+          "preset": "Válasszon előre beállított konfigurációk közül, amelyek különböző használati esetekre optimalizáltak: \n- Stabil: Olyan eszközökhöz, amelyeknek következetes mintázata van (pl. TV, esti lámpák, redőnyök, fűtés).\n- Mérsékelt: Olyan eszközökhöz, amelyeknek van némi változékonysága (pl. háztartási gépek).\n- Dinamikus: Olyan eszközökhöz, amelyek nagyon változékonyak (pl. szenzorok, jelenlét, kézzel vezérelt eszközök).\n- Egyedi: Minden paraméter kézi beállítása a finomhangoláshoz."
+        }
+      },
+      "custom_preset": {
+        "title": "Egyedi beállítások",
+        "description": "Állítsa be egyedi értékekkel a haladó konfigurációs paramétereket a finomhangoláshoz.",
+        "data": {
+          "half_life_hours": "Mintázat-lecsengési felezési idő (óra)",
+          "short_term_error_half_life_factor": "Rövid távú hiba felezési idő tényező",
+          "long_term_error_half_life_factor": "Hosszú távú hiba felezési idő tényező",
+          "base_persistence_strength": "Alap kitartási erő",
+          "persistence_half_life_factor": "Kitartási felezési idő tényező",
+          "fast_baseline_half_life_factor": "Gyors alapvonal felezési idő tényező",
+          "slow_baseline_half_life_factor": "Lassú alapvonal felezési idő tényező",
+          "min_prune_interval_factor": "Minimális nyesési intervallum tényező",
+          "adaptive_tau": "Adaptív Tau engedélyezése",
+          "tau_enter": "Tau belépési érték",
+          "tau_exit": "Tau kilépési érték"
+        },
+        "data_description": {
+          "half_life_hours": "Milyen gyorsan fakulnak a régi mintázatok (0 = soha, 168 = 1 hét, 720 = 30 nap, 8760 = 1 év). Hasznos változó szokásokhoz vagy szezonális változásokhoz. A megtanult mintázatok törlése nélkül módosítható.",
+          "short_term_error_half_life_factor": "Milyen gyorsan reagáljon az előrejelző a rövid távú hibákra (0 = nem reagál, 1 = gyorsan reagál). Hasznos gyorsan változó szokásokhoz. A megtanult mintázatok törlése nélkül módosítható.",
+          "long_term_error_half_life_factor": "Milyen gyorsan reagáljon az előrejelző a hosszú távú hibákra (0 = nem reagál, 1 = gyorsan reagál). Hasznos változó szokásokhoz vagy szezonális változásokhoz. A megtanult mintázatok törlése nélkül módosítható.",
+          "base_persistence_strength": "Milyen erősen ragaszkodjon az előrejelző a meglévő mintázatokhoz új megfigyelések esetén (0 = nem ragaszkodik, 1 = nagyon erősen ragaszkodik). Hasznos változó szokásokhoz. A megtanult mintázatok törlése nélkül módosítható.",
+          "persistence_half_life_factor": "Milyen gyorsan csökken a kitartási erő a régi megfigyelések alapján (0 = nem csökken, 1 = gyorsan csökken). Hasznos változó szokásokhoz. A megtanult mintázatok törlése nélkül módosítható.",
+          "fast_baseline_half_life_factor": "Milyen gyorsan reagáljon az előrejelző a gyorsan változó alapvonal eltolódásokra (0 = nem reagál, 1 = gyorsan reagál). Hasznos olyan eszközökhöz, amelyeknél időszakosan gyors változások fordulhatnak elő (pl. szezonális eszközök). A megtanult mintázatok törlése nélkül módosítható.",
+          "slow_baseline_half_life_factor": "Milyen gyorsan reagáljon az előrejelző a lassan változó alapvonal eltolódásokra (0 = nem reagál, 1 = gyorsan reagál). Hasznos olyan eszközökhöz, amelyeknél időszakosan lassú változások fordulhatnak elő (pl. életmódváltozások). A megtanult mintázatok törlése nélkül módosítható.",
+          "min_prune_interval_factor": "Milyen gyakran nyírja a régi mintázatokat a megtanult adatok mennyisége alapján (0.1 = nagyon gyakran, 100 = nagyon ritkán). Hasznos a megtanult mintázatok számának kezelése érdekében, miközben biztosítja az elavult mintázatok időben történő eltávolítását. A megtanult mintázatok törlése nélkül módosítható.",
+          "adaptive_tau": "Engedélyezze az adaptív Tau-t, ahol a Tau értékek a mintázat stabilitása alapján állíthatók. Ez lehetővé teszi az előrejelző számára, hogy automatikusan szigorúbb legyen a stabil mintázatokkal szemben, miközben engedékenyebb a változékony mintázatokkal szemben, javítva ezzel a predikció pontosságát és alkalmazkodóképességét.",
+          "tau_enter": "Tau belépési érték (0 = nagyon könnyen belép, 1 = nagyon nehezen lép be). Ez a küszöbérték határozza meg, hogy az előrejelző mikor váltson egy adott állapotba (pl. KI -> BE). Alacsonyabb értékek gyorsabb belépést eredményeznek, míg magasabb értékek lassabb belépést eredményeznek. A megtanult mintázatok törlése nélkül módosítható.",
+          "tau_exit": "Tau kilépési érték (0 = nagyon könnyen kilép, 1 = nagyon nehezen lép ki). Ez a küszöbérték határozza meg, hogy az előrejelző mikor váltson ki egy adott állapotból (pl. BE -> KI). Alacsonyabb értékek gyorsabb kilépést eredményeznek, míg magasabb értékek lassabb kilépést eredményeznek. A megtanult mintázatok törlése nélkül módosítható."
+        }
       }
     },
     "error": {},
@@ -33,27 +69,24 @@
   "options": {
     "step": {
       "init": {
-        "title": "Időmintázat konfiguráció",
-        "description": "Állítsa be, hogy mely időmintázatokat tanulja meg az előrejelző. Több mintázat jobb pontosságot eredményez, de több tanítási adatot igényel.",
+        "title": "Időmintázat konfigurálása",
+        "description": "Az alábbi beállítások módosítása csak a megtanult mintázatok törlésével lehetséges!",
         "data": {
+          "target_entity_id": "Előrejelzendő entitás",
           "time_bucket_size_in_minutes": "Idősáv mérete",
           "use_day_of_week": "Hét napjainak mintázatának tanulása",
           "use_month_of_year": "Havi mintázatok tanulása",
           "use_season": "Szezonális (évszak) mintázatok tanulása",
-          "state_persistence_factor": "Állapot-kitartási tényező",
-          "adaptive_persistence": "Adaptív állapot-kitartás",
-          "half_life_hours": "Mintázat-lecsengési felezési idő (óra)",
-          "calendar_features": "Naptár entitások különleges napokhoz"
+          "calendar_features": "Naptár entitások különleges napokhoz",
+          "advanced_configuration": "Haladó beállítások"
         },
         "data_description": {
-          "time_bucket_size_in_minutes": "Az időfelbontás a mintázatok tanulásához. Kisebb értékek (15-30 perc) a gyors változásokat rögzítik, nagyobb értékek (120-240 perc) az általánosabb mintázatokra fókuszálnak. A beállítás módosítása csak a megtanult mintázatok törlésével lehetséges.",
-          "use_day_of_week": "Engedélyezze a hétköznapok és hétvégék közötti különböző mintázatok tanulását (pl. munkaidő, irodai berendezések)",
-          "use_month_of_year": "Engedélyezze a havonta ismétlődő szezonális mintázatok tanulását (pl. fűtés/hűtés, öntözés, kültéri világítás)",
-          "use_season": "Engedélyezze az évszakokhoz kötött szezonális mintázatok tanulását (pl. fűtés/hűtés, öntözés, kültéri világítás)",
-          "state_persistence_factor": "Milyen erősen hajlamosak az állapotok megmaradni (0.0 = szabadon változnak, 1.0 = ritkán változnak). Tipikusan: 0.1-0.5. A megtanult mintázatok törlése nélkül módosítható.",
-          "adaptive_persistence": "Állapot-specifikus kitartás tanulása (pl. a BE állapot stabilabb lehet mint a KI). A megtanult mintázatok törlése nélkül módosítható.",
-          "half_life_hours": "Milyen gyorsan fakulnak a régi mintázatok (0 = soha, 168 = 1 hét, 720 = 30 nap, 8760 = 1 év). Hasznos változó szokásokhoz vagy szezonális változásokhoz. A megtanult mintázatok törlése nélkül módosítható.",
-          "calendar_features": "Válasszon naptár entitásokat a különleges napok (pl. ünnepnapok) figyelembevételéhez, amelyek befolyásolhatják a használati mintázatokat."
+          "time_bucket_size_in_minutes": "Az időfelbontás a mintázatok tanulásához. Kisebb értékek (15-30 perc) a gyors változásokat rögzítik, nagyobb értékek (120-240 perc) az általánosabb mintázatokra fókuszálnak.",
+          "use_day_of_week": "Engedélyezze a hétköznapok és hétvégék közötti különböző mintázatok tanulását (pl. munkaidő, irodai berendezések).",
+          "use_month_of_year": "Engedélyezze a havonta ismétlődő szezonális mintázatok tanulását (pl. fűtés/hűtés, öntözés, kültéri világítás).",
+          "use_season": "Engedélyezze az évszakokhoz kötött szezonális mintázatok tanulását (pl. fűtés/hűtés, öntözés, kültéri világítás).",
+          "calendar_features": "Válasszon naptár entitásokat a különleges napok (pl. ünnepnapok) figyelembevételéhez, amelyek befolyásolhatják a használati mintázatokat.",
+          "advanced_configuration": "Lépjen be további beállításokhoz az előrejelző tanulásának és alkalmazkodóképességének finomhangolásához."
         }
       },
       "confirm_reset": {
@@ -62,10 +95,64 @@
         "data": {
           "confirm": "Igen, törölje a megtanult mintázatokat és alkalmazza az új beállításokat"
         }
+      },
+      "advanced_configuration": {
+        "title": "Haladó beállítások",
+        "description": "Állítsa be az előrejelző tanulásának és alkalmazkodóképességének finomhangolásához szükséges további beállításokat.",
+        "data": {
+          "preset": "Előre beállított konfigurációk",
+          "adaptive_half_life": "Adaptív mintázat-lecsengés",
+          "adaptive_prune_interval": "Adaptív mintázat-nyesési intervallum",
+          "adaptive_persistence": "Adaptív állapot-kitartás"
+        },
+        "data_description": {
+          "preset": "Válasszon előre beállított konfigurációk közül, amelyek különböző használati esetekre optimalizáltak: \n- Stabil: Olyan eszközökhöz, amelyeknek következetes mintázata van (pl. TV, esti lámpák, redőnyök, fűtés).\n- Mérsékelt: Olyan eszközökhöz, amelyeknek van némi változékonysága (pl. háztartási gépek).\n- Dinamikus: Olyan eszközökhöz, amelyek nagyon változékonyak (pl. szenzorok, jelenlét, kézzel vezérelt eszközök).\n- Egyedi: Minden paraméter kézi beállítása a finomhangoláshoz.",
+          "adaptive_half_life": "Engedélyezze az adaptív mintázat-lecsengést, ahol a felezési idő a mintázat stabilitása alapján állítható. Ez lehetővé teszi az előrejelző számára, hogy automatikusan gyorsabban elhalványítsa a stabiltalan mintázatokat, miközben hosszabb ideig megtartja a stabilakat.",
+          "adaptive_prune_interval": "Engedélyezze az adaptív mintázat-nyesési intervallumot, ahol a régi mintázatok nyesésének gyakorisága a megtanult adatok mennyisége alapján állítható. Ez segít fenntartani a kezelhető számú mintázatot, miközben biztosítja az elavult mintázatok időben történő eltávolítását.",
+          "adaptive_persistence": "Engedélyezze az adaptív állapot-kitartást, ahol a kitartási tényező az egyes állapotok megfigyelt stabilitása alapján állítható. Ez lehetővé teszi az előrejelző számára, hogy megtanulja, hogy egyes állapotok (pl. BE) kitartóbbak lehetnek, mint mások (pl. KI), javítva ezzel a predikció pontosságát."
+        }
+      },
+      "custom_preset": {
+        "title": "Egyedi beállítások",
+        "description": "Állítsa be egyedi értékekkel a haladó konfigurációs paramétereket a finomhangoláshoz.",
+        "data": {
+          "half_life_hours": "Mintázat-lecsengési felezési idő (óra)",
+          "short_term_error_half_life_factor": "Rövid távú hiba felezési idő tényező",
+          "long_term_error_half_life_factor": "Hosszú távú hiba felezési idő tényező",
+          "base_persistence_strength": "Alap kitartási erő",
+          "persistence_half_life_factor": "Kitartási felezési idő tényező",
+          "fast_baseline_half_life_factor": "Gyors alapvonal felezési idő tényező",
+          "slow_baseline_half_life_factor": "Lassú alapvonal felezési idő tényező",
+          "min_prune_interval_factor": "Minimális nyesési intervallum tényező",
+          "adaptive_tau": "Adaptív Tau engedélyezése",
+          "tau_enter": "Tau belépési érték",
+          "tau_exit": "Tau kilépési érték"
+        },
+        "data_description": {
+          "half_life_hours": "Milyen gyorsan fakulnak a régi mintázatok (0 = soha, 168 = 1 hét, 720 = 30 nap, 8760 = 1 év). Hasznos változó szokásokhoz vagy szezonális változásokhoz. A megtanult mintázatok törlése nélkül módosítható.",
+          "short_term_error_half_life_factor": "Milyen gyorsan reagáljon az előrejelző a rövid távú hibákra (0 = nem reagál, 1 = gyorsan reagál). Hasznos gyorsan változó szokásokhoz. A megtanult mintázatok törlése nélkül módosítható.",
+          "long_term_error_half_life_factor": "Milyen gyorsan reagáljon az előrejelző a hosszú távú hibákra (0 = nem reagál, 1 = gyorsan reagál). Hasznos változó szokásokhoz vagy szezonális változásokhoz. A megtanult mintázatok törlése nélkül módosítható.",
+          "base_persistence_strength": "Milyen erősen ragaszkodjon az előrejelző a meglévő mintázatokhoz új megfigyelések esetén (0 = nem ragaszkodik, 1 = nagyon erősen ragaszkodik). Hasznos változó szokásokhoz. A megtanult mintázatok törlése nélkül módosítható.",
+          "persistence_half_life_factor": "Milyen gyorsan csökken a kitartási erő a régi megfigyelések alapján (0 = nem csökken, 1 = gyorsan csökken). Hasznos változó szokásokhoz. A megtanult mintázatok törlése nélkül módosítható.",
+          "fast_baseline_half_life_factor": "Milyen gyorsan reagáljon az előrejelző a gyorsan változó alapvonal eltolódásokra (0 = nem reagál, 1 = gyorsan reagál). Hasznos olyan eszközökhöz, amelyeknél időszakosan gyors változások fordulhatnak elő (pl. szezonális eszközök). A megtanult mintázatok törlése nélkül módosítható.",
+          "slow_baseline_half_life_factor": "Milyen gyorsan reagáljon az előrejelző a lassan változó alapvonal eltolódásokra (0 = nem reagál, 1 = gyorsan reagál). Hasznos olyan eszközökhöz, amelyeknél időszakosan lassú változások fordulhatnak elő (pl. életmódváltozások). A megtanult mintázatok törlése nélkül módosítható.",
+          "min_prune_interval_factor": "Milyen gyakran nyírja a régi mintázatokat a megtanult adatok mennyisége alapján (0.1 = nagyon gyakran, 100 = nagyon ritkán). Hasznos a megtanult mintázatok számának kezelése érdekében, miközben biztosítja az elavult mintázatok időben történő eltávolítását. A megtanult mintázatok törlése nélkül módosítható.",
+          "adaptive_tau": "Engedélyezze az adaptív Tau-t, ahol a Tau értékek a mintázat stabilitása alapján állíthatók. Ez lehetővé teszi az előrejelző számára, hogy automatikusan szigorúbb legyen a stabil mintázatokkal szemben, miközben engedékenyebb a változékony mintázatokkal szemben, javítva ezzel a predikció pontosságát és alkalmazkodóképességét.",
+          "tau_enter": "Tau belépési érték (0 = nagyon könnyen belép, 1 = nagyon nehezen lép be). Ez a küszöbérték határozza meg, hogy az előrejelző mikor váltson egy adott állapotba (pl. KI -> BE). Alacsonyabb értékek gyorsabb belépést eredményeznek, míg magasabb értékek lassabb belépést eredményeznek. A megtanult mintázatok törlése nélkül módosítható.",
+          "tau_exit": "Tau kilépési érték (0 = nagyon könnyen kilép, 1 = nagyon nehezen lép ki). Ez a küszöbérték határozza meg, hogy az előrejelző mikor váltson ki egy adott állapotból (pl. BE -> KI). Alacsonyabb értékek gyorsabb kilépést eredményeznek, míg magasabb értékek lassabb kilépést eredményeznek. A megtanult mintázatok törlése nélkül módosítható."
+        }
       }
     }
   },
   "selector": {
+    "preset": {
+      "options": {
+        "stable": "Stabil",
+        "moderate": "Mérsékelt",
+        "dynamic": "Dinamikus",
+        "custom": "Egyedi"
+      }
+    },
     "time_bucket_size_in_minutes": {
       "options": {
         "5": "5 perc",
