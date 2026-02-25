@@ -222,7 +222,7 @@ class DiscreteStateForecasterCoordinator(
                     CONF_HALF_LIFE_HOURS, DEFAULT_HALF_LIFE_HOURS
                 )
                 * 3600,
-                base_state_retention_strength=0.5,
+                base_state_inertia_strength=0.5,
                 adaptation_config=AdaptationConfig(
                     adapt_half_life=False,
                     adapt_prune_interval=False,

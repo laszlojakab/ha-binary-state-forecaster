@@ -107,7 +107,7 @@ def engine_runtime_params() -> ForecasterEngineRuntimeParameters:
         hyper_parameter_controller=HyperParameterControllerRuntimeParameters(
             min_prune_interval_factor=5.0,
             base_half_life=3600.0,
-            base_state_retention_strength=0.5,
+            base_state_inertia_strength=0.5,
             adaptation_config=AdaptationConfig(
                 adapt_half_life=True, adapt_prune_interval=False
             ),

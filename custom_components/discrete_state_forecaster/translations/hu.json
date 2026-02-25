@@ -6,7 +6,7 @@
         "description": "Állítsa be az előrejelző működését. Figyelem: bizonyos beállítások módosítása a már megtanult mintázatok törlésével járhat.",
         "data": {
           "target_entity_id": "Előrejelzendő entitás",
-          "time_bucket_size_in_minutes": "Idősáv mérete",
+          "time_bucket_size_in_minutes": "Időbeli felbontás",
           "use_day_of_week": "Hét napjai szerinti mintázatok tanulása",
           "use_month_of_year": "Havi mintázatok figyelembevétele",
           "use_season": "Évszakok szerinti mintázatok figyelembevétele",
@@ -14,7 +14,7 @@
           "advanced_configuration": "Haladó beállítások megjelenítése"
         },
         "data_description": {
-          "time_bucket_size_in_minutes": "Meghatározza az időbontást a mintázatok tanulásához. Kisebb érték (15–30 perc) részletesebb, gyors változásokat is követő modellt eredményez. Nagyobb érték (120–240 perc) általánosabb, stabilabb mintázatokra fókuszál.",
+          "time_bucket_size_in_minutes": "Meghatározza, milyen időléptékben tanulja a rendszer a viselkedési mintázatokat. Rövidebb időlépték érzékenyebb a gyors változásokra, hosszabb időlépték kiegyensúlyozottabb, stabilabb működést ad.",
           "use_day_of_week": "Lehetővé teszi, hogy a rendszer külön kezelje a hét különböző napjait (pl. hétköznap vs. hétvége).",
           "use_month_of_year": "Engedélyezi a hónapokhoz kötődő ismétlődő mintázatok tanulását (pl. fűtési szezon, nyári öntözés).",
           "use_season": "Engedélyezi az évszakokhoz kötődő viselkedési mintázatok figyelembevételét.",
@@ -27,13 +27,13 @@
         "description": "Az előrejelző tanulási sebességének, alkalmazkodóképességének és modellstabilitásának finomhangolása.",
         "data": {
           "preset": "Működési profil",
-          "adaptive_half_life": "Adaptív tanulási sebesség",
+          "enable_adaptive_half_life": "Adaptív felezési idő",
           "adaptive_prune_interval": "Adaptív modell tisztítás",
           "adaptive_persistence": "Adaptív állapotstabilitás"
         },
         "data_description": {
           "preset": "Válasszon működési profilt:\n\n- Stabil: Következetes mintázatú eszközökhöz (pl. TV, esti világítás, fűtés).\n- Mérsékelt: Enyhén változékony használatú eszközökhöz (pl. háztartási gépek).\n- Dinamikus: Gyorsan változó viselkedéshez (pl. jelenlét érzékelés, manuális vezérlés).\n- Egyedi: Minden paraméter manuális beállítása.",
-          "adaptive_half_life": "Engedélyezi az adaptív tanulási sebességet, amely a modell tanulási felezési idejét a megfigyelt mintázatok stabilitása alapján módosítja. Stabil mintázatok esetén a rendszer lassabban felejti a múltat, változékony mintázatok esetén gyorsabban alkalmazkodik.",
+          "enable_adaptive_half_life": "Ha engedélyezve van, a rendszer automatikusan módosítja a tanulási felezési időt a mintázatok stabilitása alapján. Bekapcsolt állapotban a rendszer gyorsabban alkalmazkodik változékony mintázatokhoz, és lassabban felejt stabil viselkedés esetén.",
           "adaptive_prune_interval": "Engedélyezi a modell komplexitásának adaptív szabályozását. Stabil mintázatok esetén ritkábban történik a ritka mintázatok eltávolítása, változékony mintázatok esetén gyakoribb modelltisztítás történik.",
           "adaptive_persistence": "Engedélyezi az adaptív állapotátmeneti stabilitást. A rendszer megtanulja, hogy egyes állapotok természetüknél fogva tartósabbak lehetnek, és ennek megfelelően módosítja az állapotváltási valószínűségeket."
         }
@@ -42,24 +42,24 @@
         "title": "Egyedi beállítások",
         "description": "Állítsa be manuálisan az előrejelző működésének részletes paramétereit.",
         "data": {
-          "half_life_hours": "Mintázatok felezési ideje (óra)",
-          "short_term_error_half_life_factor": "Rövid távú alkalmazkodás sebessége",
-          "long_term_error_half_life_factor": "Hosszú távú stabilitás",
-          "base_state_retention_strength": "Állapot-kitartás alapértéke",
-          "persistence_half_life_factor": "Állapot-kitartás lecsengése",
-          "fast_baseline_half_life_factor": "Gyors változások érzékenysége",
-          "slow_baseline_half_life_factor": "Lassú változások követése",
-          "min_prune_interval_factor": "Mintázatok tisztításának gyakorisága",
-          "adaptive_tau": "Automatikus drift küszöbérték-hangolás",
-          "tau_enter": "Drift belépési küszöb",
-          "tau_exit": "Drift kilépési küszöb"
+          "half_life_hours": "Alap tanulási felezési idő (óra)",
+          "short_term_error_half_life_factor": "Rövid távú hibaérzékenység felezési tényezője",
+          "long_term_error_half_life_factor": "Hosszú távú stabilitási memória felezési tényezője",
+          "base_state_inertia_strength": "Állapot-inercia alapértéke",
+          "persistence_half_life_factor": "Állapot-inercia lecsengési tényező",
+          "fast_baseline_half_life_factor": "XXXX - Gyors változások érzékenysége",
+          "slow_baseline_half_life_factor": "XXXX - Lassú változások követése",
+          "min_prune_interval_factor": "XXXX - Mintázatok tisztításának gyakorisága",
+          "adaptive_tau": "XXXX - Automatikus drift küszöbérték-hangolás",
+          "tau_enter": "XXXX - Drift belépési küszöb",
+          "tau_exit": "XXXX - Drift kilépési küszöb"
         },
         "data_description": {
-          "half_life_hours": "Az alap tanulási felezési idő. Meghatározza, milyen gyorsan csökken a régi megfigyelések súlya exponenciális súlyozás esetén. Kisebb érték gyorsabb alkalmazkodást, nagyobb érték stabilabb, lassabban változó modellt eredményez.",
-          "short_term_error_half_life_factor": "A rövid távú hibák súlycsökkenésének mértéke. Meghatározza, milyen gyorsan reagáljon a modell a friss előrejelzési eltérésekre. Kisebb érték gyorsabb korrekciót eredményez.",
-          "long_term_error_half_life_factor": "A hosszú távú hibaemlékezet súlycsökkenési tényezője. Ez biztosít stabil referenciát a rövid távú ingadozások mellett, és csökkenti a túlreagálást.",
-          "base_state_retention_strength": "Az aktuális állapot alap súlya a predikció számításakor. Meghatározza, milyen mértékben vegye figyelembe a rendszer az állapot-inerciát a történeti időmintához képest.",
-          "persistence_half_life_factor": "Az állapot-inercia időbeli lecsengésének mértéke. Meghatározza, milyen gyorsan csökken az aktuális állapot hatása az idő előrehaladtával.",
+          "half_life_hours": "Az alap időskála, amely meghatározza, milyen gyorsan csökken a régi megfigyelések hatása a modell tanulása során.\n\nA többi tanulási paraméter ehhez az értékhez viszonyítva kerül meghatározásra. \nKisebb érték gyorsabb alkalmazkodást, nagyobb érték stabilabb, lassabban változó mintázatokat eredményez.",
+          "short_term_error_half_life_factor": "A rövid távú előrejelzési hibák memória-lecsengési sebességét szabályozza a hosszú távú hibákhoz viszonyítva.\n\nSegít a modellnek gyorsan reagálni a friss teljesítményromlásra.",
+          "long_term_error_half_life_factor": "A hosszú távú előrejelzési hibák stabilitását szabályozza.\n\nSegít elkerülni a rövid távú zajokra adott túlreakciót, és fenntartja a hosszú távú trendek megbízható követését.",
+          "base_state_inertia_strength": "Az aktuális állapothoz való ragaszkodás alap erőssége a predikció során.\n\nNagyobb érték erősebben megőrzi az aktuális állapot valószínűségét rövid időn belül, kisebb érték gyorsabb állapotváltási alkalmazkodást eredményez.",
+          "persistence_half_life_factor": "Az állapot-inercia időbeli lecsengésének mértéke az alap tanulási felezési időhöz viszonyítva.\n\nMeghatározza, hogy az aktuális állapot hatása milyen gyorsan csökken az idő előrehaladtával.\nKisebb érték gyorsabb, nagyobb érték lassabb állapotváltási alkalmazkodást eredményez.",
           "fast_baseline_half_life_factor": "A gyors baseline exponenciális súlyozásának felezési tényezője. Rövid időskálájú viselkedésváltozások érzékelésére szolgál.",
           "slow_baseline_half_life_factor": "A lassú baseline exponenciális súlyozásának felezési tényezője. Hosszú távú viselkedési trendek stabil követésére szolgál.",
           "min_prune_interval_factor": "Meghatározza, milyen gyakran történjen a ritkán használt mintázatok eltávolítása. Nagyobb érték ritkább tisztítást jelent.",
@@ -79,7 +79,7 @@
         "description": "Figyelem: az alábbi beállítások módosítása a megtanult mintázatok törlésével jár.",
         "data": {
           "target_entity_id": "Előrejelzendő entitás",
-          "time_bucket_size_in_minutes": "Idősáv mérete",
+          "time_bucket_size_in_minutes": "Időintervallum mérete",
           "use_day_of_week": "Hét napjai szerinti mintázatok tanulása",
           "use_month_of_year": "Havi mintázatok figyelembevétele",
           "use_season": "Évszakok szerinti mintázatok figyelembevétele",
@@ -107,13 +107,13 @@
         "description": "Az előrejelző tanulási sebességének, alkalmazkodóképességének és modellstabilitásának finomhangolása.",
         "data": {
           "preset": "Működési profil",
-          "adaptive_half_life": "Adaptív tanulási sebesség",
+          "enable_adaptive_half_life": "Adaptív felezési idő",
           "adaptive_prune_interval": "Adaptív modell tisztítás",
           "adaptive_persistence": "Adaptív állapotstabilitás"
         },
         "data_description": {
           "preset": "Válasszon működési profilt:\n\n- Stabil: Következetes mintázatú eszközökhöz (pl. TV, esti világítás, fűtés).\n- Mérsékelt: Enyhén változékony használatú eszközökhöz (pl. háztartási gépek).\n- Dinamikus: Gyorsan változó viselkedéshez (pl. jelenlét érzékelés, manuális vezérlés).\n- Egyedi: Minden paraméter manuális beállítása.",
-          "adaptive_half_life": "Engedélyezi az adaptív tanulási sebességet, amely a modell tanulási felezési idejét a megfigyelt mintázatok stabilitása alapján módosítja. Stabil mintázatok esetén a rendszer lassabban felejti a múltat, változékony mintázatok esetén gyorsabban alkalmazkodik.",
+          "enable_adaptive_half_life": "Ha engedélyezve van, a rendszer automatikusan módosítja a tanulási felezési időt a mintázatok stabilitása alapján. Bekapcsolt állapotban a rendszer gyorsabban alkalmazkodik változékony mintázatokhoz, és lassabban felejt stabil viselkedés esetén.",
           "adaptive_prune_interval": "Engedélyezi a modell komplexitásának adaptív szabályozását. Stabil mintázatok esetén ritkábban történik a ritka mintázatok eltávolítása, változékony mintázatok esetén gyakoribb modelltisztítás történik.",
           "adaptive_persistence": "Engedélyezi az adaptív állapotátmeneti stabilitást. A rendszer megtanulja, hogy egyes állapotok természetüknél fogva tartósabbak lehetnek, és ennek megfelelően módosítja az állapotváltási valószínűségeket."
         }
@@ -125,7 +125,7 @@
           "half_life_hours": "Mintázatok felezési ideje (óra)",
           "short_term_error_half_life_factor": "Rövid távú alkalmazkodás sebessége",
           "long_term_error_half_life_factor": "Hosszú távú stabilitás",
-          "base_state_retention_strength": "Aktuális állapot megerősítési faktor",
+          "base_state_inertia_strength": "Állapot-inercia alapértéke",
           "persistence_half_life_factor": "Állapot-időtartam memória faktor",
           "fast_baseline_half_life_factor": "Gyors változások érzékenysége",
           "slow_baseline_half_life_factor": "Lassú változások követése",
@@ -138,7 +138,7 @@
           "half_life_hours": "Az alap tanulási felezési idő. Meghatározza, milyen gyorsan csökken a régi megfigyelések súlya exponenciális súlyozás esetén. Kisebb érték gyorsabb alkalmazkodást, nagyobb érték stabilabb, lassabban változó modellt eredményez.",
           "short_term_error_half_life_factor": "A rövid távú hibák súlycsökkenésének mértéke. Meghatározza, milyen gyorsan reagáljon a modell a friss előrejelzési eltérésekre. Kisebb érték gyorsabb korrekciót eredményez.",
           "long_term_error_half_life_factor": "A hosszú távú hibaemlékezet súlycsökkenési tényezője. Ez biztosít stabil referenciát a rövid távú ingadozások mellett, és csökkenti a túlreagálást.",
-          "base_state_retention_strength": "Meghatározza, hogy a modell mennyire erősítse meg az aktuális állapot valószínűségét rövid ideig az állapotváltás után. A megerősítés mértéke az eltelt idő és az elvárt állapot-időtartam arányától függ, és exponenciálisan csökken. Nagyobb érték → erősebb rövid távú állapot-megtartási hatás. Kisebb érték → gyengébb korrekció.",
+          "base_state_inertia_strength": "Meghatározza, hogy a modell mennyire erősítse meg az aktuális állapot valószínűségét rövid ideig az állapotváltás után. A megerősítés mértéke az eltelt idő és az elvárt állapot-időtartam arányától függ, és exponenciálisan csökken. Nagyobb érték → erősebb rövid távú állapot-megtartási hatás. Kisebb érték → gyengébb korrekció.",
           "persistence_half_life_factor": "Az állapot-időtartamokra alkalmazott exponenciális súlyozás felezési idejének szorzófaktora. A korábbi megfigyelések súlya exponenciálisan csökken a megadott felezési idő szerint.",
           "fast_baseline_half_life_factor": "A gyors baseline exponenciális súlyozásának felezési tényezője. Rövid időskálájú viselkedésváltozások érzékelésére szolgál.",
           "slow_baseline_half_life_factor": "A lassú baseline exponenciális súlyozásának felezési tényezője. Hosszú távú viselkedési trendek stabil követésére szolgál.",

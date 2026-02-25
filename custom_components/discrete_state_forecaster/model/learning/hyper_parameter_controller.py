@@ -89,7 +89,7 @@ class HyperParameterController:
                 half_life=runtime_parameters.base_half_life,  # TODO: ez nem fog atmenni...
                 min_prune_interval_factor=runtime_parameters.min_prune_interval_factor,
                 prune_enabled=True,
-                persistence_strength=runtime_parameters.base_state_retention_strength,
+                persistence_strength=runtime_parameters.base_state_inertia_strength,
             )
         )
         self._runtime_parameters: Final[HyperParameterControllerRuntimeParameters] = (

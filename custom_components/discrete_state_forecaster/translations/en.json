@@ -27,13 +27,13 @@
         "description": "Fine-tune learning speed, adaptability, and model stability.",
         "data": {
           "preset": "Behavior profile",
-          "adaptive_half_life": "Adaptive learning speed",
+          "enable_adaptive_half_life": "Adaptive learning speed",
           "adaptive_prune_interval": "Adaptive model pruning",
           "adaptive_persistence": "Adaptive state stability"
         },
         "data_description": {
           "preset": "Choose a behavior profile:\n\n- Stable: For devices with consistent behavior patterns (e.g., TV, lighting, heating).\n- Moderate: For moderately variable usage patterns (e.g., household appliances).\n- Dynamic: For highly variable behavior (e.g., presence detection, manual control).\n- Custom: Manually configure all parameters.",
-          "adaptive_half_life": "Enables adaptive learning speed by adjusting the learning half-life based on pattern stability. Stable patterns are remembered longer, while unstable patterns are adapted faster.",
+          "enable_adaptive_half_life": "Enables adaptive learning speed by adjusting the learning half-life based on pattern stability. Stable patterns are remembered longer, while unstable patterns are adapted faster.",
           "adaptive_prune_interval": "Controls model complexity adaptively. Stable patterns are pruned less frequently, while highly variable patterns trigger more frequent cleanup.",
           "adaptive_persistence": "Enables adaptive state transition stability. The system learns that some states are naturally more persistent than others and adjusts transition probabilities accordingly."
         }
@@ -45,7 +45,7 @@
           "half_life_hours": "Pattern half-life (hours)",
           "short_term_error_half_life_factor": "Short-term adaptation speed",
           "long_term_error_half_life_factor": "Long-term stability memory",
-          "base_state_retention_strength": "Base state persistence strength",
+          "base_state_inertia_strength": "Base state persistence strength",
           "persistence_half_life_factor": "State duration memory factor",
           "fast_baseline_half_life_factor": "Fast change sensitivity",
           "slow_baseline_half_life_factor": "Slow trend tracking",
@@ -58,7 +58,7 @@
           "half_life_hours": "Base learning half-life. Controls how quickly old observations lose weight in exponential smoothing. Smaller values enable faster adaptation, larger values create more stable models.",
           "short_term_error_half_life_factor": "Decay rate of short-term prediction errors. Controls how quickly the model reacts to recent prediction deviations.",
           "long_term_error_half_life_factor": "Decay rate of long-term error memory, providing stable reference behavior against short-term fluctuations.",
-          "base_state_retention_strength": "Base influence of current state persistence when calculating predictions.",
+          "base_state_inertia_strength": "Base influence of current state persistence when calculating predictions.",
           "persistence_half_life_factor": "Defines the half-life of learned state duration statistics. The effective half-life is calculated as base_half_life × persistence_half_life_factor. Smaller values make the model adapt faster to changes in typical state durations. Larger values make state persistence more stable over time.",
           "fast_baseline_half_life_factor": "Half-life factor for fast baseline tracking to detect short-term behavior changes.",
           "slow_baseline_half_life_factor": "Half-life factor for slow baseline tracking to capture long-term behavioral trends.",
