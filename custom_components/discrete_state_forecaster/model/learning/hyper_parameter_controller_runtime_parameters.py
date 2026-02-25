@@ -46,7 +46,7 @@ class HyperParameterControllerRuntimeParameters:
     adaptation_config: AdaptationConfig
     """Configuration for which hyper-parameters should be adapted."""
 
-    base_persistence_strength: float
+    base_state_retention_strength: float
     """Strength of persistence modeling (0.0 = no persistence, 1.0 = full persistence)."""
 
     min_prune_interval_factor: float = 5.0

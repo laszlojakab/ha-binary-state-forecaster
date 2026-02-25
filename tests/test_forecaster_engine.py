@@ -98,7 +98,7 @@ def create_test_parameters(
         hyper_parameter_controller=HyperParameterControllerRuntimeParameters(
             min_prune_interval_factor=min_prune_interval_factor,
             base_half_life=half_life,
-            base_persistence_strength=persistence_strength,
+            base_state_retention_strength=persistence_strength,
             adaptation_config=AdaptationConfig(
                 adapt_half_life=True, adapt_prune_interval=False
             ),

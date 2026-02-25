@@ -15,9 +15,9 @@ from .const import (
     CONF_ADAPTIVE_PRUNE_INTERVAL,
     CONF_ADAPTIVE_TAU,
     CONF_ADVANCED_CONFIGURATION,
-    CONF_BASE_PERSISTENCE_STRENGTH,
-    CONF_BASE_PERSISTENCE_STRENGTH_MAX,
-    CONF_BASE_PERSISTENCE_STRENGTH_MIN,
+    CONF_BASE_STATE_RETENTION_STRENGTH,
+    CONF_BASE_STATE_RETENTION_STRENGTH_MAX,
+    CONF_BASE_STATE_RETENTION_STRENGTH_MIN,
     CONF_FAST_BASELINE_HALF_LIFE_FACTOR,
     CONF_FAST_BASELINE_HALF_LIFE_FACTOR_MAX,
     CONF_FAST_BASELINE_HALF_LIFE_FACTOR_MIN,
@@ -215,21 +215,21 @@ def get_custom_preset_schema(options_user_input: dict[str, Any] | None = None):
             ),
         ),
         vol.Required(
-            CONF_BASE_PERSISTENCE_STRENGTH,
+            CONF_BASE_STATE_RETENTION_STRENGTH,
             default=options_user_input.get(
-                CONF_BASE_PERSISTENCE_STRENGTH,
+                CONF_BASE_STATE_RETENTION_STRENGTH,
                 current_preset.get(
-                    CONF_BASE_PERSISTENCE_STRENGTH,
+                    CONF_BASE_STATE_RETENTION_STRENGTH,
                     PRESET_CONFIGURATIONS[DEFAULT_PRESET][
-                        CONF_BASE_PERSISTENCE_STRENGTH
+                        CONF_BASE_STATE_RETENTION_STRENGTH
                     ],
                 ),
             ),
         ): vol.All(
             vol.Coerce(float),
             vol.Range(
-                min=CONF_BASE_PERSISTENCE_STRENGTH_MIN,
-                max=CONF_BASE_PERSISTENCE_STRENGTH_MAX,
+                min=CONF_BASE_STATE_RETENTION_STRENGTH_MIN,
+                max=CONF_BASE_STATE_RETENTION_STRENGTH_MAX,
             ),
         ),
         vol.Required(

@@ -19,7 +19,7 @@ from custom_components.discrete_state_forecaster.model.learning.hyper_parameter_
 
 def create_test_runtime_parameters(  # noqa: PLR0913
     base_half_life: float = 300.0,
-    base_persistence_strength: float = 0.95,
+    base_state_retention_strength: float = 0.95,
     min_prune_interval_factor: float = 5.0,
     min_half_life: float = 60.0,
     max_half_life: float = 3600.0 * 48,
@@ -35,7 +35,7 @@ def create_test_runtime_parameters(  # noqa: PLR0913
             adapt_persistence=adapt_persistence,
             adapt_prune_interval=adapt_prune_interval,
         ),
-        base_persistence_strength=base_persistence_strength,
+        base_state_retention_strength=base_state_retention_strength,
         min_prune_interval_factor=min_prune_interval_factor,
         min_half_life=min_half_life,
         max_half_life=max_half_life,
@@ -59,7 +59,7 @@ class TestHyperParameterControllerInitialization:
         """Test initialization with custom runtime parameters."""
         rp = create_test_runtime_parameters(
             base_half_life=500.0,
-            base_persistence_strength=0.8,
+            base_state_retention_strength=0.8,
             min_prune_interval_factor=10.0,
         )
         controller = HyperParameterController(runtime_parameters=rp)
@@ -298,7 +298,7 @@ class TestPersistenceAdaptation:
         """Test that persistence doesn't adapt when adaptation is disabled."""
         rp = create_test_runtime_parameters(
             base_half_life=300.0,
-            base_persistence_strength=0.95,
+            base_state_retention_strength=0.95,
             adapt_persistence=False,
         )
         controller = HyperParameterController(runtime_parameters=rp)
@@ -678,7 +678,7 @@ class TestAdaptationConfiguration:
         """Test that all parameters stay constant when adaptation is disabled."""
         rp = create_test_runtime_parameters(
             base_half_life=300.0,
-            base_persistence_strength=0.95,
+            base_state_retention_strength=0.95,
             min_prune_interval_factor=5.0,
             adapt_half_life=False,
             adapt_persistence=False,
