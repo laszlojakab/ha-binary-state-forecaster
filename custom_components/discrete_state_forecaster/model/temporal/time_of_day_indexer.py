@@ -12,7 +12,7 @@ The bucket size is configurable, allowing for different time resolutions:
 - 60 seconds: 1-minute buckets (1440 buckets per day)
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Final, Self
 
 from .time_indexer import (
@@ -139,5 +139,9 @@ class TimeOfDayIndexer(TimeIndexer):
         minutes = (next_bucket_start % 3600) // 60
         seconds = next_bucket_start % 60
 
+        # If the boundary overflows past midnight, advance to the next day
+        if hours >= 24:
+            return (timestamp + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+
         # Construct the next boundary datetime
-        return timestamp.replace(hour=hours % 24, minute=minutes, second=seconds, microsecond=0)
+        return timestamp.replace(hour=hours, minute=minutes, second=seconds, microsecond=0)

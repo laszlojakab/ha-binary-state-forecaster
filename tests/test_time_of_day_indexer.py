@@ -1,6 +1,6 @@
 """Unit tests for TimeOfDayIndexer."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Self
 
 import pytest
@@ -253,6 +253,75 @@ class TestTimeOfDayIndexerEdgeCases:
             timestamp = datetime(2024, 1, 15, hour, 30)
             key = await indexer.get_key(timestamp)
             assert key.parts == (("time_bucket", 0),)
+
+
+class TestTimeOfDayIndexerNextBoundary:
+    """Tests for TimeOfDayIndexer.next_boundary method."""
+
+    @pytest.mark.asyncio
+    async def test_mid_day_returns_next_hour_boundary(self: Self) -> None:
+        """Test that a mid-day time returns the next hour boundary."""
+        indexer = TimeOfDayIndexer(bucket_size=3600)
+        ts = datetime(2024, 1, 15, 14, 30)
+        boundary = await indexer.next_boundary(ts)
+        assert boundary == datetime(2024, 1, 15, 15, 0, 0, 0)
+
+    @pytest.mark.asyncio
+    async def test_exact_boundary_returns_next_boundary(self: Self) -> None:
+        """Test that a time exactly on a boundary returns the following boundary."""
+        indexer = TimeOfDayIndexer(bucket_size=3600)
+        ts = datetime(2024, 1, 15, 14, 0, 0)
+        boundary = await indexer.next_boundary(ts)
+        assert boundary == datetime(2024, 1, 15, 15, 0, 0, 0)
+
+    @pytest.mark.asyncio
+    async def test_last_bucket_of_day_returns_next_day_midnight(self: Self) -> None:
+        """
+        Regression test: next_boundary for the last time-bucket of the day must
+        return midnight of the NEXT day, not midnight of the same day (which is in
+        the past and would cause async_track_point_in_time to never fire).
+        """
+        indexer = TimeOfDayIndexer(bucket_size=3600)
+        # 23:30 is inside the last 1-hour bucket (23:00–23:59)
+        ts = datetime(2024, 1, 15, 23, 30)
+        boundary = await indexer.next_boundary(ts)
+        assert boundary == datetime(2024, 1, 16, 0, 0, 0, 0)
+
+    @pytest.mark.asyncio
+    async def test_last_bucket_15min_returns_next_day_midnight(self: Self) -> None:
+        """Regression test with 15-minute buckets: 23:45 must return next-day midnight."""
+        indexer = TimeOfDayIndexer(bucket_size=900)
+        ts = datetime(2024, 1, 15, 23, 45)
+        boundary = await indexer.next_boundary(ts)
+        assert boundary == datetime(2024, 1, 16, 0, 0, 0, 0)
+
+    @pytest.mark.asyncio
+    async def test_boundary_is_strictly_after_timestamp(self: Self) -> None:
+        """Test that the returned boundary is always strictly after the input."""
+        indexer = TimeOfDayIndexer(bucket_size=900)
+        for hour in range(24):
+            for minute in [0, 14, 15, 44, 45, 59]:
+                ts = datetime(2024, 6, 1, hour, minute, 0)
+                boundary = await indexer.next_boundary(ts)
+                assert boundary > ts, (
+                    f"next_boundary({ts}) returned {boundary}, which is not strictly after"
+                )
+
+    @pytest.mark.asyncio
+    async def test_preserves_date_context_within_day(self: Self) -> None:
+        """Test that the date is correct for a mid-day boundary."""
+        indexer = TimeOfDayIndexer(bucket_size=3600)
+        ts = datetime(2024, 3, 20, 10, 0, 0)
+        boundary = await indexer.next_boundary(ts)
+        assert boundary.date() == ts.date()
+
+    @pytest.mark.asyncio
+    async def test_timezone_aware_last_bucket(self: Self) -> None:
+        """Test midnight wrap for timezone-aware datetimes."""
+        indexer = TimeOfDayIndexer(bucket_size=3600)
+        ts = datetime(2024, 1, 15, 23, 30, tzinfo=timezone.utc)
+        boundary = await indexer.next_boundary(ts)
+        assert boundary == datetime(2024, 1, 16, 0, 0, 0, 0, tzinfo=timezone.utc)
 
 
 class TestTimeOfDayIndexerEquality:
