@@ -543,6 +543,80 @@ class TestHierarchicalStateStatsIntegration:
         # so we just check that it's possible to get a result
 
 
+class TestHierarchicalStateStatsPerKeyDecay:
+    """Tests ensuring per-key observation-weighted decay preserves dormant keys."""
+
+    def test_dormant_seasonal_key_not_decayed_by_other_season(self: Self) -> None:
+        """
+        The central regression test: statistics that were learned for one
+        season (e.g. winter) must not be eroded while a different season
+        (summer) is receiving new observations.
+        """
+        hp = create_test_hp()
+        rp = create_test_rp(min_support_factor=0.001)
+        stats = HierarchicalStateStats(hp, rp)
+
+        winter_key = TimeKey(("season", "winter"))
+        summer_key = TimeKey(("season", "summer"))
+
+        # Learn a strong winter pattern.
+        stats.update(winter_key, "heating", weight=1000.0)
+
+        # Simulate many summer observations using per-key decay.
+        decay = 0.9
+        for _ in range(50):
+            stats.update(summer_key, "cooling", weight=10.0, decay_factor=decay)
+
+        # The GLOBAL ancestor is touched by both seasons, so it will have
+        # decayed. But the raw winter key itself must still hold most of its
+        # support because it was never updated (and therefore never decayed).
+        winter_result = stats.predict(winter_key)
+        assert winter_result is not None
+
+        # Find the contribution that comes directly from the winter key.
+        winter_contribution = next(
+            (c for c in winter_result.contributions if c.key == winter_key), None
+        )
+        assert winter_contribution is not None, (
+            "winter_key contribution must show up in the prediction fallback"
+        )
+        # The winter key should still carry close to its original 1000-unit support.
+        assert winter_contribution.support > 900.0, (
+            f"Expected winter support > 900, got {winter_contribution.support}"
+        )
+
+    def test_per_key_decay_affects_only_current_hierarchy(self: Self) -> None:
+        """
+        When a specific TimeKey is updated with a decay_factor, only the keys
+        in its hierarchy (the key itself and all its ancestors) should be
+        decayed; sibling keys at the same level must be unchanged.
+        """
+        hp = create_test_hp()
+        rp = create_test_rp(min_support_factor=0.001)
+        stats = HierarchicalStateStats(hp, rp)
+
+        key_a = TimeKey(("hour", 10))
+        key_b = TimeKey(("hour", 22))
+
+        stats.update(key_a, "on", weight=200.0)
+        stats.update(key_b, "on", weight=200.0)
+
+        # Note: both keys share the GLOBAL ancestor, so GLOBAL will be
+        # decayed when key_a is updated.  But the key_b distribution itself
+        # must remain untouched.
+        stats.update(key_a, "on", weight=0.0, decay_factor=0.5)
+
+        result_b = stats.predict(key_b)
+        assert result_b is not None
+
+        # key_b's own distribution was not updated -> not decayed.
+        key_b_contribution = next(
+            (c for c in result_b.contributions if c.key == key_b), None
+        )
+        assert key_b_contribution is not None
+        assert abs(key_b_contribution.support - 200.0) < 1e-9
+
+
 class TestHierarchicalStateStatsSerialization:
     """Tests for HierarchicalStateStats serialization and deserialization."""
 

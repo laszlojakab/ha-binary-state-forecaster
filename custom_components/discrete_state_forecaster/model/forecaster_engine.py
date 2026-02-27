@@ -243,12 +243,18 @@ class ForecasterEngine:
                     f"current timestamp is {timestamp}"
                 )
 
-            # Update with the PREVIOUS state and its duration
-            self._stats.update(key, self._current_state, weight=duration)
-
-            # TODO: apply decay elobb vagy kesobb?
-            # Apply decay to all statistics based on the time elapsed since the last update
-            self._stats.apply_decay(self._get_decay_factor(duration))
+            # Update with the PREVIOUS state and its duration.
+            # The decay factor is passed directly so that only the keys that
+            # are part of the current temporal context (and their ancestors)
+            # are decayed.  Dormant keys – e.g. a ``season=winter`` slot
+            # observed during summer – are left untouched, preventing long-term
+            # seasonal statistics from eroding while they are not active.
+            self._stats.update(
+                key,
+                self._current_state,
+                weight=duration,
+                decay_factor=self._get_decay_factor(duration),
+            )
         else:
             duration = 0.0
 

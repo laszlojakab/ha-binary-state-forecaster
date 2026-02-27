@@ -465,3 +465,66 @@ class TestKeyedDistributionStoreSerialization:
     def test_from_dict_handles_empty_mapping(self: Self) -> None:
         restored = KeyedDistributionStore.from_dict({})
         assert restored.get_distribution("any") is None
+
+
+class TestKeyedDistributionStorePerKeyDecay:
+    """Tests for per-key observation-weighted decay via update(decay_factor=...)."""
+
+    def test_decay_applied_only_to_updated_key(self: Self) -> None:
+        """Only the key receiving an update should be decayed; dormant keys stay intact."""
+        store = KeyedDistributionStore()
+        store.update("active", "on", 100.0)
+        store.update("dormant", "on", 100.0)
+
+        # Update the active key with decay; the dormant key should be untouched.
+        store.update("active", "on", 10.0, decay_factor=0.5)
+
+        active_support = store.get_distribution("active").total_support
+        dormant_support = store.get_distribution("dormant").total_support
+
+        # active: 100 * 0.5 + 10 = 60
+        assert abs(active_support - 60.0) < 1e-9
+        # dormant: unchanged at 100
+        assert abs(dormant_support - 100.0) < 1e-9
+
+    def test_decay_not_applied_to_newly_created_key(self: Self) -> None:
+        """A decay_factor for a brand-new key should be ignored (nothing to decay yet)."""
+        store = KeyedDistributionStore()
+        store.update("fresh", "on", 50.0, decay_factor=0.1)
+
+        # The first write creates the key; decay has nothing to apply to.
+        assert abs(store.get_distribution("fresh").total_support - 50.0) < 1e-9
+
+    def test_decay_applied_before_new_observation(self: Self) -> None:
+        """Decay must happen BEFORE the new weight is added, not after."""
+        store = KeyedDistributionStore()
+        store.update("k", "on", 100.0)
+
+        # Decay 0.5 then add 50: expected = 100*0.5 + 50 = 100
+        store.update("k", "on", 50.0, decay_factor=0.5)
+
+        assert abs(store.get_distribution("k").total_support - 100.0) < 1e-9
+
+    def test_no_decay_when_factor_is_none(self: Self) -> None:
+        """decay_factor=None (default) does not change existing support."""
+        store = KeyedDistributionStore()
+        store.update("k", "on", 80.0)
+        store.update("k", "off", 20.0, decay_factor=None)
+
+        # 'on' must be untouched; 'off' is simply added
+        support_on = store.get_distribution("k").to_dict()["states"]["on"]["support"]
+        assert abs(support_on - 80.0) < 1e-9
+
+    def test_multiple_active_keys_each_decay_independently(self: Self) -> None:
+        """When two keys are updated in sequence each decays only itself."""
+        store = KeyedDistributionStore()
+        store.update("a", "x", 200.0)
+        store.update("b", "x", 200.0)
+        store.update("c", "x", 200.0)  # never updated again
+
+        store.update("a", "x", 0.0, decay_factor=0.5)  # a: 200*0.5 = 100
+        store.update("b", "x", 0.0, decay_factor=0.25)  # b: 200*0.25 = 50
+
+        assert abs(store.get_distribution("a").total_support - 100.0) < 1e-9
+        assert abs(store.get_distribution("b").total_support - 50.0) < 1e-9
+        assert abs(store.get_distribution("c").total_support - 200.0) < 1e-9

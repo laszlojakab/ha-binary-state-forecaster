@@ -57,23 +57,34 @@ class KeyedDistributionStore:
         key: TimeKey,
         state: Hashable,
         weight: float = 1.0,
+        decay_factor: float | None = None,
     ) -> None:
         """
         Updates state support in the distribution for a given key.
 
         Creates a new DistributionStats for the key if it doesn't exist yet.
-        Then updates the specified state with the given weight.
+        If `decay_factor` is provided, applies it to the existing distribution
+        **before** adding the new observation. This implements per-key
+        observation-weighted decay: a key only decays when it receives a new
+        observation, so dormant keys (e.g. a ``season=winter`` key observed
+        during summer) are frozen in place rather than silently eroded.
 
         Args:
             key: The TimeKey identifying which distribution to update.
             state: The state to update.
             weight: The weight to add to the state. Defaults to 1.0.
+            decay_factor: Optional decay factor in range (0, 1] to apply to
+                this key's distribution before writing the new observation.
+                When ``None`` (default) no decay is applied, preserving the
+                previous bulk-decay behaviour.
 
         """
         stats = self._store.get(key)
         if stats is None:
             stats = DistributionStats()
             self._store[key] = stats
+        elif decay_factor is not None:
+            stats.apply_decay(decay_factor)
 
         stats.update(state, weight)
 

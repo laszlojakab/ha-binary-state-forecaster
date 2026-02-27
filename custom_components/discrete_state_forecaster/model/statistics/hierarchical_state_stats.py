@@ -92,6 +92,7 @@ class HierarchicalStateStats:
         key: TimeKey,
         state: State,
         weight: float,
+        decay_factor: float | None = None,
     ) -> None:
         """
         Updates state statistics at all levels of the temporal hierarchy.
@@ -107,14 +108,24 @@ class HierarchicalStateStats:
         This allows the model to learn different patterns at different levels
         of temporal granularity.
 
+        If `decay_factor` is provided it is forwarded to the underlying store
+        so that each ancestor key is decayed **in-place** just before the new
+        observation is written. Keys that are *not* part of the current
+        hierarchy (e.g. ``season=winter`` keys during summer) are not touched
+        and therefore retain their accumulated statistics intact.
+
         Args:
             key: The specific TimeKey at which the state was observed.
             state: The state that was observed.
             weight: The weight to increment for this observation.
+            decay_factor: Optional decay factor in range (0, 1] to apply to
+                each ancestor key's distribution before writing the new
+                observation. When ``None`` (default) no per-key decay is
+                applied.
 
         """
         for ancestor in key.hierarchy():
-            self._stats.update(ancestor, state, weight)
+            self._stats.update(ancestor, state, weight, decay_factor=decay_factor)
 
     def predict(self: Self, key: TimeKey) -> PredictionResult | None:
         """
