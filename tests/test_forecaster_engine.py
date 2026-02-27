@@ -483,3 +483,164 @@ class TestForecasterEngineIntegration:
         # Error tracking should work internally
         prediction = engine.predict(key)
         assert prediction is not None
+
+
+class TestForecasterEngineBackgroundDecay:
+    """Tests for the background_decay_half_life_factor feature."""
+
+    def _create_engine_with_bg_decay(
+        self: Self,
+        half_life: float,
+        background_decay_half_life_factor: float,
+    ) -> ForecasterEngine:
+        """Create an engine with background decay enabled."""
+        params = ForecasterEngineRuntimeParameters(
+            hierarchical_state_stats=HierarchicalStateStatsRuntimeParameters(
+                min_support_factor=0.001
+            ),
+            short_term_error_tracker=OnlineErrorTrackerRuntimeParameters(
+                error_half_life_factor=1.0
+            ),
+            long_term_error_tracker=OnlineErrorTrackerRuntimeParameters(
+                error_half_life_factor=10.0
+            ),
+            state_persistence_tracker=StatePersistenceTrackerRuntimeParameters(
+                persistence_half_life_factor=1.0
+            ),
+            drift_monitor=DriftMonitorRuntimeParameters(
+                slow_baseline=DurationWeightedBaselineRuntimeParameters(
+                    half_life_factor=20.0,
+                    prune_threshold=1e-6,
+                    epsilon=1e-9,
+                ),
+                fast_baseline=DurationWeightedBaselineRuntimeParameters(
+                    half_life_factor=1.5,
+                    prune_threshold=1e-6,
+                    epsilon=1e-9,
+                ),
+                drift_stats=DriftStatsRuntimeParameters(half_life_factor=30.0),
+                tau_enter=0.1,
+                tau_exit=0.05,
+                adaptive_tau=True,
+                n_enter=3,
+                n_exit=5,
+            ),
+            hyper_parameter_controller=HyperParameterControllerRuntimeParameters(
+                min_prune_interval_factor=5.0,
+                base_half_life=half_life,
+                base_state_inertia_strength=0.5,
+                adaptation_config=AdaptationConfig(
+                    adapt_half_life=False,
+                    adapt_prune_interval=False,
+                    adapt_persistence=False,
+                ),
+                background_decay_half_life_factor=background_decay_half_life_factor,
+            ),
+        )
+        return ForecasterEngine(params)
+
+    def test_background_decay_disabled_dormant_key_unchanged(self: Self) -> None:
+        """With factor=0, dormant keys must not decay between updates."""
+        half_life = 100.0
+        engine = self._create_engine_with_bg_decay(half_life, 0.0)
+
+        winter_key = TimeKey(("season", "winter"))
+        summer_key = TimeKey(("season", "summer"))
+
+        # Fill winter with strong support.
+        for i in range(20):
+            engine.update(winter_key, "heating", timestamp=float(i * 50))
+
+        winter_support_before = (
+            engine.predict(winter_key).confidence.support
+        )
+
+        # Now run many summer updates.  Winter should not be touched at all.
+        base_ts = 1000.0
+        for i in range(100):
+            engine.update(summer_key, "cooling", timestamp=base_ts + i * 50)
+
+        winter_result = engine.predict(winter_key)
+        assert winter_result is not None
+        # No background decay → winter support identical to before the summer run.
+        assert abs(winter_result.confidence.support - winter_support_before) < 1e-6
+
+    def test_background_decay_enabled_dormant_key_erodes(self: Self) -> None:
+        """With factor>0, the winter-key-specific distribution erodes during summer.
+
+        After enough background decay the winter_key's own distribution falls below
+        the min-support threshold and ``predict(winter_key)`` falls back to GLOBAL.
+        GLOBAL is dominated by the massive number of summer 'cooling' observations,
+        so the predicted state should flip from 'heating' to 'cooling'.
+        """
+        half_life = 100.0
+        factor = 2.0  # background half-life = 2 * 100 = 200 s (aggressive for testing)
+        engine = self._create_engine_with_bg_decay(half_life, factor)
+
+        winter_key = TimeKey(("season", "winter"))
+        summer_key = TimeKey(("season", "summer"))
+
+        # Fill winter with a strong 'heating' pattern.
+        for i in range(30):
+            engine.update(winter_key, "heating", timestamp=float(i * 50))
+
+        # Verify that winter pattern is recognized before summer starts.
+        before = engine.predict(winter_key)
+        assert before is not None
+        assert before.distribution.get("heating", 0.0) > 0.5
+
+        # Run many summer updates over a long period (200 * 250 = 50 000 s >> 200 s background HL).
+        # This floods GLOBAL with 'cooling' data and background-decays the winter_key distribution.
+        base_ts = float(30 * 50) + 50.0
+        for i in range(200):
+            engine.update(summer_key, "cooling", timestamp=base_ts + i * 250)
+
+        after = engine.predict(winter_key)
+        assert after is not None
+
+        # The winter_key-specific distribution should have been wiped out by background decay.
+        # The fallback goes to GLOBAL which now has mostly 'cooling'.
+        # Either the winter_key no longer contributes (only GLOBAL in contributions),
+        # or the dominant state has switched from 'heating' to 'cooling'.
+        winter_contribution = next(
+            (c for c in after.contributions if c.key == winter_key), None
+        )
+        cooling_dominates = after.distribution.get("cooling", 0.0) > after.distribution.get("heating", 0.0)
+        winter_specific_gone = winter_contribution is None or winter_contribution.support < 1.0
+
+        assert cooling_dominates or winter_specific_gone, (
+            f"Expected winter-specific distribution to erode: "
+            f"dist={after.distribution}, contributions={after.contributions}"
+        )
+
+    def test_background_decay_slower_than_active_decay(self: Self) -> None:
+        """Background decay on a dormant key must be much slower than active decay."""
+        half_life = 100.0
+        factor = 20.0
+        engine = self._create_engine_with_bg_decay(half_life, factor)
+
+        key_active = TimeKey(("slot", "a"))
+        key_dormant = TimeKey(("slot", "b"))
+
+        # Give both keys equal support.
+        for i in range(30):
+            engine.update(key_active, "on", timestamp=float(i * 50))
+            engine.update(key_dormant, "on", timestamp=float(i * 50))
+
+        support_active_start = engine.predict(key_active).confidence.support
+        support_dormant_start = engine.predict(key_dormant).confidence.support
+
+        # Now only update the active key for a while.
+        base_ts = 1500.0
+        for i in range(50):
+            engine.update(key_active, "on", timestamp=base_ts + i * 50)
+
+        support_active_end = engine.predict(key_active).confidence.support
+        support_dormant_end = engine.predict(key_dormant).confidence.support
+
+        active_drop = support_active_start - support_active_end
+        dormant_drop = support_dormant_start - support_dormant_end
+
+        # Active key accumulates new observations so it may even grow;
+        # the key assertion is that the dormant key decays much less.
+        assert dormant_drop < active_drop or support_dormant_end > support_dormant_start * 0.5

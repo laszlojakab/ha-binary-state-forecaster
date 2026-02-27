@@ -575,8 +575,8 @@ class TestBaselineAdaptation:
                 entropy_confidence=0.8,
             )
 
-        decreased_log_half_life = controller._log_half_life
         initial_baseline = controller._baseline_log_half_life
+        decreased_log_half_life = controller.hyper_parameters.half_life
 
         # Now stabilize - baseline should slowly approach current half-life
         for _ in range(100):

@@ -255,6 +255,13 @@ class ForecasterEngine:
                 weight=duration,
                 decay_factor=self._get_decay_factor(duration),
             )
+
+            # Optionally apply a slow background decay to ALL keys (including
+            # dormant ones) so that completely stale data eventually fades out.
+            # Only active when background_decay_half_life_factor > 0.
+            bg_factor = self._get_background_decay_factor(duration)
+            if bg_factor is not None:
+                self._stats.apply_decay(bg_factor)
         else:
             duration = 0.0
 
@@ -538,3 +545,29 @@ class ForecasterEngine:
         return 2 ** (
             -duration / self._hyper_parameter_controller.hyper_parameters.half_life
         )
+
+    def _get_background_decay_factor(self: Self, duration: float) -> float | None:
+        """
+        Calculates the slow background decay factor applied to all keys.
+
+        Used when ``background_decay_half_life_factor > 0``.  The effective
+        half-life for background decay is::
+
+            background_half_life = background_decay_half_life_factor * half_life
+
+        and the decay factor is::
+
+            decay = 2^(-duration / background_half_life)
+
+        Args:
+            duration: Time duration in seconds.
+
+        Returns:
+            Decay factor between 0 and 1, or ``None`` if background decay is
+            disabled (``background_decay_half_life_factor == 0``).
+        """
+        hp = self._hyper_parameter_controller.hyper_parameters
+        factor = hp.background_decay_half_life_factor
+        if factor <= 0.0:
+            return None
+        return 2 ** (-duration / (factor * hp.half_life))

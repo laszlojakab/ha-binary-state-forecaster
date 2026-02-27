@@ -90,6 +90,7 @@ class HyperParameterController:
                 min_prune_interval_factor=runtime_parameters.min_prune_interval_factor,
                 prune_enabled=True,
                 persistence_strength=runtime_parameters.base_state_inertia_strength,
+                background_decay_half_life_factor=runtime_parameters.background_decay_half_life_factor,
             )
         )
         self._runtime_parameters: Final[HyperParameterControllerRuntimeParameters] = (
@@ -292,4 +293,5 @@ class HyperParameterController:
             min_prune_interval_factor=min_prune_interval_factor,
             prune_enabled=prune_enabled,
             persistence_strength=persistence_strength,
+            background_decay_half_life_factor=self._runtime_parameters.background_decay_half_life_factor,
         )

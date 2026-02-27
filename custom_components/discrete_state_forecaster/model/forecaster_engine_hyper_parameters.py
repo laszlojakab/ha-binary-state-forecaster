@@ -24,6 +24,12 @@ class ForecasterEngineHyperParameters:
         _min_prune_interval_factor: Current minimum pruning interval factor.
         _prune_enabled: Whether pruning is currently enabled.
         _persistence_strength: Current persistence modeling strength.
+        _background_decay_half_life_factor: Multiplier for background (dormant-key)
+            decay.  ``0.0`` disables background decay entirely (pure per-key
+            observation-weighted decay).  A positive value ``f`` causes all
+            keys to receive a slow background decay whose effective half-life
+            is ``f * half_life``; e.g. ``20.0`` means dormant keys decay
+            20× slower than actively observed keys.
 
     Example:
         >>> hp = ForecasterEngineHyperParameters(
@@ -49,6 +55,7 @@ class ForecasterEngineHyperParameters:
         min_prune_interval_factor: float,
         prune_enabled: bool,
         persistence_strength: float,
+        background_decay_half_life_factor: float = 0.0,
     ) -> None:
         """
         Initialize forecaster engine hyper-parameters.
@@ -58,12 +65,17 @@ class ForecasterEngineHyperParameters:
             min_prune_interval_factor: Minimum interval factor for pruning.
             prune_enabled: Whether pruning is enabled.
             persistence_strength: Strength of persistence modeling (0.0 to 1.0).
+            background_decay_half_life_factor: Multiplier for background decay
+                applied to all keys (including dormant ones) at each update.
+                ``0.0`` (default) disables background decay.  A positive value
+                ``f`` gives dormant keys a half-life of ``f * half_life``.
 
         """
         self._half_life: float = half_life
         self._min_prune_interval_factor: float = min_prune_interval_factor
         self._prune_enabled: bool = prune_enabled
         self._persistence_strength: float = persistence_strength
+        self._background_decay_half_life_factor: float = background_decay_half_life_factor
 
     def update(
         self: Self,
@@ -72,6 +84,7 @@ class ForecasterEngineHyperParameters:
         min_prune_interval_factor: float | None = None,
         prune_enabled: bool | None = None,
         persistence_strength: float | None = None,
+        background_decay_half_life_factor: float | None = None,
     ) -> None:
         """
         Update hyper-parameters with new values.
@@ -84,6 +97,8 @@ class ForecasterEngineHyperParameters:
             min_prune_interval_factor: New pruning interval factor (if provided).
             prune_enabled: New pruning enabled state (if provided).
             persistence_strength: New persistence strength (if provided).
+            background_decay_half_life_factor: New background decay multiplier
+                (if provided).  ``0.0`` disables background decay.
 
         """
         if half_life is not None:
@@ -94,6 +109,8 @@ class ForecasterEngineHyperParameters:
             self._prune_enabled = prune_enabled
         if persistence_strength is not None:
             self._persistence_strength = persistence_strength
+        if background_decay_half_life_factor is not None:
+            self._background_decay_half_life_factor = background_decay_half_life_factor
 
     @property
     def half_life(self: Self) -> float:
@@ -139,6 +156,19 @@ class ForecasterEngineHyperParameters:
         """
         return self._min_prune_interval_factor
 
+    @property
+    def background_decay_half_life_factor(self: Self) -> float:
+        """
+        Get background decay half-life multiplier.
+
+        Returns:
+            Multiplier applied to ``half_life`` to obtain the effective
+            half-life for background (dormant-key) decay.  ``0.0`` means
+            background decay is disabled.
+
+        """
+        return self._background_decay_half_life_factor
+
     def to_dict(self: Self) -> dict[str, Any]:
         """
         Serialize hyper-parameters to a dictionary.
@@ -152,6 +182,7 @@ class ForecasterEngineHyperParameters:
             "min_prune_interval_factor": self._min_prune_interval_factor,
             "prune_enabled": self._prune_enabled,
             "persistence_strength": self._persistence_strength,
+            "background_decay_half_life_factor": self._background_decay_half_life_factor,
         }
 
     @classmethod
@@ -171,4 +202,7 @@ class ForecasterEngineHyperParameters:
             min_prune_interval_factor=data["min_prune_interval_factor"],
             prune_enabled=data["prune_enabled"],
             persistence_strength=data["persistence_strength"],
+            background_decay_half_life_factor=data.get(
+                "background_decay_half_life_factor", 0.0
+            ),
         )
