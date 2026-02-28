@@ -88,7 +88,7 @@ class HyperParameterController:
         """
         self._hyper_parameters: Final[ForecasterEngineHyperParameters] = (
             ForecasterEngineHyperParameters(
-                half_life=runtime_parameters.base_half_life,  # TODO: ez nem fog atmenni...
+                half_life=runtime_parameters.base_half_life,
                 min_prune_interval_factor=runtime_parameters.min_prune_interval_factor,
                 prune_enabled=True,
                 persistence_strength=runtime_parameters.base_state_inertia_strength,
@@ -100,9 +100,8 @@ class HyperParameterController:
         )
 
         self._half_life: float = runtime_parameters.base_half_life
-        # TODO.JL: ha adaptiv be van kapcsolva, majd kikapcsolja akkor a serializalas 
-        # miatt ez nem fog menni felulirodni
         self._baseline_half_life: float = runtime_parameters.base_half_life
+        self._initial_half_life: Final = runtime_parameters.base_half_life
 
         self._min_half_life: float = self._runtime_parameters.min_half_life
         self._max_half_life: float = self._runtime_parameters.max_half_life
@@ -118,6 +117,14 @@ class HyperParameterController:
             The HyperParameters instance being controlled.
 
         """
+        if self._initial_half_life != self._runtime_parameters.base_half_life:
+            # Reset to initial half-life if runtime parameter has changed, ensuring that changes to
+            # the base half-life are respected.
+            self._initial_half_life = self._runtime_parameters.base_half_life
+            self._half_life = self._initial_half_life
+            self._baseline_half_life = self._initial_half_life
+            self._hyper_parameters.update(half_life=self._initial_half_life)
+
         return self._hyper_parameters
 
     @property
@@ -198,6 +205,7 @@ class HyperParameterController:
             "hyper_parameters": self._hyper_parameters.to_dict(),
             "half_life": self._half_life,
             "baseline_half_life": self._baseline_half_life,
+            "initial_half_life": self._initial_half_life,
         }
 
     @classmethod
@@ -222,10 +230,9 @@ class HyperParameterController:
         instance._hyper_parameters = ForecasterEngineHyperParameters.from_dict(
             data["hyper_parameters"]
         )
-        instance._half_life = data.get("half_life", runtime_parameters.base_half_life)
-        instance._baseline_half_life = data.get(
-            "baseline_half_life", runtime_parameters.base_half_life
-        )
+        instance._half_life = data["half_life"]
+        instance._baseline_half_life = data["baseline_half_life"]
+        instance._initial_half_life = data["initial_half_life"]
 
         return instance
 
