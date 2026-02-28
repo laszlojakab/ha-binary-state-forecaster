@@ -57,17 +57,3 @@ class HyperParameterControllerRuntimeParameters:
 
     max_half_life: float = 3600.0 * 8760
     """Upper bound for half-life adaptation (in seconds, default: 1 year)."""
-
-    background_decay_half_life_factor: float = 0.0
-    """
-    Multiplier for background (dormant-key) decay.
-
-    ``0.0`` disables background decay completely (pure per-key
-    observation-weighted decay, the default).  A positive value ``f`` causes
-    *all* keys – including dormant ones – to receive a slow exponential decay
-    whose effective half-life is ``f * base_half_life``.  For example,
-    ``20.0`` means dormant keys (e.g. ``season=winter`` slots during summer)
-    decay 20× slower than actively observed keys, preventing completely stale
-    data from persisting indefinitely while still preserving long-term seasonal
-    statistics across off-season periods.
-    """

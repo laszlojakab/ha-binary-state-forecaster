@@ -534,8 +534,8 @@ class TestForecasterEngineBackgroundDecay:
                     adapt_prune_interval=False,
                     adapt_persistence=False,
                 ),
-                background_decay_half_life_factor=background_decay_half_life_factor,
             ),
+            background_decay_half_life_factor=background_decay_half_life_factor,
         )
         return ForecasterEngine(params)
 

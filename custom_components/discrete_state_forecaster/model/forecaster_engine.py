@@ -166,6 +166,7 @@ class ForecasterEngine:
         Args:
             parameters: Runtime parameters for configuring the engine's behavior.
         """
+        self._parameters = parameters
         self._hyper_parameter_controller: Final = HyperParameterController(
             runtime_parameters=parameters.hyper_parameter_controller,
         )
@@ -566,8 +567,10 @@ class ForecasterEngine:
             Decay factor between 0 and 1, or ``None`` if background decay is
             disabled (``background_decay_half_life_factor == 0``).
         """
-        hp = self._hyper_parameter_controller.hyper_parameters
-        factor = hp.background_decay_half_life_factor
+        factor = self._parameters.background_decay_half_life_factor
         if factor <= 0.0:
             return None
-        return 2 ** (-duration / (factor * hp.half_life))
+        return 2 ** (
+            -duration
+            / (factor * self._hyper_parameter_controller.hyper_parameters.half_life)
+        )

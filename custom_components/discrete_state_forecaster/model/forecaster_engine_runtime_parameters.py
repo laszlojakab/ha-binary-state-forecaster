@@ -39,3 +39,13 @@ class ForecasterEngineRuntimeParameters:
 
     hyper_parameter_controller: Final[HyperParameterControllerRuntimeParameters]
     """Runtime parameters for hyperparameter control."""
+
+    background_decay_half_life_factor: float = 0.0
+    """
+    Multiplier for background (dormant-key) decay.
+
+    ``0.0`` disables background decay completely (pure per-key
+    observation-weighted decay, the default).  A positive value ``f`` causes
+    *all* keys – including dormant ones – to receive a slow exponential decay
+    whose effective half-life is ``f * base_half_life``.
+    """
