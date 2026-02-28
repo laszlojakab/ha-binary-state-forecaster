@@ -437,30 +437,10 @@ class DiscreteStateForecasterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN
         )
         title = f"{entity_name} Forecast"
 
-        config_data = {
-            CONF_TARGET_ENTITY_ID: user_input[CONF_TARGET_ENTITY_ID],
-        }
+        target_entity = user_input.pop(CONF_TARGET_ENTITY_ID)
 
-        # Store initial options (indexers and prediction settings)
-        options_data = {
-            CONF_PRESET: user_input.get(CONF_PRESET, PRESET_MODERATE),
-            CONF_TIME_BUCKET_SIZE_IN_MINUTES: int(
-                user_input.get(
-                    CONF_TIME_BUCKET_SIZE_IN_MINUTES,
-                    DEFAULT_TIME_BUCKET_SIZE_IN_MINUTES,
-                )
-            ),
-            CONF_USE_DAY_OF_WEEK: user_input.get(
-                CONF_USE_DAY_OF_WEEK, DEFAULT_USE_DAY_OF_WEEK
-            ),
-            CONF_USE_MONTH_OF_YEAR: user_input.get(
-                CONF_USE_MONTH_OF_YEAR, DEFAULT_USE_MONTH_OF_YEAR
-            ),
-            CONF_USE_SEASON: user_input.get(CONF_USE_SEASON, DEFAULT_USE_SEASON),
-            CONF_HALF_LIFE_HOURS: user_input.get(
-                CONF_HALF_LIFE_HOURS, DEFAULT_HALF_LIFE_HOURS
-            ),
-            #     CONF_CALENDAR_FEATURES: user_input.get(CONF_CALENDAR_FEATURES, []),
+        config_data = {
+            CONF_TARGET_ENTITY_ID: target_entity,
         }
 
         LOGGER.info(
@@ -470,7 +450,7 @@ class DiscreteStateForecasterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN
         )
 
         return self.async_create_entry(
-            title=title, data=config_data, options=options_data
+            title=title, data=config_data, options=user_input
         )
 
     async def async_step_custom_preset(

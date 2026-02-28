@@ -246,14 +246,6 @@ class DiscreteStateForecasterCoordinator(
         self._next_time_bucket_start_at = None
         self._current_time_bucket_start_at = None
 
-        #         # Get persistence settings from options
-        #         state_persistence_factor = config_entry.options.get(
-        #             CONF_STATE_PERSISTENCE_FACTOR, DEFAULT_STATE_PERSISTENCE_FACTOR
-        #         )
-        #         adaptive_persistence = config_entry.options.get(
-        #             CONF_ADAPTIVE_PERSISTENCE, DEFAULT_ADAPTIVE_PERSISTENCE
-        #         )
-
         self._forecaster = TimeAwareForecaster(
             StructuralParameters(
                 indexer=self._composite_indexer,
@@ -568,6 +560,7 @@ class DiscreteStateForecasterCoordinator(
         if use_month:
             indexers.append(MonthIndexer())
 
+        # Season indexer (optional)
         use_season = options.get(CONF_USE_SEASON, DEFAULT_USE_SEASON)
         if use_season:
             indexers.append(SeasonIndexer())
