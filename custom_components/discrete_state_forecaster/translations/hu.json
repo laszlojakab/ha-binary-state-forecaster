@@ -52,7 +52,8 @@
           "min_prune_interval_factor": "XXXX - Mintázatok tisztításának gyakorisága",
           "adaptive_tau": "XXXX - Automatikus drift küszöbérték-hangolás",
           "tau_enter": "XXXX - Drift belépési küszöb",
-          "tau_exit": "XXXX - Drift kilépési küszöb"
+          "tau_exit": "XXXX - Drift kilépési küszöb",
+          "background_decay_half_life_factor": "Háttér-lecsengés felezési tényező"
         },
         "data_description": {
           "half_life_hours": "Az alap időskála, amely meghatározza, milyen gyorsan csökken a régi megfigyelések hatása a modell tanulása során.\n\nA többi tanulási paraméter ehhez az értékhez viszonyítva kerül meghatározásra. \nKisebb érték gyorsabb alkalmazkodást, nagyobb érték stabilabb, lassabban változó mintázatokat eredményez.",
@@ -65,7 +66,8 @@
           "min_prune_interval_factor": "Meghatározza, milyen gyakran történjen a ritkán használt mintázatok eltávolítása. Nagyobb érték ritkább tisztítást jelent.",
           "adaptive_tau": "Engedélyezi a drift küszöbértékek automatikus hangolását a minta stabilitása alapján. Stabil viselkedés esetén szigorúbb, változékony esetben megengedőbb működést eredményez.",
           "tau_enter": "A drift statisztika felső küszöbértéke. Ha a gyors és lassú baseline közötti eltérés ezt meghaladja, a rendszer új viselkedési rezsimet érzékel.",
-          "tau_exit": "A drift statisztika alsó küszöbértéke. Ha az eltérés ez alá csökken, a rendszer visszatér a normál működési állapotba. A tau_enter értéknél alacsonyabbnak kell lennie a hiszterézis biztosításához."
+          "tau_exit": "A drift statisztika alsó küszöbértéke. Ha az eltérés ez alá csökken, a rendszer visszatér a normál működési állapotba. A tau_enter értéknél alacsonyabbnak kell lennie a hiszterézis biztosításához.",
+          "background_decay_half_life_factor": "Az összes tárolt mintázatra – köztük a ritkán észleltekre – alkalmazott háttér-lecsengés szorzófaktora. A 0 érték teljesen kikapcsolja a háttér-lecsengést (alapértelmezett). Pozitív érték esetén minden tárolt mintázat lassan lecseng az idő múlásával. A tényleges lecsengési felezési időt a következőképpen számítja a rendszer: background_decay_half_life_factor × alap_felezési_idő. Kisebb pozitív értékkel (pl. 5–20) fokozatosan elfelejthetők azok az elavult mintázatok, amelyeket már nem figyelnek meg."
         }
       }
     },
@@ -132,7 +134,8 @@
           "min_prune_interval_factor": "Mintázatok tisztításának gyakorisága",
           "adaptive_tau": "Automatikus drift küszöbérték-hangolás",
           "tau_enter": "Drift belépési küszöb",
-          "tau_exit": "Drift kilépési küszöb"
+          "tau_exit": "Drift kilépési küszöb",
+          "background_decay_half_life_factor": "Háttér-lecsengés felezési tényező"
         },
         "data_description": {
           "half_life_hours": "Az alap tanulási felezési idő. Meghatározza, milyen gyorsan csökken a régi megfigyelések súlya exponenciális súlyozás esetén. Kisebb érték gyorsabb alkalmazkodást, nagyobb érték stabilabb, lassabban változó modellt eredményez.",
@@ -145,7 +148,8 @@
           "min_prune_interval_factor": "Meghatározza, milyen gyakran történjen a ritkán használt mintázatok eltávolítása. Nagyobb érték ritkább tisztítást jelent.",
           "adaptive_tau": "Engedélyezi a drift küszöbértékek automatikus hangolását a minta stabilitása alapján. Stabil viselkedés esetén szigorúbb, változékony esetben megengedőbb működést eredményez.",
           "tau_enter": "A drift statisztika felső küszöbértéke. Ha a gyors és lassú baseline közötti eltérés ezt meghaladja, a rendszer új viselkedési rezsimet érzékel.",
-          "tau_exit": "A drift statisztika alsó küszöbértéke. Ha az eltérés ez alá csökken, a rendszer visszatér a normál működési állapotba. A tau_enter értéknél alacsonyabbnak kell lennie a hiszterézis biztosításához."
+          "tau_exit": "A drift statisztika alsó küszöbértéke. Ha az eltérés ez alá csökken, a rendszer visszatér a normál működési állapotba. A tau_enter értéknél alacsonyabbnak kell lennie a hiszterézis biztosításához.",
+          "background_decay_half_life_factor": "Az összes tárolt mintázatra – köztük a ritkán észleltekre – alkalmazott háttér-lecsengés szorzófaktora. A 0 érték teljesen kikapcsolja a háttér-lecsengést (alapértelmezett). Pozitív érték esetén minden tárolt mintázat lassan lecseng az idő múlásával. A tényleges lecsengési felezési időt a következőképpen számítja a rendszer: background_decay_half_life_factor × alap_felezési_idő. Kisebb pozitív értékkel (pl. 5–20) fokozatosan elfelejthetők azok az elavult mintázatok, amelyeket már nem figyelnek meg."
         }
       }
     }

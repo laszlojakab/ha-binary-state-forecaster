@@ -87,6 +87,7 @@ from custom_components.discrete_state_forecaster.model.time_aware_forecaster imp
 from .const import (
     #     CONF_ADAPTIVE_PERSISTENCE,
     #     CONF_CALENDAR_FEATURES,
+    CONF_BACKGROUND_DECAY_HALF_LIFE_FACTOR,
     CONF_HALF_LIFE_HOURS,
     #     CONF_STATE_PERSISTENCE_FACTOR,
     CONF_TARGET_ENTITY_ID,
@@ -228,6 +229,9 @@ class DiscreteStateForecasterCoordinator(
                     adapt_prune_interval=False,
                     adapt_persistence=False,
                 ),
+            ),
+            background_decay_half_life_factor=config_entry.options.get(
+                CONF_BACKGROUND_DECAY_HALF_LIFE_FACTOR, 0.0
             ),
         )
 
@@ -684,6 +688,10 @@ class DiscreteStateForecasterCoordinator(
 
         self._runtime_parameters.hyper_parameter_controller.base_half_life = (
             half_life_hours * 3600
+        )
+
+        self._runtime_parameters.background_decay_half_life_factor = (
+            config_entry.options.get(CONF_BACKGROUND_DECAY_HALF_LIFE_FACTOR, 0.0)
         )
 
         # Trigger update to refresh all entities

@@ -12,6 +12,9 @@ from .const import (
     CONF_ADAPTIVE_PRUNE_INTERVAL,
     CONF_ADAPTIVE_TAU,
     CONF_ADVANCED_CONFIGURATION,
+    CONF_BACKGROUND_DECAY_HALF_LIFE_FACTOR,
+    CONF_BACKGROUND_DECAY_HALF_LIFE_FACTOR_MAX,
+    CONF_BACKGROUND_DECAY_HALF_LIFE_FACTOR_MIN,
     CONF_BASE_STATE_INERTIA_STRENGTH,
     CONF_BASE_STATE_INERTIA_STRENGTH_MAX,
     CONF_BASE_STATE_INERTIA_STRENGTH_MIN,
@@ -344,6 +347,24 @@ def get_custom_preset_schema(options_user_input: dict[str, Any] | None = None):
             vol.Range(
                 min=CONF_MIN_PRUNE_INTERVAL_FACTOR_MIN,
                 max=CONF_MIN_PRUNE_INTERVAL_FACTOR_MAX,
+            ),
+        ),
+        vol.Required(
+            CONF_BACKGROUND_DECAY_HALF_LIFE_FACTOR,
+            default=options_user_input.get(
+                CONF_BACKGROUND_DECAY_HALF_LIFE_FACTOR,
+                current_preset.get(
+                    CONF_BACKGROUND_DECAY_HALF_LIFE_FACTOR,
+                    PRESET_CONFIGURATIONS[DEFAULT_PRESET][
+                        CONF_BACKGROUND_DECAY_HALF_LIFE_FACTOR
+                    ],
+                ),
+            ),
+        ): vol.All(
+            vol.Coerce(float),
+            vol.Range(
+                min=CONF_BACKGROUND_DECAY_HALF_LIFE_FACTOR_MIN,
+                max=CONF_BACKGROUND_DECAY_HALF_LIFE_FACTOR_MAX,
             ),
         ),
     }
