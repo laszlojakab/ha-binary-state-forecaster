@@ -49,7 +49,9 @@ class HyperParameterController:
     Attributes:
         _hyper_parameters: Configuration object to update.
         _runtime_parameters: Runtime parameters for hyper-parameter control.
-        _log_half_life: Log of current half-life (for smooth exponential updates).
+        _half_life: Current half-life value.
+        _baseline_half_life: Baseline half-life; adapts toward _half_life
+            only in STABLE mode, providing a stable reference that ignores transient drifts.
         _min_half_life: Lower bound for half-life.
         _max_half_life: Upper bound for half-life.
         _mode: Current adaptation mode.
@@ -96,6 +98,11 @@ class HyperParameterController:
         self._runtime_parameters: Final[HyperParameterControllerRuntimeParameters] = (
             runtime_parameters
         )
+
+        self._half_life: float = runtime_parameters.base_half_life
+        # TODO.JL: ha adaptiv be van kapcsolva, majd kikapcsolja akkor a serializalas 
+        # miatt ez nem fog menni felulirodni
+        self._baseline_half_life: float = runtime_parameters.base_half_life
 
         self._min_half_life: float = self._runtime_parameters.min_half_life
         self._max_half_life: float = self._runtime_parameters.max_half_life
@@ -189,6 +196,8 @@ class HyperParameterController:
         return {
             "mode": self._mode.name,
             "hyper_parameters": self._hyper_parameters.to_dict(),
+            "half_life": self._half_life,
+            "baseline_half_life": self._baseline_half_life,
         }
 
     @classmethod
@@ -212,6 +221,10 @@ class HyperParameterController:
         instance._mode = AdaptationMode[data["mode"]]
         instance._hyper_parameters = ForecasterEngineHyperParameters.from_dict(
             data["hyper_parameters"]
+        )
+        instance._half_life = data.get("half_life", runtime_parameters.base_half_life)
+        instance._baseline_half_life = data.get(
+            "baseline_half_life", runtime_parameters.base_half_life
         )
 
         return instance
@@ -242,18 +255,26 @@ class HyperParameterController:
                 # so we increase the half-life slightly to reinforce memory of stable patterns.
                 log_change = +0.01
 
-            half_life = math.exp(
-                max(
-                    math.log(self._min_half_life),
-                    min(
-                        math.log(self._max_half_life),
-                        math.log(self._runtime_parameters.base_half_life) + log_change,
-                    ),
-                )
+            self._half_life = max(
+                self._min_half_life,
+                min(
+                    self._max_half_life,
+                    self._half_life * math.exp(log_change),
+                ),
             )
+
+            # Baseline adapts toward current half-life only in stable mode,
+            # so transient drifts don't permanently shift the baseline reference.
+            if self._mode == AdaptationMode.STABLE:
+                self._baseline_half_life += (
+                    self._half_life - self._baseline_half_life
+                ) * 0.01
+
+            half_life = self._half_life
         else:
             # We reset to baseline half-life
             half_life = self._runtime_parameters.base_half_life
+            self._half_life = half_life
 
         # ---- persistence derived from half-life ----
         ratio = (half_life - self._min_half_life) / (

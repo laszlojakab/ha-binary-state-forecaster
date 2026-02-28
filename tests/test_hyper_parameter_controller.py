@@ -559,7 +559,7 @@ class TestBaselineAdaptation:
         controller = HyperParameterController(runtime_parameters=rp)
 
         # Access private attribute for testing
-        assert controller._baseline_log_half_life == controller._log_half_life
+        assert controller._baseline_half_life == controller._half_life
 
     def test_baseline_adapts_in_stable_mode(self) -> None:
         """Test that baseline adapts toward current half-life in stable mode."""
@@ -575,8 +575,8 @@ class TestBaselineAdaptation:
                 entropy_confidence=0.8,
             )
 
-        initial_baseline = controller._baseline_log_half_life
-        decreased_log_half_life = controller.hyper_parameters.half_life
+        initial_baseline = controller._baseline_half_life
+        decreased_half_life = controller._half_life
 
         # Now stabilize - baseline should slowly approach current half-life
         for _ in range(100):
@@ -587,22 +587,22 @@ class TestBaselineAdaptation:
                 entropy_confidence=0.8,
             )
 
-        final_baseline = controller._baseline_log_half_life
-        final_log_half_life = controller._log_half_life
+        final_baseline = controller._baseline_half_life
+        final_half_life = controller._half_life
 
         # Baseline should have moved toward decreased value (but not all the way)
         assert final_baseline < initial_baseline
         # Baseline should be between initial and current
-        assert decreased_log_half_life < final_baseline < initial_baseline
+        assert decreased_half_life < final_baseline < initial_baseline
         # Current half-life should have increased from the decreased level
-        assert final_log_half_life > decreased_log_half_life
+        assert final_half_life > decreased_half_life
 
     def test_baseline_does_not_adapt_in_drift_mode(self) -> None:
         """Test that baseline doesn't adapt when not in stable mode."""
         rp = create_test_runtime_parameters(base_half_life=300.0)
         controller = HyperParameterController(runtime_parameters=rp)
 
-        initial_baseline = controller._baseline_log_half_life
+        initial_baseline = controller._baseline_half_life
 
         # Apply drift updates
         for _ in range(10):
@@ -613,7 +613,7 @@ class TestBaselineAdaptation:
                 entropy_confidence=0.8,
             )
 
-        final_baseline = controller._baseline_log_half_life
+        final_baseline = controller._baseline_half_life
 
         # Baseline should not have changed
         assert final_baseline == initial_baseline
@@ -636,15 +636,15 @@ class TestBaselineAdaptation:
         data = controller.to_dict()
 
         # Should include baseline
-        assert "baseline_log_half_life" in data
-        assert "log_half_life" in data
+        assert "baseline_half_life" in data
+        assert "half_life" in data
 
         # Deserialize
         controller2 = HyperParameterController.from_dict(data, rp)
 
         # Baselines should match
-        assert controller2._baseline_log_half_life == controller._baseline_log_half_life
-        assert controller2._log_half_life == controller._log_half_life
+        assert controller2._baseline_half_life == controller._baseline_half_life
+        assert controller2._half_life == controller._half_life
 
 
 class TestAdaptationConfiguration:
